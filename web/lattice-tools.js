@@ -600,7 +600,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     planes.push({
       id: ++nextId,
       hkl: [1, 0, 0],
-      m: 0,
+      m: 1,
       family: false,
       visible: true,
       color: PLANE_COLORS[planes.length % PLANE_COLORS.length],

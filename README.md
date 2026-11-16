@@ -39,7 +39,7 @@ Open `/?example=forsterite` for a worked example using the Mg end member of oliv
 
 ## Planes, directions and symmetry
 
-Choose **Lattice** in the sidebar. **＋ Plane** adds a Miller-index plane with integer indices and a fractional offset m in hx + ky + lz = m. **Family** draws the parallel planes at m + n for integer n intersecting the displayed extent. Changing m moves the whole family. Each plane reports its interplanar spacing in ångströms. The Lattice **Labels** toggle annotates added planes and directions. **＋ Arrow** adds a direct-lattice [uvw] vector with a fractional origin and a length multiplier.
+Choose **Lattice** in the sidebar. **＋ Plane** adds a Miller-index plane with integer indices and an editable fractional offset m in hx + ky + lz = m, starting at m = 1. This makes common planes such as (110) and (111) visible within a single unit cell. **Family** draws the parallel planes at m + n for integer n intersecting the displayed extent. Changing m moves the whole family. Each plane reports its interplanar spacing in ångströms. The Lattice **Labels** toggle annotates added planes and directions. **＋ Arrow** adds a direct-lattice [uvw] vector with a fractional origin and a length multiplier.
 
 **Elements** shows symmetry axes, planes and inversion centers derived from the imported CIF operations. Use the type filters to examine rotation, screw, rotoinversion, inversion, mirror or glide elements. The **Operations** list shows their fractional-coordinate equations. Generated overlays are clipped to the plotting extent. A status note identifies any generation limit.
 
