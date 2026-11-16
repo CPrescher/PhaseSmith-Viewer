@@ -138,13 +138,19 @@ async def desktop(browser, width, height, touch, theme):
         cdp = await context.new_cdp_session(page)
         await cdp.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": cx, "y": cy, "id": 1}]})
         await cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [{"x": cx + box["width"] * 0.45, "y": cy, "id": 1}]})
-        await page.wait_for_timeout(900)
+        # A software renderer may advance the intentionally frame-capped
+        # fine tuner more slowly. Hold until a shell actually changes;
+        # this still requires live feedback before releasing the pointer.
+        await page.wait_for_function("before => document.getElementById('pair-count-1').textContent !== before", arg=counts0, timeout=15000)
         await cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
     else:
         await page.mouse.move(cx, cy)
         await page.mouse.down()
         await page.mouse.move(cx + box["width"] * 0.45, cy, steps=4)
-        await page.wait_for_timeout(900)
+        # A software renderer may advance the intentionally frame-capped
+        # fine tuner more slowly. Hold until a shell actually changes;
+        # this still requires live feedback before releasing the pointer.
+        await page.wait_for_function("before => document.getElementById('pair-count-1').textContent !== before", arg=counts0, timeout=15000)
         await page.mouse.up()
     await page.wait_for_timeout(250)
     frames = await page.evaluate(STOP)
