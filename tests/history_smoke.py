@@ -263,7 +263,20 @@ async def check(browser, phone):
     await page.mouse.up(button="right")
     await idle(page)
     assert await count() == n + 1
-    await roundtrip(before, await state(page))
+    panned = await state(page)
+    # Settling history recreates TrackballControls. It must preserve the
+    # quaternion for the panned target before the next anchored zoom.
+    exposed = await page.evaluate("""viewerDiagnostics().atoms.find(a => a.visible &&
+      document.elementFromPoint(a.x, a.y)?.tagName === 'CANVAS')""")
+    assert exposed
+    await page.mouse.move(exposed["x"], exposed["y"])
+    await page.mouse.wheel(0, -60)
+    await idle(page)
+    zoomed_atom = next(a for a in (await diagnostics(page))["atoms"] if a["key"] == exposed["key"])
+    assert math.dist([zoomed_atom["x"], zoomed_atom["y"]], [exposed["x"], exposed["y"]]) < .5
+    await roundtrip(panned, await state(page))
+    await press("#history-undo")
+    await roundtrip(before, panned)
     if not phone:
         # Back-to-back gestures remain separate even before damping settles.
         n = await count()

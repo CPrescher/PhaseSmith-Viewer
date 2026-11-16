@@ -146,6 +146,11 @@ function initialize() {
     controls = createControls(target);
     controls.minDistance = minDistance;
     controls.maxDistance = maxDistance;
+    // TrackballControls' constructor looks at its default origin before
+    // createControls installs the real target. Restore the camera's pose
+    // now, including its quaternion, so a subsequent anchored zoom uses
+    // the panned view's basis even before another render runs.
+    controls.update();
   }
   // Studio lighting fixed to the view: the lights live in a rig whose
   // orientation follows the rendered camera every frame, so the crystal
@@ -3222,6 +3227,7 @@ function initialize() {
     if (refit) reset(true);
     else invalidate();
     boundDetails();
+    if (historyReady) placeHistoryControls();
     if (syncHistory) {
       const { camera, activeView } = exportHistoryState();
       history.amend({ camera, activeView });
@@ -3252,8 +3258,12 @@ function initialize() {
     onVisibility(tool, visible) {
       if (tool === "style") styleEditor.setOpen(visible);
       if (tool === "export" && visible) updateExportInfo();
+      if (historyReady) placeHistoryControls();
     },
-    onChange: () => scheduleSave(),
+    onChange: () => {
+      scheduleSave();
+      if (historyReady) placeHistoryControls();
+    },
   });
 
   // Light/dark theme: CSS follows data-theme; scene overlays that carry
@@ -3542,6 +3552,16 @@ function initialize() {
     typeof value === "number" ? Number(value.toPrecision(12)) : value,
   ) === JSON.stringify(b, (key, value) => typeof value === "number" ? Number(value.toPrecision(12)) : value);
   const history = createHistory({ limit: 100, equal: historyEqual });
+  function placeHistoryControls() {
+    const row = $("history-controls");
+    const compact = $("app").dataset.profile !== "float";
+    const window = [...document.querySelectorAll(".tool-window")].find((el) => !el.hidden);
+    const head = compact && window?.querySelector(".tool-window-head");
+    row.classList.toggle("in-window", Boolean(head));
+    if (head) head.querySelector(".tool-window-title").after(row);
+    else document.querySelector(".view-directions").append(row);
+  }
+  placeHistoryControls();
   let historyTimer = 0, historyLabel = "Change view", pressedHistoryLabel = "Change view", cameraGesture = false, historyKeyHeld = false;
   const historyPointers = new Set();
   const historyAvailable = () => historyReady && !historyApplying && saveSuspended === 0 && !exporter.busy && $("loading").hidden;
@@ -3568,7 +3588,9 @@ function initialize() {
     if (!historyReady || historyApplying || saveSuspended > 0) return;
     // Stop residual trackball inertia at an action boundary. Subsequent
     // frames cannot move a camera whose snapshot has already been stored.
-    if (cameraGesture) stopMotion();
+    const moving = cameraGesture;
+    cameraGesture = false;
+    if (moving) stopMotion();
     if (pendingBuild) {
       cancelScheduledBuild();
       build(); // include the last live edit and its resulting selection
