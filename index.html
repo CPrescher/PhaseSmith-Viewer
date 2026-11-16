@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101d2d" />
+    <title>PhaseSmith · Crystal Viewer</title>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <a class="brand" href="./"
+          ><span class="brand-mark">◇</span
+          ><span>PhaseSmith <b>Viewer</b></span></a
+        ><button id="open" class="primary">
+          ＋ Open CIF <span class="desktop">file</span></button
+        ><input id="file" type="file" accept=".cif,.mcif,text/plain" hidden />
+      </header>
+      <main>
+        <aside>
+          <div class="eyebrow">STRUCTURE</div>
+          <h1 id="name">Loading example…</h1>
+          <p id="source" class="muted">Local, private, in your browser.</p>
+          <label id="block-wrap" hidden
+            >Data block<select id="block"></select
+          ></label>
+          <div id="stats" class="stats"></div>
+          <section>
+            <div class="section-title">
+              Elements <span id="element-count"></span>
+            </div>
+            <div id="elements" class="elements"></div>
+          </section>
+          <section class="measurement">
+            <div class="section-title">
+              Measure distance
+              <button id="clear" class="text-button">Clear</button>
+            </div>
+            <div id="distance" class="distance" aria-live="polite">
+              — <span>Å</span>
+            </div>
+            <p id="selection">Tap two atoms to measure their separation.</p>
+            <div class="measurement-note">
+              Distance follows the selected visible atoms, including
+              cell-boundary images.
+            </div>
+          </section>
+          <section class="display">
+            <div class="section-title">Display</div>
+            <label class="toggle"
+              ><span>Unit cell</span
+              ><input id="cell" type="checkbox" checked /></label
+            ><label class="toggle"
+              ><span>Boundary atoms</span
+              ><input id="boundary" type="checkbox" checked /></label
+            ><label class="slider-label"
+              >Atom size<input
+                id="size"
+                type="range"
+                min="0.5"
+                max="1.5"
+                value="1"
+                step="0.05"
+            /></label>
+          </section>
+          <div id="warnings" class="warnings" hidden></div>
+        </aside>
+        <div id="viewport">
+          <div class="view-top">
+            <span></span
+            ><button id="reset" class="view-button" title="Reset view">
+              ↺ Reset view
+            </button>
+          </div>
+          <div id="measure-overlay" aria-live="polite" hidden></div>
+          <div id="error" role="alert" hidden></div>
+          <div id="loading">Reading crystal structure…</div>
+          <div class="view-bottom">
+            <span
+              ><b>Drag</b> rotate <i>·</i> <b>Pinch / scroll</b> zoom <i>·</i>
+              <b>Tap atom</b> measure</span
+            ><span id="atom-summary"></span>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="/web/main.js"></script>
+  </body>
+</html>

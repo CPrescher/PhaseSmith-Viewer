@@ -1,0 +1,17 @@
+{
+  "name": "phasesmith-viewer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "build:engine": "cargo build --locked --manifest-path engine/Cargo.toml --target wasm32-unknown-unknown --release && node scripts/copy-engine.mjs"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "vite": "^7.2.0"
+  },
+  "description": "Interactive crystal structures from CIF, with a local PhaseSmith WebAssembly engine."
+}
