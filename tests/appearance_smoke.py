@@ -64,16 +64,13 @@ async def check(browser, width, height):
     await page.locator("#style-open").tap()
     assert await opacity.input_value() == "20"
     await paint.tap()
-    await set_size(75)
+    assert not await size.is_visible()
     changed = await diagnostics(page)
     check_crystal(changed)
     faces = changed["faceMaterials"]
-    assert all(s["color"] == "#668df3" and s["scale"] == 0.75 for s in faces[0]["styles"])
+    assert all(s["color"] == "#668df3" and s["scale"] == 1 for s in faces[0]["styles"])
     assert faces[1]["styles"] == before["faceMaterials"][1]["styles"]
-    await set_size(140)
-    enlarged = await diagnostics(page)
-    check_crystal(enlarged)
-    assert all(s["scale"] == 1.4 for s in enlarged["faceMaterials"][0]["styles"])
+    assert [p["volume"] for p in changed["polyhedra"]] == [p["volume"] for p in before["polyhedra"]]
     await reset.tap()
     assert math.isclose((await diagnostics(page))["faceMaterials"][0]["opacity"], 0.34)
     assert (await diagnostics(page))["faceMaterials"][0]["styles"] == before["faceMaterials"][0]["styles"]
@@ -129,16 +126,18 @@ async def check(browser, width, height):
             if (await target.input_value()).startswith("poly:"):
                 break
     assert (await target.input_value()).startswith("poly:")
-    await set_size(65)
+    assert not await size.is_visible()
+    await paint.tap()
     now = await diagnostics(page)
-    assert sum(s["scale"] == 0.65 for face in now["faceMaterials"] for s in face["styles"]) == 1
+    assert all(s["scale"] == 1 for face in now["faceMaterials"] for s in face["styles"])
+    assert now["appearance"]["polyhedronOverrides"] == 1
     assert now["appearance"]["pickMarkerCount"] == 1
     assert not now["selectedIds"]
     await page.locator("#mode-pairs").tap()
     assert (await diagnostics(page))["appearance"]["pickMarkerCount"] == 0
     assert await page.evaluate("window.scrollY === 0")
     await page.close()
-    print(f"{width}×{height}: Mg radius/color, Si–O scale/color, geometry and reset verified")
+    print(f"{width}×{height}: Mg radius/color, Si–O true geometry/color, geometry and reset verified")
 
 
 async def main():

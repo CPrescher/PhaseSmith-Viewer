@@ -3,13 +3,12 @@
 // Scopes, from broad to narrow (narrower wins, "reset" falls back):
 //   element   – every atom of one element          (colour, radius scale)
 //   atom      – one plotted atom copy, by atom key (colour, radius scale)
-//   pair      – every polyhedron of one pair rule  (colour, display scale)
-//   polyhedron– one polyhedron, by rule + centre   (colour, display scale)
+//   pair      – every polyhedron of one pair rule  (colour)
+//   polyhedron– one polyhedron, by rule + centre   (colour)
 //
 // Nothing here touches coordinates, distances, cutoffs or coordination:
-// radius scale changes only the drawn sphere (and its hit radius), and
-// polyhedron scale shrinks faces and edges about the central atom for
-// display; 100 % is the true geometry.
+// radius scale changes only the drawn sphere (and its hit radius).
+// Polyhedron faces and edges always pass through the true neighbor positions.
 
 export const PALETTE = [
   "#ed7073",
@@ -49,7 +48,7 @@ export function polyhedronStyle(state, rule, centerKey, base) {
   const own = state.polyhedra.get(polyKey(rule.id, centerKey));
   return {
     color: own?.color ?? rule.color ?? base,
-    scale: own?.scale ?? rule.scale ?? 1,
+    scale: 1, // Ignore display scales from sessions saved by earlier versions.
   };
 }
 
@@ -74,6 +73,7 @@ export function createAppearanceEditor(host) {
     swatches = $("style-swatches"),
     custom = $("style-color"),
     size = $("style-size"),
+    sizeRow = $("style-size-row"),
     sizeName = $("style-size-name"),
     sizeValue = $("style-size-value"),
     hint = $("style-size-hint"),
@@ -213,7 +213,7 @@ export function createAppearanceEditor(host) {
     const info = target ? host.describe(target) : null;
     for (const control of [custom, size, opacity, reset, ...swatches.children])
       control.disabled = !info;
-    if (!info) opacityRow.hidden = true;
+    if (!info) opacityRow.hidden = sizeRow.hidden = hint.hidden = true;
     if (!info) {
       title.textContent = "Open a structure to edit colors and sizes.";
       resetIndividual.hidden = true;
@@ -227,21 +227,19 @@ export function createAppearanceEditor(host) {
         String(swatch.dataset.color.toLowerCase() === info.color.toLowerCase()),
       );
     const atom = info.kind === "atom";
-    sizeName.textContent = atom ? "Radius" : "Scale";
-    size.min = atom ? "30" : "20";
-    size.max = atom ? "250" : "200";
-    size.title = atom
-      ? "Drawn radius relative to the element default; picking follows it"
-      : "Display size about the central atom; 100% is the true polyhedron";
+    sizeRow.hidden = hint.hidden = !atom;
+    size.disabled = !atom;
+    sizeName.textContent = "Radius";
+    size.min = "30";
+    size.max = "250";
+    size.title = "Drawn radius relative to the element default; picking follows it";
     // Always-visible reference (touch has no tooltips).
-    hint.textContent = atom
-      ? "100% = element default radius · display only"
-      : "100% = true geometry · display only, about the central atom";
+    hint.textContent = "100% = element default radius · display only";
     hint.classList.toggle("off-true", info.scale !== 1);
-    size.value = String(Math.round(info.scale * 100));
+    size.value = String(Math.round((info.scale ?? 1) * 100));
     sizeValue.value = `${size.value}%`;
     size.setAttribute("aria-valuetext", `${size.value}%`);
-    size.setAttribute("aria-label", atom ? "Atom radius" : "Polyhedron display scale");
+    size.setAttribute("aria-label", "Atom radius");
     // Opacity only for polyhedron targets (never atoms).
     const hasOpacity = !atom && info.opacity != null;
     opacityRow.hidden = !hasOpacity;
@@ -257,9 +255,9 @@ export function createAppearanceEditor(host) {
     const kind = target.split(":")[0];
     const resets = {
       atom: ["Reset atom", "Remove this atom copy's own color and size; it then follows its element's current style"],
-      poly: ["Reset polyhedron", "Remove this polyhedron's own color and scale; it then follows its pair's current style"],
+      poly: ["Reset polyhedron", "Remove this polyhedron's own color; it then follows its pair's current style"],
       element: ["Reset element", "Restore the element's default color and radius, including its individually styled copies"],
-      pair: ["Reset pair", "Restore the pair's default color, scale and opacity, including its individually styled polyhedra"],
+      pair: ["Reset pair", "Restore the pair's default color and opacity, including its individually styled polyhedra"],
     }[kind] ?? ["Reset", "Restore the default style"];
     reset.textContent = resets[0];
     reset.title = resets[1];

@@ -71,7 +71,7 @@ Choose **Sites** in the sidebar to see the original CIF site labels, fractional 
 
 ## Changing colors and sizes
 
-Choose **Style** in the sidebar's mode bar (**Pairs · Style · Lattice · Sites · Extent**); the other tabs switch back. Choose an element to change all its spheres, or choose a pair to change all its polyhedra. Choose a swatch or a custom color, then adjust **Radius** or **Scale**. A polyhedron at 100% has its vertices at the coordinating atoms. Changing the display scale moves its faces and edges about the central atom. Distances use the original coordinates at every scale.
+Choose **Style** in the sidebar's mode bar (**Pairs · Style · Lattice · Sites · Extent**); the other tabs switch back. Choose an element to change its spheres' color and **Radius**, or a pair to change its polyhedra's color and **Opacity**. Polyhedron faces and edges always use the actual coordinating atom positions; saved display scales from earlier versions are ignored. Atom radius changes only the spheres drawn on screen.
 
 To highlight one copy, enable **Pick one** and tap a sphere or a polyhedron face. Individually styled copies stay in the target list, also after a restart. The reset button names its target. **Reset atom** or **Reset polyhedron** removes only that copy's own style, so it follows the current element or pair style again. **Reset element** or **Reset pair** restores the defaults of the whole element or pair, including its individually styled copies. **Reset all … individual styles** removes every individual override at once. Resets never change coordinates. Leave the Style tab to return to measuring.
 

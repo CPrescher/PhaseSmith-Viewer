@@ -1470,28 +1470,21 @@ function initialize() {
         model.add(cylinders);
       }
       // All polyhedra of a pair share one face mesh and one edge mesh.
-      // Per-polyhedron colour is a vertex colour; per-polyhedron display
-      // scale moves face and edge vertices together toward the central
-      // atom. Atom positions themselves are never moved.
+      // Per-polyhedron colour is a vertex colour. Faces and edges always
+      // use the actual neighbor coordinates.
       const positions = [],
         faceColors = [],
         edges = [],
         edgeColors = [],
         owners = [],
         styles = [],
-        tint = new THREE.Color(),
-        point = new THREE.Vector3();
+        tint = new THREE.Color();
       plan.hulls.forEach(({ center, vertices, hull }, owner) => {
         const key = atomKey(center);
         const style = polyhedronStyle(appearance, plan.rule, key, plan.color);
         styles.push({ center: key, color: style.color, scale: style.scale });
         tint.set(style.color);
-        const place = (atom) =>
-          point
-            .copy(atom.position)
-            .sub(center.position)
-            .multiplyScalar(style.scale)
-            .add(center.position);
+        const place = (atom) => atom.position;
         for (const face of hull.faces) {
           owners.push(owner);
           for (const i of face) {
@@ -2368,12 +2361,10 @@ function initialize() {
           title: `All ${pairName(rule)} polyhedra`,
           kind: "poly",
           color: ruleColor(rule),
-          scale: rule.scale ?? 1,
           opacity,
           opacityLabel: "Opacity",
           overridden:
             rule.color != null ||
-            rule.scale != null ||
             Math.abs(opacity - DEFAULT_FACE_OPACITY) > 1e-9 ||
             [...appearance.polyhedra.keys()].some((key) => key.startsWith(`${rule.id}|`)),
         };
@@ -2396,6 +2387,10 @@ function initialize() {
     // of those copies (e.g. a custom size when only color changes) stay.
     apply(value, patch, final) {
       const { type, id } = parseTarget(value);
+      if (type === "pair" || type === "poly") {
+        if (patch.color == null) return;
+        patch = { color: patch.color };
+      }
       const keys = Object.keys(patch);
       if (type === "element") {
         merge(appearance.elements, id, patch);
@@ -3191,7 +3186,6 @@ function initialize() {
         polyhedra: Boolean(r.polyhedra),
         opacity: r.opacity ?? DEFAULT_FACE_OPACITY,
         ...(r.color != null ? { color: r.color } : {}),
-        ...(r.scale != null ? { scale: r.scale } : {}),
       })),
       appearance: {
         elements: [...appearance.elements].map(([k, v]) => [k, { ...v }]),
@@ -3270,7 +3264,6 @@ function initialize() {
           polyhedra: r.polyhedra === true,
           opacity: finite(r.opacity) && r.opacity >= 0 && r.opacity <= 1 ? r.opacity : DEFAULT_FACE_OPACITY,
           ...(hex(r.color) ? { color: r.color } : {}),
-          ...(finite(r.scale) && r.scale >= 0.2 && r.scale <= 2 ? { scale: r.scale } : {}),
         });
       }
       nextRule = Math.max(0, ...rules.map((r) => r.id));
@@ -3294,7 +3287,7 @@ function initialize() {
     }
     const ruleIds = new Set(rules.map((r) => r.id));
     for (const [k, v] of pairs(s.appearance?.polyhedra)) {
-      const o = style(v, 0.2, 2);
+      const o = hex(v.color) ? { color: v.color } : {};
       if (ruleIds.has(Number(k.split("|")[0])) && Object.keys(o).length) appearance.polyhedra.set(k, o);
     }
     // Atom display.
