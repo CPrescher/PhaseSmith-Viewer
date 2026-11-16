@@ -399,6 +399,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     "#turn-panel",
     "#tool-rail",
     ".tool-window:not([hidden])",
+    "#history-controls",
     ".view-directions details[open] #direction-form",
     ".measure-row",
     ".measure-details",
@@ -1300,7 +1301,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       };
     },
     /** Apply validated session settings; invalid entries are skipped. */
-    restoreState(state) {
+    restoreState(state, { trusted = false } = {}) {
       if (!state || typeof state !== "object") return;
       const finite = (v) => typeof v === "number" && Number.isFinite(v);
       const triple = (v) => Array.isArray(v) && v.length === 3 && v.every(finite);
@@ -1316,7 +1317,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       };
       planes = (Array.isArray(state.planes) ? state.planes : [])
         .filter((p) => p && triple(p.hkl) && p.hkl.every(Number.isInteger) && p.hkl.some((x) => x !== 0) && finite(p.m))
-        .slice(0, 50)
+        .slice(0, trusted ? undefined : 50)
         .map((p, i) => ({
           id: freshId(p.id),
           hkl: [...p.hkl],
@@ -1331,7 +1332,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         }));
       arrows = (Array.isArray(state.arrows) ? state.arrows : [])
         .filter((a) => a && triple(a.uvw) && a.uvw.some((x) => x !== 0) && triple(a.origin) && finite(a.length) && a.length !== 0)
-        .slice(0, 50)
+        .slice(0, trusted ? undefined : 50)
         .map((a, i) => ({
           id: freshId(a.id),
           uvw: [...a.uvw],
