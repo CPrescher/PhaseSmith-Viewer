@@ -41,7 +41,10 @@ async def check(browser, w, h):
     await page.locator("#mode-lattice").tap()
     await page.locator("#plane-add").tap()
     plane = page.locator("[data-plane-id]").first
-    assert await plane.locator('[data-field="m"]').input_value() == "1"
+    assert await plane.locator('[data-field="m"]').input_value() == "0.5"
+    await change(plane.locator('[data-field="hkl"]'), "-1 -1 -1")
+    negative = (await diagnostics(page))["lattice"]["planes"][0]
+    assert negative["m"] == -1.5 and negative["polygons"], negative
     await change(plane.locator('[data-field="hkl"]'), "1 1 0")
     assert (await diagnostics(page))["lattice"]["planes"][0]["polygons"]
     assert "d" in await plane.inner_text()

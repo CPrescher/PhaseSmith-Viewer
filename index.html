@@ -372,6 +372,28 @@
                 ＋ Plane
               </button>
             </div>
+            <!-- Label text option for planes; shown once a plane exists. -->
+            <div id="plane-label-options" class="tool-options" hidden>
+              <label
+                class="chip small"
+                title="Label text only: adds “· m=…” to plane labels. Planes stay where they are."
+                ><input
+                  id="lattice-label-offsets"
+                  type="checkbox"
+                  checked
+                  aria-label="Show plane offsets in labels"
+                /><span>Show m in labels</span></label
+              ><label
+                class="export-select label-position"
+                title="Where plane labels sit: outside an edge with a short leader, on an edge, or at the center of the plane"
+                ><span class="tool-caption">Position</span
+                ><select id="plane-label-position" aria-label="Plane label position">
+                  <option value="outside" selected>Outside</option>
+                  <option value="edge">Edge</option>
+                  <option value="center">Center</option>
+                </select></label
+              >
+            </div>
             <div id="plane-list" class="tool-list"></div>
             <div class="section-title">
               <h2 id="arrow-title">Directions [uvw]</h2>

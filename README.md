@@ -39,7 +39,19 @@ Open `/?example=forsterite` for a worked example using the Mg end member of oliv
 
 ## Planes, directions and symmetry
 
-Choose **Lattice** in the sidebar. **＋ Plane** adds a Miller-index plane with integer indices and an editable fractional offset m in hx + ky + lz = m, starting at m = 1. This makes common planes such as (110) and (111) visible within a single unit cell. **Family** draws the parallel planes at m + n for integer n intersecting the displayed extent. Changing m moves the whole family. Each plane reports its interplanar spacing in ångströms. The Lattice **Labels** toggle annotates added planes and directions. **＋ Arrow** adds a direct-lattice [uvw] vector with a fractional origin and a length multiplier.
+Choose **Lattice** in the sidebar. **＋ Plane** adds a Miller-index plane with integer indices and an editable fractional offset m in hx + ky + lz = m. A new plane starts at the m that passes through the center of the displayed extent, so it always cuts through the plotted cells, also for negative or mixed indices and shifted or repeated ranges. While m has not been typed in, it follows changes to the indices. Once you enter m yourself it stays fixed, also when the indices or the extent change.
+
+**Family** draws the parallel planes at m + n for integer n intersecting the displayed extent. Changing m moves the whole family.
+
+**Size** (100–200%) draws a plane's faces beyond the plotted range, enlarging the clipping box about its center. The plane equation, m, the spacing and the family offsets stay the same.
+
+**Opacity** (0–100%, default 28%) sets how strongly each plane entry's faces are drawn. At 0% only the outline and the label remain. At 100% the faces are opaque and hide what lies behind them. Each plane reports its interplanar spacing in ångströms.
+
+The Lattice **Labels** toggle annotates added planes and directions. **Show m in labels** adds the offset to plane labels ("(100) · m=0.5"); turned off, labels show only the indices. It changes label text only, and in exports too.
+
+**Position** places plane labels **Outside** a projected edge of the drawn plane with a short leader line in the plane's color (default), against an **Edge** without a leader, or at the **Center** of the plane. Outside and Edge labels avoid the view controls, the legend, other labels and, where possible, the structure itself. In tight views a label falls back to sitting on the edge, and further members of a family are left unlabeled rather than placed over the middle of the structure. Exported images and movies show the same label positions and leaders. Direction labels stay beside the arrow tip.
+
+**＋ Arrow** adds a direct-lattice [uvw] vector with a fractional origin and a length multiplier.
 
 **Elements** shows symmetry axes, planes and inversion centers derived from the imported CIF operations. Use the type filters to examine rotation, screw, rotoinversion, inversion, mirror or glide elements. The **Operations** list shows their fractional-coordinate equations. Generated overlays are clipped to the plotting extent. A status note identifies any generation limit.
 

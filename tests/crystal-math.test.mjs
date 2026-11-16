@@ -4,6 +4,8 @@ import {
   angleAt,
   dSpacing,
   planeOffsets,
+  initialPlaneOffset,
+  planeDisplayRanges,
   directVector,
   clipPlaneToBox,
   hullVolume,
@@ -31,6 +33,64 @@ const inversion = {
   ],
   translation: [0, 0, 0],
 };
+test("initial plane offsets cut the interior for signed indices and shifted bounds", () => {
+  for (const ranges of [
+    box,
+    [
+      [-3, -1],
+      [2, 5],
+      [-0.5, 0.25],
+    ],
+    [
+      [0, 1],
+      [0, 3],
+      [0, 1],
+    ],
+  ]) {
+    for (let h = -2; h <= 2; h++)
+      for (let k = -2; k <= 2; k++)
+        for (let l = -2; l <= 2; l++) {
+          if (!(h || k || l)) continue;
+          const hkl = [h, k, l],
+            m = initialPlaneOffset(hkl, ranges);
+          const extrema = ranges.map(([lo, hi], i) => [
+            hkl[i] * lo,
+            hkl[i] * hi,
+          ]);
+          const lo = extrema.reduce((s, v) => s + Math.min(...v), 0);
+          const hi = extrema.reduce((s, v) => s + Math.max(...v), 0);
+          assert.ok(lo < m && m < hi);
+          const polygon = clipPlaneToBox(hkl, m, ranges);
+          assert.ok(polygon?.length >= 3);
+          assert.ok(
+            polygon.every(
+              (p) =>
+                Math.abs(p.reduce((s, v, i) => s + v * hkl[i], 0) - m) < 1e-9,
+            ),
+          );
+        }
+  }
+  assert.equal(initialPlaneOffset([-1, -1, -1], box), -1.5);
+  assert.equal(initialPlaneOffset([1, -1, 0], box), 0);
+});
+test("plane size enlarges the polygon without changing its offset or cell bounds", () => {
+  const enlarged = planeDisplayRanges(box, 1.5);
+  assert.deepEqual(enlarged, [
+    [-0.25, 1.25],
+    [-0.25, 1.25],
+    [-0.25, 1.25],
+  ]);
+  assert.deepEqual(box, [
+    [0, 1],
+    [0, 1],
+    [0, 1],
+  ]);
+  const polygon = clipPlaneToBox([1, 1, 0], 1, enlarged);
+  assert.ok(polygon.some((p) => p.some((v) => v < 0 || v > 1)));
+  assert.ok(polygon.every((p) => Math.abs(p[0] + p[1] - 1) < 1e-10));
+  for (const invalid of [0, -1, NaN, Infinity])
+    assert.throws(() => planeDisplayRanges(box, invalid));
+});
 test("Miller normal uses reciprocal metric while directions use direct vectors", () => {
   const basis = [
     [4, 1, 0],

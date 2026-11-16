@@ -568,6 +568,8 @@ function initialize() {
     getStructure: () => structure,
     getRanges: () => plotRanges,
     toScene: (frac) => cart(frac).sub(modelCenter),
+    // Plane labels avoid covering the model's projected box.
+    getSceneBounds: () => fitBounds,
   });
   // Unobtrusive marker for an individually picked appearance target: a
   // thin amber shell around the atom, or amber edges on the polyhedron.

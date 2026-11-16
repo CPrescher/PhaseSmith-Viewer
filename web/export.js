@@ -179,12 +179,26 @@ export function createExporter(ctx) {
       g.fillStyle = css("--label-text");
       g.fillText(l.label, x + 3 * s, y + h / 2);
     }
+    // Plane/direction labels: the live view's own placement (rect in CSS
+    // px) and plane leaders, scaled — the same boxes and lines as on screen.
+    for (const l of ctx.latticeLabels()) {
+      if (!l.leader) continue;
+      g.strokeStyle = l.color;
+      g.globalAlpha = 0.9;
+      g.lineWidth = 1.25 * s;
+      g.lineCap = "round";
+      g.beginPath();
+      g.moveTo(l.leader.x1 * s, l.leader.y1 * s);
+      g.lineTo(l.leader.x2 * s, l.leader.y2 * s);
+      g.stroke();
+      g.globalAlpha = 1;
+    }
     for (const l of ctx.latticeLabels()) {
       g.font = font(11);
-      const w = g.measureText(l.text).width + 11 * s,
-        h = 16 * s;
-      const x = l.kind === "arrow" ? (l.x + 6) * s : l.x * s - w / 2,
-        y = l.kind === "arrow" ? (l.y - 6) * s - h : l.y * s - h / 2;
+      const h = 16 * s;
+      const w = l.rect ? l.rect.w * s : g.measureText(l.text).width + 11 * s;
+      const x = l.rect ? l.rect.x * s : l.kind === "arrow" ? (l.x + 6) * s : l.x * s - w / 2,
+        y = l.rect ? l.rect.y * s : l.kind === "arrow" ? (l.y - 6) * s - h : l.y * s - h / 2;
       g.fillStyle = css("--label-bg");
       roundRect(g, x, y, w, h, 3 * s);
       g.fill();

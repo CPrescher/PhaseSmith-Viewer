@@ -6,6 +6,8 @@ import {
   dSpacing,
   clipPlaneToBox,
   planeOffsets,
+  initialPlaneOffset,
+  planeDisplayRanges,
   directVector,
   symmetryElements,
   elementCategory,
@@ -49,7 +51,7 @@ const CATEGORY_COLORS = new Proxy(
 const make = (tag, props = {}) => Object.assign(document.createElement(tag), props);
 const fmt = (v) => String(Number(v.toFixed(4)));
 
-export function createLatticeTools({ THREE, scene, invalidate, getStructure, getRanges, toScene }) {
+export function createLatticeTools({ THREE, scene, invalidate, getStructure, getRanges, toScene, getSceneBounds }) {
   const $ = (id) => document.getElementById(id);
   const group = new THREE.Group();
   group.name = "lattice-tools";
@@ -104,8 +106,25 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     return g;
   };
 
+  // Plane face opacity, live on the existing material (no geometry rebuild):
+  //   0       faces hidden (out of depth peeling too); outline and label stay;
+  //   (0, 1)  translucent, peeled per pixel with polyhedron faces;
+  //   1       opaque, ordinary depth-writing path on layer 0.
+  function setFaceOpacity(mesh, opacity) {
+    const material = mesh.material;
+    const opaque = opacity >= 1;
+    mesh.visible = opacity > 0;
+    material.opacity = opacity;
+    if (material.transparent === opaque) {
+      material.transparent = !opaque;
+      material.needsUpdate = true;
+    }
+    material.depthWrite = opaque;
+    mesh.layers.set(opaque ? 0 : PEEL_LAYER);
+  }
   function renderPlanes(structure, ranges) {
     for (const plane of planes) {
+      plane.faceMesh = null;
       plane.render = { offsets: [], polygons: [], truncated: false };
       if (plane.error) continue;
       try {
@@ -114,10 +133,13 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         plane.error = error.message;
         continue;
       }
+      // Family offsets come from the real plotting range; only each
+      // polygon's clipping box grows with plane.size.
       const { offsets, truncated } = planeOffsets(plane.hkl, plane.m, ranges, plane.family);
+      const clipBox = planeDisplayRanges(ranges, plane.size / 100);
       const polygons = [];
       for (const m of offsets) {
-        const polygon = clipPlaneToBox(plane.hkl, m, ranges);
+        const polygon = clipPlaneToBox(plane.hkl, m, clipBox);
         if (polygon) polygons.push({ m, polygon });
       }
       plane.render = { offsets, polygons, truncated };
@@ -132,14 +154,14 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           color: plane.color,
           side: THREE.DoubleSide,
           transparent: true,
-          opacity: 0.28,
+          opacity: plane.opacity,
           depthWrite: false,
         }),
       );
       mesh.renderOrder = 3;
-      // Peeled per pixel together with translucent polyhedron faces.
-      mesh.layers.set(PEEL_LAYER);
       mesh.userData.tool = "plane";
+      plane.faceMesh = mesh;
+      setFaceOpacity(mesh, plane.opacity);
       group.add(
         mesh,
         new THREE.LineSegments(
@@ -294,6 +316,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   // anchor, so their labels disappear with them.
   const LABEL_LIMIT = 80;
   let labelsOn = true,
+    labelOffsets = true, // include "· m=…" in plane labels (kept while labels are off)
     anchors = [],
     shownLabels = [];
   const labelPool = [];
@@ -310,8 +333,18 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       const name = indexText(plane.hkl, "(", ")");
       for (const { m, polygon } of plane.render.polygons) {
         const centroid = [0, 1, 2].map((i) => polygon.reduce((s, p) => s + p[i], 0) / polygon.length);
-        const text = plane.family || Math.abs(m) > 1e-9 ? `${name} · m=${fmt(m)}` : name;
-        anchors.push({ text, color: plane.color, world: vec(centroid), kind: "plane" });
+        // "Show m in labels" changes label text only, never the plane or
+        // where its label is anchored.
+        const text = labelOffsets ? `${name} · m=${fmt(m)}` : name;
+        // The ACTUAL drawn polygon (after Size clipping) anchors the label.
+        anchors.push({
+          text,
+          color: plane.color,
+          world: vec(centroid),
+          verts: polygon.map(vec),
+          kind: "plane",
+          planeId: plane.id,
+        });
       }
     }
     for (const arrow of arrows) {
@@ -320,23 +353,221 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       anchors.push({ text, color: arrow.color, world: vec(arrow.render.end), kind: "arrow" });
     }
   }
+  // ---- Placement ----------------------------------------------------------
+  // Plane label position: "outside" (default) puts the label box just
+  // beyond a projected polygon edge with a short leader to that edge;
+  // "edge" puts it against an edge without a leader; "center" keeps the
+  // old centroid placement. Candidates per label: ≤ 6 edges × 3 points ×
+  // a few variants, scored against the canvas, earlier labels, the view
+  // overlays and the model's projected box — no per-atom or per-triangle
+  // work. Arrow labels keep their place beside the tip.
+  let labelPosition = "outside";
+  const LEADER = 14,
+    LABEL_H = 16,
+    REJECT = 600;
+  const widthCache = new Map();
+  let measureCtx = null;
+  function labelWidth(text, layer) {
+    let w = widthCache.get(text);
+    if (w === undefined) {
+      if (!measureCtx) {
+        measureCtx = document.createElement("canvas").getContext("2d");
+        measureCtx.font = `11px ${getComputedStyle(layer).fontFamily}`;
+      }
+      // padding 4 + 4 and the 3px color bar (see .lattice-label); the
+      // exporter draws the same box width.
+      w = measureCtx.measureText(text).width + 11;
+      if (widthCache.size > 500) widthCache.clear();
+      widthCache.set(text, w);
+    }
+    return w;
+  }
+  // View overlays (toolbar, measurement card, legend, compass, atom
+  // count) in canvas CSS px, read on EVERY rendered frame that places
+  // plane labels. No time cache: rendering is on demand, so the frame
+  // after a selection (which grows the measurement/Info card) may be the
+  // last one; it must see the card's new size. A handful of DOM reads.
+  const OBSTACLES = [".view-directions", "#measure-overlay", ".view-bottom > *", ".axis-compass", "#atom-summary"];
+  let obstacles = [];
+  function refreshObstacles(canvasRect) {
+    obstacles = [];
+    for (const selector of OBSTACLES)
+      for (const el of document.querySelectorAll(selector)) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0)
+          obstacles.push({ x: r.left - canvasRect.left, y: r.top - canvasRect.top, w: r.width, h: r.height });
+      }
+  }
+  const hits = (a, b, pad = 0) =>
+    a.x < b.x + b.w + pad && b.x < a.x + a.w + pad && a.y < b.y + b.h + pad && b.y < a.y + a.h + pad;
+  const overlapFraction = (a, b) => {
+    const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x),
+      h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+    return w > 0 && h > 0 ? (w * h) / (a.w * a.h) : 0;
+  };
+  // Nearest point of a rectangle to p (leader end).
+  const nearest = (r, p) => ({
+    x: Math.min(Math.max(p.x, r.x), r.x + r.w),
+    y: Math.min(Math.max(p.y, r.y), r.y + r.h),
+  });
+  const boxCorners = new Array(8).fill(0).map(() => new THREE.Vector3());
+  function modelRect(camera, W, H) {
+    const box = getSceneBounds?.();
+    if (!box || box.isEmpty()) return null;
+    let x0 = Infinity,
+      y0 = Infinity,
+      x1 = -Infinity,
+      y1 = -Infinity;
+    boxCorners.forEach((v, i) => {
+      v.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).project(camera);
+      const x = ((v.x + 1) * W) / 2,
+        y = ((1 - v.y) * H) / 2;
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x);
+      y1 = Math.max(y1, y);
+    });
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
+  function score(rect, leader, base, ctx) {
+    const { W, H, placed, model } = ctx;
+    let s = base;
+    if (rect.x < 2 || rect.y < 2 || rect.x + rect.w > W - 2 || rect.y + rect.h > H - 2) s += 1000;
+    if (obstacles.some((o) => hits(rect, o, 2))) s += 700;
+    if (placed.some((p) => hits(rect, p.rect, 2))) s += 800;
+    if (leader && placed.some((p) => segmentHitsRect(leader, p.rect))) s += 40;
+    if (model) s += 220 * overlapFraction(rect, model);
+    return s;
+  }
+  function segmentHitsRect(l, r) {
+    // Coarse: sample the short leader.
+    for (let t = 0; t <= 1; t += 0.25) {
+      const x = l.x1 + (l.x2 - l.x1) * t,
+        y = l.y1 + (l.y2 - l.y1) * t;
+      if (x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.h) return true;
+    }
+    return false;
+  }
+  // Best placement for one plane label, or null (skipped).
+  function placePlane(a, sv, w, ctx) {
+    const h = LABEL_H;
+    const n = sv.length;
+    let cx = 0,
+      cy = 0,
+      area = 0;
+    for (let i = 0; i < n; i++) {
+      cx += sv[i].x / n;
+      cy += sv[i].y / n;
+      const q = sv[(i + 1) % n];
+      area += sv[i].x * q.y - q.x * sv[i].y;
+    }
+    if (labelPosition === "center") {
+      const rect = { x: cx - w / 2, y: cy - h / 2, w, h };
+      if (cx < 0 || cy < 0 || cx > ctx.W || cy > ctx.H) return null;
+      if (ctx.placed.some((p) => hits(rect, p.rect, 2))) return null;
+      return { rect, leader: null, x: cx, y: cy };
+    }
+    // Edge-on (degenerate projection): outward is ambiguous, try both sides.
+    const degenerate = Math.abs(area) / 2 < 40;
+    const mc = ctx.model ? { x: ctx.model.x + ctx.model.w / 2, y: ctx.model.y + ctx.model.h / 2 } : { x: ctx.W / 2, y: ctx.H / 2 };
+    let best = null;
+    const consider = (rect, leader, base, M) => {
+      const s = score(rect, leader, base, ctx);
+      if (!best || s < best.s) best = { s, rect, leader, x: M.x, y: M.y };
+    };
+    for (let i = 0; i < n; i++) {
+      const P = sv[i],
+        Q = sv[(i + 1) % n];
+      const dx = Q.x - P.x,
+        dy = Q.y - P.y,
+        len = Math.hypot(dx, dy);
+      if (len < 6) continue;
+      let nx = -dy / len,
+        ny = dx / len;
+      const mid = { x: (P.x + Q.x) / 2, y: (P.y + Q.y) / 2 };
+      if ((mid.x - cx) * nx + (mid.y - cy) * ny < 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+      const normals = degenerate ? [[nx, ny], [-nx, -ny]] : [[nx, ny]];
+      for (const t of [0.5, 0.3, 0.7]) {
+        const M = { x: P.x + dx * t, y: P.y + dy * t };
+        for (const [ux, uy] of normals) {
+          // Prefer edges facing away from the model's middle.
+          const away = Math.hypot(M.x - mc.x, M.y - mc.y) || 1;
+          const facing = 12 * (1 - ((M.x - mc.x) * ux + (M.y - mc.y) * uy) / away) + (t === 0.5 ? 0 : 3);
+          const ext = (Math.abs(ux) * w) / 2 + (Math.abs(uy) * h) / 2;
+          const at = (dist) => ({ x: M.x + ux * dist - w / 2, y: M.y + uy * dist - h / 2, w, h });
+          if (labelPosition === "outside") {
+            const rect = at(LEADER + ext);
+            const end = nearest(rect, M);
+            consider(rect, { x1: M.x, y1: M.y, x2: end.x, y2: end.y }, facing, M);
+          }
+          // Against the edge, outside (Edge mode; Outside fallback).
+          consider(at(ext + 1), null, facing + (labelPosition === "outside" ? 90 : 0), M);
+          // Tight views: straddling or just inside the edge.
+          consider(at(0), null, facing + 140, M);
+          consider(at(-(ext + 1)), null, facing + 170, M);
+        }
+      }
+    }
+    if (!best || best.s >= REJECT) return null;
+    // Do not cover the middle of the model just to label every member of
+    // a family: later members need a clear spot.
+    if (best.s >= 150 && ctx.placed.some((p) => p.planeId === a.planeId)) return null;
+    return best;
+  }
   function updateLabels(camera, canvas) {
     if (!anchors.length && !shownLabels.length) return;
     const layer = $("lattice-labels");
-    const { width, height } = canvas.getBoundingClientRect();
-    const placed = [];
+    const canvasRect = canvas.getBoundingClientRect();
+    const { width: W, height: H } = canvasRect;
+    const toScreen = (v) => {
+      projected.copy(v).project(camera);
+      return { x: ((projected.x + 1) * W) / 2, y: ((1 - projected.y) * H) / 2, z: projected.z };
+    };
     const candidates = [];
     for (const a of anchors) {
-      projected.copy(a.world).project(camera);
-      if (Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1 || Math.abs(projected.z) > 1) continue;
-      candidates.push({ ...a, x: ((projected.x + 1) * width) / 2, y: ((1 - projected.y) * height) / 2, z: projected.z });
+      const c = toScreen(a.world);
+      if (Math.abs(c.z) > 1) continue;
+      if (a.kind === "plane") {
+        const sv = a.verts.map(toScreen);
+        // Skip polygons entirely off the canvas.
+        if (sv.every((p) => p.x < 0) || sv.every((p) => p.x > W) || sv.every((p) => p.y < 0) || sv.every((p) => p.y > H)) continue;
+        candidates.push({ ...a, sv, x: c.x, y: c.y, z: c.z });
+      } else {
+        if (c.x < 0 || c.y < 0 || c.x > W || c.y > H) continue;
+        candidates.push({ ...a, x: c.x, y: c.y, z: c.z });
+      }
     }
     candidates.sort((p, q) => p.z - q.z);
+    if (labelPosition !== "center" && candidates.some((c) => c.kind === "plane")) refreshObstacles(canvasRect);
+    const ctx = { W, H, placed: [], model: labelPosition === "center" ? null : modelRect(camera, W, H) };
+    const placed = ctx.placed;
     for (const c of candidates) {
       if (placed.length >= LABEL_LIMIT) break;
-      if (placed.some((p) => p.text === c.text && Math.hypot(p.x - c.x, p.y - c.y) < 4)) continue;
-      if (placed.some((p) => Math.abs(p.x - c.x) < 48 && Math.abs(p.y - c.y) < 15)) continue;
-      placed.push(c);
+      if (placed.some((p) => p.text === c.text && Math.hypot(p.anchorX - c.x, p.anchorY - c.y) < 4)) continue;
+      const w = labelWidth(c.text, layer);
+      if (c.kind === "arrow") {
+        const rect = { x: c.x + 6, y: c.y - 6 - LABEL_H, w, h: LABEL_H };
+        if (placed.some((p) => hits(rect, p.rect, 2))) continue;
+        placed.push({ text: c.text, color: c.color, kind: "arrow", x: c.x, y: c.y, rect, leader: null, anchorX: c.x, anchorY: c.y });
+        continue;
+      }
+      const spot = placePlane(c, c.sv, w, ctx);
+      if (!spot) continue;
+      placed.push({
+        text: c.text,
+        color: c.color,
+        kind: "plane",
+        planeId: c.planeId,
+        x: spot.x,
+        y: spot.y,
+        rect: spot.rect,
+        leader: spot.leader,
+        anchorX: c.x,
+        anchorY: c.y,
+      });
     }
     while (labelPool.length < placed.length) {
       const span = make("span", { className: "lattice-label" });
@@ -349,18 +580,68 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       if (!c) return;
       if (span.textContent !== c.text) span.textContent = c.text;
       span.style.setProperty("--tool-color", c.color);
-      // Plane labels centered on the clipped polygon; arrow labels beside the tip.
-      span.style.transform =
-        c.kind === "arrow"
-          ? `translate(${(c.x + 6).toFixed(1)}px, ${(c.y - 6).toFixed(1)}px) translate(0, -100%)`
-          : `translate(${c.x.toFixed(1)}px, ${c.y.toFixed(1)}px) translate(-50%, -50%)`;
+      span.style.transform = `translate(${c.rect.x.toFixed(1)}px, ${c.rect.y.toFixed(1)}px)`;
     });
+    // Pooled leader lines (SVG, no pointer events).
+    let svg = layer.querySelector("svg.lattice-leaders");
+    const leaders = placed.filter((c) => c.leader);
+    if (!svg && leaders.length) {
+      svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "lattice-leaders");
+      layer.prepend(svg);
+    }
+    if (svg) {
+      while (svg.childElementCount < leaders.length)
+        svg.append(document.createElementNS("http://www.w3.org/2000/svg", "line"));
+      [...svg.children].forEach((line, i) => {
+        const c = leaders[i];
+        line.setAttribute("visibility", c ? "visible" : "hidden");
+        if (!c) return;
+        line.setAttribute("x1", c.leader.x1.toFixed(1));
+        line.setAttribute("y1", c.leader.y1.toFixed(1));
+        line.setAttribute("x2", c.leader.x2.toFixed(1));
+        line.setAttribute("y2", c.leader.y2.toFixed(1));
+        line.setAttribute("stroke", c.color);
+      });
+    }
     shownLabels = placed.map((c) => c.text);
-    lastPlaced = placed.map(({ text, x, y, color, kind }) => ({ text, x, y, color, kind }));
+    const round = (v) => Math.round(v * 10) / 10;
+    lastPlaced = placed.map(({ text, x, y, color, kind, rect, leader, planeId }) => ({
+      text,
+      x,
+      y,
+      color,
+      kind,
+      planeId: planeId ?? null,
+      rect: { x: round(rect.x), y: round(rect.y), w: rect.w, h: rect.h },
+      leader: leader ? { x1: round(leader.x1), y1: round(leader.y1), x2: round(leader.x2), y2: round(leader.y2) } : null,
+    }));
   }
   let lastPlaced = [];
+  // The m option is subordinate to Labels: disabled (preference kept)
+  // while labels are off.
+  function syncLabelOptions() {
+    const offsets = $("lattice-label-offsets");
+    offsets.checked = labelOffsets;
+    offsets.disabled = !labelsOn;
+    const position = $("plane-label-position");
+    position.value = labelPosition;
+    position.disabled = !labelsOn;
+    $("plane-label-options").hidden = !planes.length;
+  }
+  $("plane-label-position").onchange = () => {
+    const value = $("plane-label-position").value;
+    labelPosition = ["outside", "edge", "center"].includes(value) ? value : "outside";
+    invalidate();
+  };
   $("lattice-labels-toggle").onchange = () => {
     labelsOn = $("lattice-labels-toggle").checked;
+    syncLabelOptions();
+    collectLabelAnchors();
+    invalidate();
+  };
+  $("lattice-label-offsets").onchange = () => {
+    labelOffsets = $("lattice-label-offsets").checked;
     collectLabelAnchors();
     invalidate();
   };
@@ -430,6 +711,13 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
             const v = parseTriple(text, { integer: true, label: "indices" });
             if (v.every((x) => x === 0)) throw Error("Miller indices must not all be zero.");
             plane.hkl = v;
+            // Until m is edited by hand, it follows the indices so the
+            // plane cuts through the middle of the displayed range.
+            if (plane.autoOffset) {
+              plane.m = initialPlaneOffset(v, getRanges());
+              m.value = fmt(plane.m);
+              m.setCustomValidity("");
+            }
           }),
         );
         hkl.dataset.field = "hkl";
@@ -438,6 +726,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
             const v = Number(text.replace(",", "."));
             if (!Number.isFinite(v)) throw Error("Enter a finite offset m.");
             plane.m = v;
+            plane.autoOffset = false; // a hand-set m stays anchored
           }),
         );
         m.dataset.field = "m";
@@ -469,14 +758,69 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           "Planes at m + n (integer n) through the plotting range, spaced d",
         );
         family.input.dataset.field = "family";
+        // Display size of this entry's faces (all family members): the
+        // clipping box grows about the range centre; the plane equation,
+        // m, d and the family offsets stay the same.
+        const slider = ({ caption, field, aria, title, min, max, step, value, onInput }) => {
+          const wrap = make("label", { className: "plane-slider", title });
+          const output = make("output", { value: `${value}%` });
+          const input = make("input", { type: "range", min: String(min), max: String(max), step: String(step), value: String(value) });
+          input.dataset.field = field;
+          input.setAttribute("aria-label", aria);
+          input.setAttribute("aria-valuetext", `${value}%`);
+          input.oninput = () => {
+            const v = Number(input.value);
+            output.value = `${v}%`;
+            input.setAttribute("aria-valuetext", `${v}%`);
+            onInput(v);
+          };
+          wrap.append(make("span", { className: "caption", textContent: caption }), input, output);
+          return wrap;
+        };
+        const size = slider({
+          caption: "Size",
+          field: "size",
+          aria: "Plane size",
+          title: "Draw the plane faces larger than the plotting range (display only)",
+          min: 100,
+          max: 200,
+          step: 5,
+          value: plane.size,
+          onInput: (v) => {
+            plane.size = v;
+            rebuild();
+          },
+        });
+        // Face opacity of this entry (all family members), live on the
+        // material: no geometry rebuild, m/size/family untouched.
+        const opacity = slider({
+          caption: "Opacity",
+          field: "opacity",
+          aria: "Plane opacity",
+          title: "Face opacity; at 0% only the outline (and label) remain",
+          min: 0,
+          max: 100,
+          step: 1,
+          value: Math.round(plane.opacity * 100),
+          onInput: (v) => {
+            plane.opacity = v / 100;
+            if (plane.faceMesh) setFaceOpacity(plane.faceMesh, plane.opacity);
+            invalidate();
+          },
+        });
         const readout = make("span", { className: "tool-readout" });
         readout.dataset.readout = "plane";
+        // Sliders share a line when the sidebar is wide enough and wrap to
+        // one full-width slider per line otherwise (never tiny).
+        const sliders = make("div", { className: "tool-line" });
+        sliders.append(size, opacity);
         const bottom = make("div", { className: "tool-line" });
         bottom.append(family.label, readout);
-        row.append(top, bottom);
+        row.append(top, sliders, bottom);
         return row;
       }),
     );
+    syncLabelOptions();
   }
   function renderArrowList() {
     $("arrow-list").replaceChildren(
@@ -600,7 +944,12 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     planes.push({
       id: ++nextId,
       hkl: [1, 0, 0],
-      m: 1,
+      // Through the middle of the current plotting range; follows later
+      // index edits until m is set by hand (autoOffset).
+      m: initialPlaneOffset([1, 0, 0], getRanges()),
+      autoOffset: true,
+      size: 100, // percent of the plotting range used to clip the faces
+      opacity: 0.28, // face opacity, fraction 0..1 (slider shows percent)
       family: false,
       visible: true,
       color: PLANE_COLORS[planes.length % PLANE_COLORS.length],
@@ -687,11 +1036,23 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       const counts = {};
       for (const e of result?.elements ?? []) counts[elementCategory(e)] = (counts[elementCategory(e)] || 0) + 1;
       return {
-        labels: { enabled: labelsOn, anchors: anchors.map((a) => a.text), shown: [...shownLabels] },
+        labels: {
+          enabled: labelsOn,
+          includeOffsets: labelOffsets,
+          position: labelPosition,
+          anchors: anchors.map((a) => a.text),
+          shown: [...shownLabels],
+          // Canvas CSS px, exactly what the live view and exports draw.
+          placed: anchors.length ? lastPlaced.map((l) => ({ ...l, rect: { ...l.rect }, leader: l.leader && { ...l.leader } })) : [],
+        },
         planes: planes.map((p) => ({
           id: p.id,
           hkl: [...p.hkl],
           m: p.m,
+          autoOffset: p.autoOffset,
+          size: p.size,
+          opacity: p.opacity, // fraction 0..1
+          faces: p.faceMesh ? { visible: p.faceMesh.visible, opaque: !p.faceMesh.material.transparent, peeled: p.faceMesh.layers.isEnabled(PEEL_LAYER) } : null,
           family: p.family,
           visible: p.visible,
           color: p.color,

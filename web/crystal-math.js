@@ -55,6 +55,27 @@ export function parseTriple(text, { integer = false, label = "indices" } = {}) {
 }
 
 // ---- Lattice planes (hkl) ---------------------------------------------------
+/** Offset h·f = m through the center of the displayed fractional bounds.
+ *  For nonzero indices and positive-width bounds this cuts the interior,
+ *  including negative/mixed indices and translated or repeated cells. */
+export function initialPlaneOffset(hkl, ranges) {
+  return dot(
+    hkl,
+    ranges.map(([lo, hi]) => lo + (hi - lo) / 2),
+  );
+}
+
+/** Enlarge only a plane's clipping box about the displayed box center.
+ *  The original cell/atom bounds and the plane equation stay unchanged. */
+export function planeDisplayRanges(ranges, scale = 1) {
+  if (!Number.isFinite(scale) || scale <= 0)
+    throw Error("Plane size must be positive.");
+  return ranges.map(([lo, hi]) => {
+    const extra = ((hi - lo) * (scale - 1)) / 2;
+    return [lo - extra, hi + extra];
+  });
+}
+
 /** Interplanar spacing d_hkl = 1 / |B^-T h| (Å). */
 export function dSpacing(basis, hkl) {
   const inv = inverse3(basis);
