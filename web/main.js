@@ -3585,7 +3585,8 @@ function initialize() {
     historyTimer = setTimeout(flushHistory, delay);
   }
   function cameraHistoryChanged() {
-    if (cameraGesture && historyAvailable()) scheduleHistory(220);
+    if (cameraGesture && historyAvailable())
+      scheduleHistory(historyLabel === "Zoom view" ? 300 : 220);
   }
   function historyActionLabel(target) {
     if (target === renderer.domElement) return cameraGesture ? historyLabel : "Pick atom";

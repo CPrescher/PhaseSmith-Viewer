@@ -241,11 +241,13 @@ async def check(browser, phone):
     before = await state(page)
     n = await count()
     await page.mouse.move(x, y)
-    for _ in range(5):
-        await page.mouse.wheel(0, 35)
-        await page.wait_for_timeout(35)
+    # Queue one native input burst without waiting for a rendered frame
+    # between events. Software rendering in CI can take longer than the
+    # gesture's quiet period; serial awaited inputs then become separate
+    # gestures even though the test requested only a 35 ms pause.
+    await asyncio.gather(*(page.mouse.wheel(0, 35) for _ in range(5)))
     await idle(page)
-    assert await count() == n + 1
+    assert await count() == n + 1, ("wheel grouping", await count(), n)
     await roundtrip(before, await state(page))
     before = await state(page)
     n = await count()
@@ -354,6 +356,8 @@ async def check(browser, phone):
 async def main():
     async with async_playwright() as p:
         options = {"args": ["--enable-unsafe-swiftshader"]}
+        if os.environ.get("CI"):
+            options["args"] += ["--use-gl=angle", "--use-angle=swiftshader-webgl"]
         if os.environ.get("BROWSER_CHANNEL"):
             options["channel"] = os.environ["BROWSER_CHANNEL"]
         browser = await p.chromium.launch(**options)
