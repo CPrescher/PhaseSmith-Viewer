@@ -173,11 +173,8 @@
               class="measurement info-mode"
               aria-label="Atom info"
             >
-              <div class="measure-row">
-                <div id="distance" class="distance" aria-live="polite">
-                  —
-                </div>
-                <div class="measure-mode" role="group" aria-label="Selection mode">
+              <div class="measure-row toolbar">
+                <div class="measure-mode" role="group" aria-label="Left-click action">
                   <button
                     id="measure-info"
                     class="view-button info-button"
@@ -211,11 +208,15 @@
                   class="view-button"
                   aria-label="Clear selection"
                   title="Clear selection"
+                  disabled
                 >
                   ✕
                 </button>
               </div>
-              <p id="selection">Tap an atom for its details.</p>
+              <div class="measure-details">
+                <div id="distance" class="distance" aria-live="polite">—</div>
+                <p id="selection">Tap an atom for its details.</p>
+              </div>
             </section>
           </div>
           <div id="atom-labels" class="atom-labels" aria-hidden="true"></div>

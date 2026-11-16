@@ -1,6 +1,6 @@
-"""Stable layout: the crystal canvas, the lower/side panel and its tab bar keep
-their exact bounds in every frame while atoms are picked, measurement modes
-and tabs change, pairs/planes/arrows are added and edited, the panel is
+"""Stable layout: the crystal canvas, the lower/side panel, its tab bar and
+the mouse-action buttons keep their exact bounds in every frame while atoms
+are picked, measurement modes and tabs change, pairs/planes/arrows are added and edited, the panel is
 scrolled by a real touch gesture (wheel with a mouse), Turn and editors open
 and close, and after a resize/orientation round trip.
 
@@ -18,7 +18,10 @@ from phone_measure_smoke import CIF
 
 URL = os.environ.get("VIEWER_URL", "http://127.0.0.1:4179").rstrip("/")
 SIZES = [(390, 844, True), (768, 1024, True), (700, 900, False), (1440, 900, False)]
-TRACKED = ["#viewport", "canvas", "aside", ".mode-bar"]
+TRACKED = [
+    "#viewport", "canvas", "aside", ".mode-bar",
+    "#measure-info", "#measure-distance", "#measure-angle", "#clear",
+]
 RECTS = """(sels) => Object.fromEntries(sels.map((s) => {
   const r = document.querySelector(s).getBoundingClientRect();
   return [s, [r.x, r.y, r.width, r.height]];

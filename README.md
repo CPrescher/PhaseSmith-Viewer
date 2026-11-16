@@ -63,6 +63,8 @@ The Lattice **Labels** toggle annotates added planes and directions. **Show m in
 
 Choose **Info** to inspect one atom at a time, including its CIF label, element, occupancy, displayed coordinates and configured coordination information.
 
+The left-click action buttons stay fixed at the top right of the crystal view. Atom details and measurement results appear in a separate card below them; **Clear** keeps its place and is dimmed until an atom is selected. On phones, the buttons stay in a vertical column and the full details remain in the lower panel.
+
 Use **∠** in the measurement control and pick three atoms in A–B–C order. The second atom is the angle vertex. Select **↔** (Distance) to return to two-atom distance measurements.
 
 Choose **Sites** in the sidebar to see the original CIF site labels, fractional coordinates and occupancies. **Labels** annotates visible spheres. Tap a table row to highlight visible copies of that site. The polyhedron table reports coordination numbers and convex-hull volumes in Å³ by central site. These volumes use the physical atomic coordinates.

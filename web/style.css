@@ -956,27 +956,42 @@ h2 {
   margin: 6px 0 0;
 }
 
-/* Measurement readout */
-/* Taps pass through the readout to atoms beneath; only Clear is a target. */
+/* Anchor the action toolbar independently of the changing readout below. */
 .measurement {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
   pointer-events: none;
-  min-width: 190px;
-  max-width: min(320px, 46%);
-  padding: 6px 6px 8px 12px;
+  width: min(320px, 46%);
+}
+.measure-details {
+  max-width: 100%;
+  padding: 8px 12px;
   border: 1px solid var(--overlay-line);
   border-radius: 10px;
   background: var(--overlay-bg);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
-.measurement.active {
+.measurement.active .measure-details {
   border-color: var(--accent);
 }
 .measure-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
+  flex: none;
+  gap: 4px;
+}
+.measure-row #clear {
+  border-left: 1px solid var(--overlay-line);
+  border-radius: 0 7px 7px 0;
+  padding: 0 6px;
+}
+.measure-row #clear:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 .distance {
   font-size: 24px;
@@ -991,18 +1006,9 @@ h2 {
   color: var(--muted);
   letter-spacing: 0;
 }
-/* Before a pick the card shows only the distance/angle switch and the
-   hint; the value and Clear appear with the first picked atom. */
-.measurement:not(.active) .distance,
-.measurement:not(.active) #clear {
+/* Keep Clear's space reserved even before any atoms have been picked. */
+.measurement:not(.active) .distance {
   display: none;
-}
-/* Idle card hugs its switch and hint (no empty strip on the left). */
-.measurement:not(.active) {
-  min-width: 0;
-}
-.measurement:not(.active) .measure-mode {
-  margin-left: 0;
 }
 #selection {
   margin: 0;
@@ -1219,8 +1225,7 @@ button.element[aria-pressed="false"] .dot {
   .tool-label {
     display: none;
   }
-  /* Phone: the ↔/∠ switch sits beside the view toolbar (one row), the
-     readout wraps below it only while atoms are picked. */
+  /* Phone: keep the action column anchored beside the view toolbar. */
   .view-top {
     flex-direction: row;
     flex-wrap: wrap;
@@ -1231,28 +1236,28 @@ button.element[aria-pressed="false"] .dot {
     gap: 6px;
   }
   .measurement {
-    max-width: 100%;
-    min-width: 0;
-    margin-left: auto;
+    width: 88px;
+  }
+  .measure-row,
+  .measure-mode {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .measure-row {
+    padding: 3px;
+  }
+  .measure-row #clear {
+    border-left: 0;
+    border-top: 1px solid var(--overlay-line);
+    border-radius: 0 0 7px 7px;
   }
   #atom-summary {
     display: none;
   }
-  /* On phones, before any pick, the card shrinks to the compact Å | ∠
-     selector; the readout appears once an atom is picked. */
-  .measurement:not(.active) {
-    padding: 3px;
-    min-width: 0;
-  }
-  .measurement:not(.active) .distance,
-  .measurement:not(.active) #selection,
-  .measurement:not(.active) #clear {
+  .measurement:not(.active) .measure-details,
+  .measurement.info-mode .measure-details,
+  .measurement #selection {
     display: none;
-  }
-  /* Idle: ↔ ∠ i stacked at the top right, beside the toolbar and the
-     centered crystal. */
-  .measurement:not(.active) .measure-mode {
-    flex-direction: column;
   }
   .view-bottom {
     left: 8px;
@@ -1696,7 +1701,6 @@ aside .export-panel {
 .measure-mode {
   display: flex;
   gap: 2px;
-  margin-left: auto;
 }
 .measure-mode .view-button {
   min-width: var(--touch);
@@ -1728,6 +1732,8 @@ aside .export-panel {
 .measurement.info-mode .distance {
   font-size: 20px;
   font-weight: 600;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 /* Atom details in the bottom panel (phones only; elsewhere the card next
    to the crystal shows them). */
@@ -1799,32 +1805,15 @@ aside .export-panel {
   .inspector-header .mode-bar {
     margin: 0 0 8px;
   }
-  /* Phone, any mode with picked atoms: the details live in the panel
-     below, so the card over the crystal stays the narrow right-hand column
-     (value, ↔ ∠ i, ✕) and never covers the selected atoms in the middle. */
-  .measurement.active #selection,
-  .measurement.info-mode.active .distance {
-    display: none;
+  /* Full details stay in the lower pane; only the value sits below the
+     fixed action column, clear of the crystal in the center. */
+  .measure-details {
+    padding: 4px 6px;
   }
-  .measurement.active {
-    padding: 3px;
-    min-width: 0;
-    max-width: 88px;
-  }
-  .measurement.active .measure-row,
-  .measurement.active .measure-mode {
-    flex-direction: column;
-    gap: 2px;
-  }
-  .measurement.active .measure-mode {
-    margin-left: 0;
-  }
-  /* The distance/angle value heads the column, compact but readable. */
   .measurement.active .distance {
     font-size: 16px;
     font-weight: 600;
     letter-spacing: 0;
-    padding: 4px 2px 2px;
     text-align: center;
     white-space: normal;
     line-height: 1.15;
@@ -2025,7 +2014,7 @@ aside .export-panel {
 #viewport.style-picking canvas {
   cursor: crosshair;
 }
-.measurement.picking {
+.measurement.picking .measure-details {
   border-color: var(--accent);
 }
 .measurement.picking #selection {
