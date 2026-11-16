@@ -13,6 +13,18 @@ npm run dev
 
 Open the local address printed by Vite. Pick **Open CIF** to load a file from the device. Drag to rotate, use the wheel or pinch to zoom, then click or tap two atoms. The result is the Cartesian distance in ångströms between the selected images. This distinction matters across cell faces: two periodic copies of the same crystallographic site can be a lattice translation apart.
 
+## Orientation
+
+Drag continuously in any direction to turn the model over its poles. Use the **a**, **b**, or **c** views to align the camera with a direct lattice axis. For a custom direction, enter the three indices of [uvw]. The camera looks toward the structure from the positive side of the vector u**a** + v**b** + w**c**. The parallel projection aligns rows of atoms along that direction. These are direct lattice directions. In a nonorthogonal cell a direct direction and the normal to the plane with the same indices generally differ.
+
+## Bonds and coordination polyhedra
+
+Choose the central element, its neighboring element, and their maximum distance in ångströms. Bonds and polyhedra can be switched independently for each pair. A center inside the displayed cell can have neighbors in adjacent cells. The viewer includes these periodic images and measures distances to the actual image selected.
+
+Use **Polyhedra only** to show the centers and vertices of visible polyhedra. Turn it off to see the surrounding structure. Changing the cutoff changes which neighbors qualify for the display; the imported atom positions stay fixed.
+
+Open `/?example=forsterite` for a worked example using the Mg end member of olivine (Boström, 1987, *American Mineralogist* 72, 965–972, AMCSD 0001118). The Si–O and Mg–O cutoffs of 1.80 Å and 2.30 Å include the complete first coordination shells. Hide one rule to examine the other. Lower the Mg–O cutoff to 2.15 Å to retain all six neighbors around Mg1 and three around Mg2.
+
 ## Try on a tablet
 
 Build the application, then serve the compiled directory over your local network.
@@ -38,6 +50,8 @@ The importer uses PhaseSmith’s conventional crystal-structure CIF reader. Insp
 The initial NaCl example is an idealized rock-salt structure with a rounded 5.64 Å unit-cell edge.
 
 ## Verification
+
+Run the JavaScript geometry tests with `node --test tests/*.test.mjs`. The coordination browser test uses the packaged forsterite CIF (`python tests/coordination_smoke.py`). Run `python tests/steering_smoke.py` to check unrestricted rotation, axis views and custom directions in a triclinic cell.
 
 ```sh
 cargo test --locked --manifest-path engine/Cargo.toml

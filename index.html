@@ -25,6 +25,31 @@
             >Data block<select id="block"></select
           ></label>
           <div id="stats" class="stats"></div>
+          <section class="coordination">
+            <div class="section-title">
+              Bonds &amp; polyhedra
+              <button id="add-rule" class="text-button">＋ Add pair</button>
+            </div>
+            <p class="coordination-help">
+              Choose a central element, its neighbors, and a distance cutoff.
+              Periodic neighbors complete each coordination shell.
+            </p>
+            <label class="toggle"
+              ><span>Polyhedra only</span
+              ><input id="polyhedra-only" type="checkbox"
+            /></label>
+            <p id="isolation-note" class="coordination-help">
+              Full structure visible. Polyhedra only keeps completed polyhedra
+              and their atoms.
+            </p>
+            <div id="pair-rules"></div>
+            <p class="coordination-help">
+              New structures reset the pairs. Suggested oxide cutoffs are
+              starting points; adjust them for your structure. Polyhedra need
+              four noncoplanar neighbors. Neighbors outside the cell are
+              included at their actual element size.
+            </p>
+          </section>
           <section>
             <div class="section-title">
               Elements <span id="element-count"></span>
@@ -67,8 +92,36 @@
         </aside>
         <div id="viewport">
           <div class="view-top">
-            <span></span
-            ><button id="reset" class="view-button" title="Reset view">
+            <div
+              class="view-directions"
+              aria-label="View along lattice direction"
+            >
+              <span>View along</span>
+              <button id="view-a" class="view-button" title="Look along +a">
+                a
+              </button>
+              <button id="view-b" class="view-button" title="Look along +b">
+                b
+              </button>
+              <button id="view-c" class="view-button" title="Look along +c">
+                c
+              </button>
+              <details>
+                <summary>[u v w]</summary>
+                <form id="direction-form">
+                  <label for="view-direction">Lattice direction [u v w]</label>
+                  <div>
+                    <input
+                      id="view-direction"
+                      value="1 1 1"
+                      aria-describedby="direction-error"
+                    /><button class="view-button" type="submit">View</button>
+                  </div>
+                  <p id="direction-error" role="status"></p>
+                </form>
+              </details>
+            </div>
+            <button id="reset" class="view-button" title="Reset view">
               ↺ Reset view
             </button>
           </div>

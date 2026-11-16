@@ -1,6 +1,8 @@
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { TrackballControls } from "three/addons/controls/TrackballControls.js";
 import "./style.css";
+import { latticeViewDirection } from "./view-direction.js";
+import { buildCoordinationEnvironments, convexHull } from "./coordination.js";
 const $ = (id) => document.getElementById(id),
   viewport = $("viewport");
 function initialize() {
@@ -28,12 +30,48 @@ function initialize() {
   viewport.append(renderer.domElement);
   const scene = new THREE.Scene(),
     camera = new THREE.PerspectiveCamera(38, 1, 0.01, 10000);
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.09;
-  controls.minDistance = 0.5;
-  controls.maxDistance = 1000;
-  controls.screenSpacePanning = true;
+  // A perspective control camera supplies intuitive distance-based zoom;
+  // the synchronized parallel camera renders and picks the crystal.
+  const viewCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10000);
+  function syncViewCamera() {
+    const halfHeight =
+      camera.position.distanceTo(controls.target) *
+      Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    viewCamera.left = -halfHeight * camera.aspect;
+    viewCamera.right = halfHeight * camera.aspect;
+    viewCamera.top = halfHeight;
+    viewCamera.bottom = -halfHeight;
+    viewCamera.near = camera.near;
+    viewCamera.far = camera.far;
+    viewCamera.position.copy(camera.position);
+    viewCamera.quaternion.copy(camera.quaternion);
+    viewCamera.up.copy(camera.up);
+    viewCamera.updateProjectionMatrix();
+    viewCamera.updateMatrixWorld();
+  }
+  function createControls(target = new THREE.Vector3()) {
+    const next = new TrackballControls(camera, renderer.domElement);
+    next.rotateSpeed = 2.2;
+    next.zoomSpeed = 1.2;
+    next.panSpeed = 0.6;
+    next.staticMoving = false;
+    next.dynamicDampingFactor = 0.15;
+    next.minDistance = 0.5;
+    next.maxDistance = 1000;
+    next.target.copy(target);
+    next.addEventListener("change", invalidate);
+    next.addEventListener("start", invalidate);
+    return next;
+  }
+  let controls = createControls();
+  function stopMotion() {
+    const { minDistance, maxDistance } = controls;
+    const target = controls.target.clone();
+    controls.dispose();
+    controls = createControls(target);
+    controls.minDistance = minDistance;
+    controls.maxDistance = maxDistance;
+  }
   scene.add(new THREE.HemisphereLight(0xe4f1ff, 0x324353, 2.4));
   const light = new THREE.DirectionalLight(0xffffff, 3);
   light.position.set(5, 8, 10);
@@ -43,6 +81,11 @@ function initialize() {
   scene.add(fill);
   let model = new THREE.Group();
   scene.add(model);
+  let rules = [],
+    coordinationStats = [],
+    coordinationTotals = {},
+    nextRule = 0;
+  const pairColors = ["#62d5df", "#efa04c", "#c6a0ef", "#8cdf9b", "#ef95b3"];
   let structure,
     atoms = [],
     meshes = [],
@@ -54,22 +97,26 @@ function initialize() {
     request = 0,
     frame = 0,
     fitDistance = 20,
+    fitBounds = new THREE.Box3(),
     modelCenter = new THREE.Vector3(),
     distance = null;
   scene.add(selectionGroup);
   function render() {
     frame = 0;
-    const moving = controls.update();
-    renderer.render(scene, camera);
-    if (moving) invalidate();
+    // Trackball emits change while damping moves the camera. That event
+    // schedules the next frame; once settled, no animation frames remain.
+    controls.update();
+    syncViewCamera();
+    renderer.render(scene, viewCamera);
   }
   function invalidate() {
     if (!frame) frame = requestAnimationFrame(render);
   }
-  controls.addEventListener("change", invalidate);
+  renderer.domElement.addEventListener("wheel", invalidate, { passive: true });
   const resize = new ResizeObserver(() => {
     const { width, height } = viewport.getBoundingClientRect();
     renderer.setSize(width, height);
+    controls.handleResize();
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     invalidate();
@@ -130,7 +177,11 @@ function initialize() {
       }
     });
   }
-  function build() {
+  function atomKey(a) {
+    return `${a.sourceIndex}:${a.frac.map((v) => Math.round(v * 1e9)).join(",")}`;
+  }
+  function build(preserve = true) {
+    const selectedKeys = preserve ? selection.map(atomKey) : [];
     dispose(model);
     scene.remove(model);
     model = new THREE.Group();
@@ -167,6 +218,8 @@ function initialize() {
             });
           }
     });
+    buildCoordination();
+    selection = atoms.filter((a) => selectedKeys.includes(atomKey(a)));
     const byElement = new Map();
     atoms.forEach((a) => {
       if (!byElement.has(a.element)) byElement.set(a.element, []);
@@ -204,6 +257,13 @@ function initialize() {
       meshes.push(mesh);
     }
     sphere.dispose();
+    fitBounds = new THREE.Box3().setFromPoints(
+      corners.map((p) => p.clone().sub(modelCenter)),
+    );
+    for (const atom of atoms) {
+      fitBounds.expandByPoint(atom.position.clone().addScalar(atom.radius));
+      fitBounds.expandByPoint(atom.position.clone().addScalar(-atom.radius));
+    }
     const points = [];
     for (let i = 0; i < 8; i++)
       for (let axis = 0; axis < 3; axis++)
@@ -230,17 +290,429 @@ function initialize() {
     camera.updateProjectionMatrix();
     $("atom-summary").textContent =
       `${atoms.length.toLocaleString()} visible atoms`;
+    updateSelection();
     invalidate();
   }
+  function resetRules() {
+    nextRule = 0;
+    const elements = [...new Set(structure.atoms.map((a) => a.element))];
+    const cutoffs = { Si: 2.1, Mg: 2.6, Al: 2.3, Fe: 2.7, Ca: 3.0, Ti: 2.5 };
+    rules = elements.includes("O")
+      ? elements
+          .filter((e) => cutoffs[e])
+          .map((e) => ({
+            id: ++nextRule,
+            center: e,
+            neighbor: "O",
+            cutoff: cutoffs[e],
+            bonds: false,
+            polyhedra: false,
+          }))
+      : [];
+    rules.sort((a, b) => (a.center === "Si" ? -1 : b.center === "Si" ? 1 : 0));
+    const preset = !currentFilename || currentFilename === "Forsterite example";
+    if (
+      preset &&
+      new URLSearchParams(location.search).get("example") === "forsterite"
+    ) {
+      rules = rules.filter((r) => r.center === "Si" || r.center === "Mg");
+      rules.forEach((r) => {
+        r.cutoff = r.center === "Si" ? 1.8 : 2.3;
+        r.polyhedra = true;
+      });
+      $("polyhedra-only").checked = true;
+      $("boundary").checked = false;
+    } else $("polyhedra-only").checked = false;
+    renderRules();
+  }
+  function renderRules() {
+    const elements = [...new Set(structure.atoms.map((a) => a.element))];
+    $("pair-rules").replaceChildren(
+      ...rules.map((rule, index) => {
+        const card = document.createElement("div");
+        card.className = "pair-rule";
+        card.style.setProperty(
+          "--pair-color",
+          pairColors[index % pairColors.length],
+        );
+        const heading = document.createElement("div");
+        heading.className = "pair-heading";
+        const title = document.createElement("span");
+        title.textContent = `${rule.center} → ${rule.neighbor}`;
+        const remove = document.createElement("button");
+        remove.className = "text-button";
+        remove.textContent = "Delete";
+        remove.onclick = () => {
+          rules = rules.filter((r) => r !== rule);
+          renderRules();
+          build();
+        };
+        heading.append(title, remove);
+        const fields = document.createElement("div");
+        fields.className = "pair-fields";
+        for (const field of ["center", "neighbor", "cutoff"]) {
+          const label = document.createElement("label");
+          label.textContent =
+            field === "cutoff"
+              ? "Distance cutoff (Å)"
+              : field === "center"
+                ? "Center"
+                : "Neighbor";
+          let input;
+          if (field === "cutoff") {
+            label.className = "pair-cutoff";
+            input = document.createElement("input");
+            input.type = "number";
+            input.min = "0.1";
+            input.step = "any";
+            input.value = rule.cutoff;
+          } else {
+            input = document.createElement("select");
+            for (const e of elements) {
+              const o = document.createElement("option");
+              o.value = o.textContent = e;
+              input.append(o);
+            }
+            input.value = rule[field];
+          }
+          input.dataset.field = field;
+          input.setAttribute("aria-label", label.textContent);
+          input.onchange = () => {
+            if (
+              field === "cutoff" &&
+              (!input.checkValidity() || !Number.isFinite(Number(input.value)))
+            ) {
+              input.reportValidity();
+              return;
+            }
+            rule[field] =
+              field === "cutoff" ? Number(input.value) : input.value;
+            title.textContent = `${rule.center} → ${rule.neighbor}`;
+            build();
+          };
+          label.append(input);
+          fields.append(label);
+        }
+        const switches = document.createElement("div");
+        switches.className = "pair-switches";
+        for (const field of ["bonds", "polyhedra"]) {
+          const label = document.createElement("label");
+          label.className = "toggle";
+          const input = document.createElement("input");
+          input.type = "checkbox";
+          input.checked = rule[field];
+          input.dataset.field = field;
+          input.onchange = () => {
+            if (
+              field === "polyhedra" &&
+              input.checked &&
+              !rules.some((r) => r.polyhedra)
+            )
+              $("polyhedra-only").checked = true;
+            rule[field] = input.checked;
+            build();
+          };
+          label.append(
+            input,
+            document.createTextNode(field === "bonds" ? "Bonds" : "Polyhedra"),
+          );
+          switches.append(label);
+        }
+        const counts = document.createElement("p");
+        counts.className = "pair-counts";
+        counts.id = `pair-count-${rule.id}`;
+        card.append(heading, fields, switches, counts);
+        return card;
+      }),
+    );
+  }
+  $("add-rule").onclick = () => {
+    if (!structure) return;
+    const elements = [...new Set(structure.atoms.map((a) => a.element))];
+    rules.push({
+      id: ++nextRule,
+      center: elements.find((e) => e !== "O") || elements[0],
+      neighbor: elements.includes("O") ? "O" : elements.at(-1),
+      cutoff: 2.5,
+      bonds: false,
+      polyhedra: false,
+    });
+    renderRules();
+    build();
+  };
+  $("polyhedra-only").onchange = () => {
+    if (structure) build();
+  };
+  function buildCoordination() {
+    const base = [...atoms];
+    const all = new Map(base.map((a) => [atomKey(a), a]));
+    const used = new Set();
+    const plans = [];
+    const bondKeys = new Set();
+    coordinationStats = [];
+    let polyhedronCount = 0;
+    const ensure = (neighbor) => {
+      const atom = {
+        ...neighbor.atom,
+        sourceIndex: neighbor.sourceIndex,
+        frac: neighbor.frac,
+        cartesian: neighbor.cartesian,
+        position: new THREE.Vector3(...neighbor.cartesian).sub(modelCenter),
+      };
+      const key = atomKey(atom);
+      if (!all.has(key)) all.set(key, atom);
+      return all.get(key);
+    };
+    for (const [index, rule] of rules.entries()) {
+      const stat = {
+        ...rule,
+        counts: [],
+        environments: [],
+        siteCounts: {},
+        bondCount: 0,
+        polyhedronCount: 0,
+        outsideAtomCount: 0,
+      };
+      const plan = {
+        color: pairColors[index % pairColors.length],
+        hulls: [],
+        bonds: [],
+        stat,
+      };
+      if (rule.bonds || rule.polyhedra) {
+        try {
+          const environments = buildCoordinationEnvironments({
+            basis: structure.basis,
+            atoms: structure.atoms,
+            centres: base,
+            centerElement: rule.center,
+            neighborElement: rule.neighbor,
+            cutoff: rule.cutoff,
+          });
+          stat.counts = [
+            ...new Set(environments.map((e) => e.neighbors.length)),
+          ].sort((a, b) => a - b);
+          stat.centerCount = environments.length;
+          for (const env of environments) {
+            const label = env.center.label || env.center.element;
+            stat.siteCounts[label] ||= [];
+            if (!stat.siteCounts[label].includes(env.neighbors.length))
+              stat.siteCounts[label].push(env.neighbors.length);
+            const vertices = env.neighbors.map(ensure);
+            const hull = rule.polyhedra
+              ? convexHull(vertices.map((a) => a.cartesian))
+              : null;
+            if (hull) plan.hulls.push({ center: env.center, vertices, hull });
+            if (rule.bonds)
+              for (const atom of vertices) plan.bonds.push([env.center, atom]);
+          }
+          // Publish a rule only after all its geometry has succeeded.
+          for (const item of plan.hulls) {
+            const indices = [...new Set(item.hull.faces.flat())];
+            used.add(atomKey(item.center));
+            indices.forEach((i) => used.add(atomKey(item.vertices[i])));
+            stat.environments.push({
+              center: atomKey(item.center),
+              vertices: indices.map((i) => atomKey(item.vertices[i])),
+              edgeCount: item.hull.edges.length,
+              faceCount: item.hull.faces.length,
+            });
+          }
+          stat.polyhedronCount = plan.hulls.length;
+          polyhedronCount += plan.hulls.length;
+          plans.push(plan);
+        } catch (error) {
+          stat.error = error.message;
+        }
+      }
+      coordinationStats.push(stat);
+    }
+    const enabledPolyhedra = rules.some((rule) => rule.polyhedra);
+    const isolated = $("polyhedra-only").checked && enabledPolyhedra;
+    const visible = new Map((isolated ? [] : base).map((a) => [atomKey(a), a]));
+    for (const key of used) visible.set(key, all.get(key));
+    const matrix = new THREE.Matrix4();
+    const rotation = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    const up = new THREE.Vector3(0, 1, 0);
+    for (const plan of plans) {
+      const acceptedBonds = [];
+      for (const bond of plan.bonds) {
+        if (isolated && bond.some((a) => !used.has(atomKey(a)))) continue;
+        const key = bond.map(atomKey).sort().join("|");
+        if (bondKeys.has(key)) continue;
+        bondKeys.add(key);
+        acceptedBonds.push(bond);
+        bond.forEach((a) => visible.set(atomKey(a), a));
+      }
+      plan.stat.bondCount = acceptedBonds.length;
+      const participating = new Set(
+        plan.stat.environments.flatMap((env) => [env.center, ...env.vertices]),
+      );
+      acceptedBonds.flat().forEach((atom) => participating.add(atomKey(atom)));
+      plan.stat.outsideAtomCount = [...participating].filter((key) =>
+        all.get(key)?.frac.some((v) => v < -1e-8 || v > 1 + 1e-8),
+      ).length;
+      if (acceptedBonds.length) {
+        const cylinders = new THREE.InstancedMesh(
+          new THREE.CylinderGeometry(1, 1, 1, 8),
+          new THREE.MeshStandardMaterial({
+            color: plan.color,
+            roughness: 0.55,
+          }),
+          acceptedBonds.length,
+        );
+        acceptedBonds.forEach(([a, b], i) => {
+          const delta = b.position.clone().sub(a.position);
+          const midpoint = a.position
+            .clone()
+            .add(b.position)
+            .multiplyScalar(0.5);
+          scale.set(0.045, delta.length(), 0.045);
+          rotation.setFromUnitVectors(up, delta.normalize());
+          matrix.compose(midpoint, rotation, scale);
+          cylinders.setMatrixAt(i, matrix);
+        });
+        cylinders.instanceMatrix.needsUpdate = true;
+        model.add(cylinders);
+      }
+      const positions = [],
+        edges = [];
+      for (const { vertices, hull } of plan.hulls) {
+        for (const face of hull.faces)
+          for (const i of face)
+            positions.push(...vertices[i].position.toArray());
+        for (const edge of hull.edges)
+          for (const i of edge) edges.push(vertices[i].position);
+      }
+      if (positions.length) {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute(
+          "position",
+          new THREE.Float32BufferAttribute(positions, 3),
+        );
+        geometry.computeVertexNormals();
+        model.add(
+          new THREE.Mesh(
+            geometry,
+            new THREE.MeshStandardMaterial({
+              color: plan.color,
+              transparent: true,
+              opacity: 0.34,
+              side: THREE.DoubleSide,
+              depthWrite: false,
+              roughness: 0.8,
+            }),
+          ),
+        );
+        model.add(
+          new THREE.LineSegments(
+            new THREE.BufferGeometry().setFromPoints(edges),
+            new THREE.LineBasicMaterial({
+              color: plan.color,
+              transparent: true,
+              opacity: 0.9,
+            }),
+          ),
+        );
+      }
+    }
+    atoms = [...visible.values()];
+    atoms.forEach((a, i) => {
+      a.id = i;
+    });
+    const outside = atoms.filter((a) =>
+      a.frac.some((v) => v < -1e-8 || v > 1 + 1e-8),
+    ).length;
+    coordinationTotals = {
+      bondCount: bondKeys.size,
+      polyhedronCount,
+      outsideAtomCount: outside,
+    };
+    for (const stat of coordinationStats) {
+      const p = $(`pair-count-${stat.id}`);
+      if (!p) continue;
+      const siteCounts = Object.entries(stat.siteCounts)
+        .map(([label, counts]) => `${label}: ${counts.join(", ")}`)
+        .join(" · ");
+      p.textContent =
+        stat.error ||
+        (!(stat.bonds || stat.polyhedra)
+          ? "Enable Bonds or Polyhedra to inspect coordination."
+          : `${stat.counts.join(", ") || "0"} neighbors per center (${stat.centerCount || 0} centers) · ${stat.polyhedronCount} polyhedra · ${stat.bondCount} bonds. ${siteCounts}`);
+    }
+    $("isolation-note").textContent = isolated
+      ? polyhedronCount
+        ? "Showing completed polyhedra, their centers, and all ligand atoms. Unconnected atoms are hidden."
+        : "No complete polyhedra at these cutoffs. Adjust the cutoff, enable another pair, or turn off Polyhedra only to inspect the full structure."
+      : "Full structure visible. Polyhedra only keeps completed polyhedra and their atoms.";
+  }
+  function orient(indices) {
+    if (!structure) return;
+    try {
+      const { direction, up } = latticeViewDirection(structure.basis, indices);
+      const target = controls.target.clone();
+      const zoomDistance = camera.position.distanceTo(target);
+      stopMotion();
+      camera.up.set(...up);
+      camera.position
+        .copy(target)
+        .addScaledVector(new THREE.Vector3(...direction), zoomDistance);
+      controls.update();
+      $("direction-error").textContent = "";
+      invalidate();
+    } catch (error) {
+      $("direction-error").textContent = error.message;
+    }
+  }
+  for (const [axis, indices] of [
+    ["a", [1, 0, 0]],
+    ["b", [0, 1, 0]],
+    ["c", [0, 0, 1]],
+  ]) {
+    $(`view-${axis}`).onclick = () => orient(indices);
+  }
+  $("direction-form").onsubmit = (event) => {
+    event.preventDefault();
+    const text = $("view-direction")
+      .value.replace(/−/g, "-")
+      .replace(/[\[\](),]/g, " ")
+      .trim();
+    // Compact notation is restricted to three single-digit indices so a
+    // multi-digit component remains unambiguous when separated by spaces.
+    const fields = /^[+-]?\d[+-]?\d[+-]?\d$/.test(text)
+      ? text.match(/[+-]?\d/g)
+      : text.split(/\s+/);
+    if (
+      fields.length !== 3 ||
+      fields.some((value) => !Number.isFinite(Number(value)))
+    ) {
+      $("direction-error").textContent =
+        "Enter three finite components, such as 1 0 −1, or compact single-digit indices like [110] or [1-10].";
+      return;
+    }
+    orient(fields.map(Number));
+  };
   function reset() {
     selection = [];
     updateSelection();
-    camera.position.set(
-      fitDistance * 0.68,
-      fitDistance * 0.48,
-      fitDistance * 0.8,
-    );
-    controls.target.set(0, 0, 0);
+    const sphere = fitBounds.getBoundingSphere(new THREE.Sphere());
+    const vertical = THREE.MathUtils.degToRad(camera.fov / 2);
+    const horizontal = Math.atan(Math.tan(vertical) * camera.aspect);
+    fitDistance =
+      (Math.max(sphere.radius, 1) / Math.sin(Math.min(vertical, horizontal))) *
+      1.12;
+    const target = sphere.center;
+    const direction = new THREE.Vector3(0.68, 0.48, 0.8).normalize();
+    stopMotion();
+    camera.up.set(0, 1, 0);
+    camera.position.copy(target).addScaledVector(direction, fitDistance);
+    controls.target.copy(target);
+    controls.maxDistance = fitDistance * 12;
+    controls.minDistance = fitDistance * 0.03;
+    camera.near = Math.max(fitDistance / 1000, 0.001);
+    camera.far = fitDistance * 100;
+    camera.updateProjectionMatrix();
     controls.update();
     invalidate();
   }
@@ -314,6 +786,7 @@ function initialize() {
     }
   });
   renderer.domElement.addEventListener("pointermove", (e) => {
+    if (active.size) invalidate();
     if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6)
       down = null;
   });
@@ -333,7 +806,8 @@ function initialize() {
       ((e.clientX - r.left) / r.width) * 2 - 1,
       (-(e.clientY - r.top) / r.height) * 2 + 1,
     );
-    raycaster.setFromCamera(pointer, camera);
+    syncViewCamera();
+    raycaster.setFromCamera(pointer, viewCamera);
     const hit = raycaster.intersectObjects(meshes, false)[0];
     if (hit) {
       const atom = hit.object.userData.atoms[hit.instanceId];
@@ -392,7 +866,8 @@ function initialize() {
     const warnings = data.warnings || [];
     $("warnings").hidden = !warnings.length;
     $("warnings").textContent = warnings.join(" ");
-    build();
+    resetRules();
+    build(false);
     reset();
   }
   const worker = new Worker(new URL("./import-worker.js", import.meta.url), {
@@ -489,16 +964,19 @@ function initialize() {
   };
   window.viewerDiagnostics = () => {
     camera.updateMatrixWorld();
+    syncViewCamera();
     const rect = renderer.domElement.getBoundingClientRect();
     return {
       atoms: atoms.map((a) => {
-        const p = a.position.clone().project(camera);
+        const p = a.position.clone().project(viewCamera);
         return {
           id: a.id,
           element: a.element,
           label: a.label,
           frac: [...a.frac],
           cartesian: [...a.cartesian],
+          sourceIndex: a.sourceIndex,
+          outsideCell: a.frac.some((v) => v < -1e-8 || v > 1 + 1e-8),
           x: rect.left + ((p.x + 1) * rect.width) / 2,
           y: rect.top + ((1 - p.y) * rect.height) / 2,
           z: p.z,
@@ -507,20 +985,35 @@ function initialize() {
       selectedIds: selection.map((a) => a.id),
       distance,
       camera: {
+        projection: "orthographic",
         position: camera.position.toArray(),
+        up: camera.up.toArray(),
         target: controls.target.toArray(),
+      },
+      coordination: {
+        rules: coordinationStats,
+        ...coordinationTotals,
+        isolated: $("polyhedra-only").checked,
       },
       block: structure?.block,
       basis: structure?.basis,
     };
   };
-  fetch(`${import.meta.env.BASE_URL}example.cif`)
+  const forsteriteExample =
+    new URLSearchParams(location.search).get("example") === "forsterite";
+  fetch(
+    `${import.meta.env.BASE_URL}${forsteriteExample ? "examples/forsterite.cif" : "example.cif"}`,
+  )
     .then((r) => {
       if (!r.ok) throw Error("Example unavailable");
       return r.text();
     })
     .then((text) => {
-      if (!userIntent && !request) load(text, "Example structure");
+      if (!userIntent && !request)
+        load(
+          text,
+          forsteriteExample ? "Forsterite example" : "Example structure",
+        );
     })
     .catch(() => {
       if (userIntent || request || structure) return;
