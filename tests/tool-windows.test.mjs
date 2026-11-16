@@ -20,6 +20,7 @@ import {
   setTune,
   stageRect,
   stageOffset,
+  supportsKeptWindows,
   unpinTool,
   validateState,
 } from "../web/tool-windows.js";
@@ -208,4 +209,21 @@ test("only one extra tool can stay open, including restored state", () => {
   s = chooseTool(s, "lattice");
   assert.equal(pinTool(s, "lattice"), s);
   assert.deepEqual(validateState({ ...s, pinned: ["pairs", "sites", "export"] }).pinned, ["pairs"]);
+});
+
+
+test("two tablet palettes retain a useful full-height column instead of a shallow strip", () => {
+  const ws = { width: 1024, height: 711 };
+  const palettes = [{ x: 632, y: 250, w: 300, h: 421 }, { x: 324, y: 250, w: 300, h: 421 }];
+  assert.deepEqual(stageRect(ws, palettes), { x: 0, y: 0, w: 324, h: 711 });
+});
+
+
+test("Keep open requires a useful unobstructed stage, not just room for palettes", () => {
+  for (const width of [900, 940, 960, 980, 1000, 1024, 1440]) {
+    const ws = { width, height: 994 };
+    const base = defaultRect("float", ws, { paletteTop: 250, railColumn: 92, bottomGap: 40 });
+    const next = placeWindow(base, [base], ws);
+    assert.equal(Boolean(next && supportsKeptWindows(ws, [base, next])), width >= 1024, String(width));
+  }
 });

@@ -2,6 +2,7 @@
 import asyncio
 import os
 from playwright.async_api import async_playwright, expect
+from smoke import choose_tool
 
 URL = os.environ.get('VIEWER_URL', 'http://127.0.0.1:4193').rstrip('/')
 
@@ -54,7 +55,7 @@ async def main():
             await expect(page.locator('#structure-library')).not_to_be_visible()
             await expect(page.locator('#source a')).to_have_attribute('href', 'https://www.crystallography.net/cod/5000035.html')
             assert await page.evaluate('new Set(window.viewerDiagnostics().atoms.map(a => a.element)).size') == 2
-            await page.locator('#mode-export').click()
+            await choose_tool(page, '#mode-export', phone)
             await page.locator('#session-save').click()
             await page.wait_for_timeout(300)
             await page.reload()

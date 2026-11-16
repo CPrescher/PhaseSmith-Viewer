@@ -2541,3 +2541,7 @@ button.element[aria-pressed="false"] .dot {
   }
   .tool-window[data-place="float"] .tool-window-body { padding-bottom: 44px; }
 }
+
+/* Parked tools share a fixed palette; desktop positions remain untouched. */
+#app[data-parked="true"] .tool-window-head { cursor: default; touch-action: auto; }
+#app[data-parked="true"] .window-grip { display: none; }

@@ -2034,7 +2034,7 @@ function initialize() {
   }
   $("measure-more").onclick = () => setDetailsOpen(!detailsOpen);
   document.addEventListener("pointerdown", (event) => {
-    if (detailsOpen && !$("measure-overlay").contains(event.target)) setDetailsOpen(false);
+    if (detailsOpen && event.target !== renderer.domElement && !$("measure-overlay").contains(event.target)) setDetailsOpen(false);
   });
   $("measure-overlay").addEventListener("keydown", (event) => {
     if (event.key === "Escape" && detailsOpen) {

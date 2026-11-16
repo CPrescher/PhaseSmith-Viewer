@@ -226,10 +226,16 @@ async def desktop(browser, width, height, touch, theme):
     await tap(page, "#measure-info", touch)
 
     # ---- Keep open: a second window beside it, never a duplicate.
+    def crystal_size(state):
+        visible = [a for a in state["atoms"] if a["visible"]]
+        return [max(a[k] for a in visible) - min(a[k] for a in visible) for k in ("x", "y")]
+    before_keep = crystal_size(await diag(page))
     await tap(page, "#tool-window-lattice [data-action=pin]", touch)
     await choose(page, "#mode-pairs", touch)
     d = await diag(page)
     rects = d["windows"]["rects"]
+    retained = [after / before for after, before in zip(crystal_size(d), before_keep)]
+    assert min(retained) >= 0.8, (where, "Keep open shrank the crystal", retained, d["stage"])
     assert sorted(d["windows"]["visible"]) == ["lattice", "pairs"], (where, d["windows"]["visible"])
     a, b = rects["lattice"], rects["pairs"]
     assert a["x"] >= b["x"] + b["w"] or b["x"] >= a["x"] + a["w"] or a["y"] >= b["y"] + b["h"] or b["y"] >= a["y"] + a["h"], (where, "windows overlap", rects)
@@ -355,6 +361,15 @@ async def phone(browser, width, height, theme):
     footer = await page.locator(".view-bottom").bounding_box()
     assert pop["y"] + pop["height"] <= footer["y"] - 4, (where, "Details over the atom controls", pop, footer)
     assert await page.evaluate(HITS, "#measure-more"), (where, "Details covered its own close button")
+    prior = (await diag(page))["selectedIds"]
+    alternatives = [a for a in (await diag(page))["atoms"] if a["visible"] and a["id"] not in prior and await page.evaluate("([x,y])=>document.elementFromPoint(x,y)?.tagName==='CANVAS'", [a["x"], a["y"]])]
+    assert alternatives, where
+    previous_atom = next(a for a in (await diag(page))["atoms"] if a["id"] == prior[0])
+    target = max(alternatives, key=lambda a: math.dist([a["x"], a["y"]], [previous_atom["x"], previous_atom["y"]]))
+    await page.touchscreen.tap(target["x"], target["y"])
+    await settle(page)
+    assert (await diag(page))["selectedIds"] != prior, where
+    assert await page.locator("#measure-more").get_attribute("aria-expanded") == "true", (where, "new atom closed Details")
     await page.locator("#measure-more").press("Escape")
     assert await page.locator("#measure-more").get_attribute("aria-expanded") == "false", where
     await tap(page, "#measure-more", True)
@@ -388,6 +403,30 @@ async def parked_tool(browser):
     await choose(page, "#mode-lattice", True)
     await tap(page, "#plane-add", True)
     assert await page.locator('#tool-window-lattice [data-action="pin"]').is_disabled()
+    original_rects = (await diag(page))["windows"]["rects"]
+    await page.set_viewport_size({"width": 960, "height": 1050})
+    await settle(page)
+    assert (await diag(page))["windows"]["parked"]
+    assert (await diag(page))["windows"]["visible"] == ["lattice"]
+    narrow_rect = (await page.evaluate(RECTS, [WINDOW]))[0]
+    saved_rects = (await diag(page))["windows"]["state"]["rects"]
+    head = await page.locator("#tool-title-lattice").bounding_box()
+    await page.mouse.move(head["x"] + 20, head["y"] + 10)
+    await page.mouse.down()
+    await page.mouse.move(head["x"] - 80, head["y"] + 70, steps=5)
+    await page.mouse.up()
+    await page.locator("#tool-title-lattice").dblclick()
+    await settle(page)
+    assert same((await page.evaluate(RECTS, [WINDOW]))[0], narrow_rect)
+    assert (await diag(page))["windows"]["state"]["rects"] == saved_rects
+    assert not await page.locator("#tool-window-lattice .window-grip").is_visible()
+    await stage_frames_crystal(page, "narrow desktop parked windows")
+    await choose(page, "#mode-pairs", True)
+    assert same((await page.evaluate(RECTS, [WINDOW]))[0], narrow_rect)
+    await page.set_viewport_size({"width": 1440, "height": 900})
+    await settle(page)
+    assert (await diag(page))["windows"]["rects"] == original_rects
+    assert not (await diag(page))["windows"]["parked"]
     await page.set_viewport_size({"width": 390, "height": 844})
     await settle(page)
     await choose(page, "#mode-pairs", True)
@@ -413,6 +452,16 @@ async def parked_tool(browser):
     print("Kept tool: phone Tune, named parameter refresh, readable fields, focus, desktop restoration")
 
 
+async def narrow_desktop(browser):
+    for width, height, touch in [(960, 1050, False), (980, 720, False), (940, 700, True), (1000, 1000, False)]:
+        context, page, errors = await open_page(browser, width, height, touch, "dark")
+        assert await page.locator('#tool-window-pairs [data-action="pin"]').is_disabled(), (width, height)
+        await stage_frames_crystal(page, f"{width}x{height} single palette")
+        assert not errors, errors
+        await context.close()
+    print("Narrow desktop: Keep open unavailable when it would obscure or shrink the crystal")
+
+
 async def main():
     async with async_playwright() as p:
         options = {"args": ["--enable-unsafe-swiftshader"]}
@@ -436,6 +485,7 @@ async def main():
         assert not errors, errors
         await context.close()
         print("768×1024: sheet below the rail, controls and crystal clear")
+        await narrow_desktop(browser)
         await parked_tool(browser)
         await browser.close()
 

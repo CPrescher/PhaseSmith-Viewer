@@ -165,7 +165,8 @@ export function placeWindow(rect, occupied, ws, gap = MARGIN) {
 /**
  * The stage: where the crystal is centred. Windows along an edge leave a
  * full-height column (side palettes) or a full-width row (bottom sheet);
- * the larger free one is the stage. If windows are scattered so that no
+ * the one with the larger limiting dimension is the stage. A wide but
+ * shallow strip must not win solely on pixel area and shrink the crystal. If windows are scattered so that no
  * column or row keeps at least `minShare` of the view, the whole view stays
  * the stage: a palette deliberately moved over the crystal never pushes it
  * into a sliver.
@@ -189,8 +190,15 @@ export function stageRect(ws, obstacles, minShare = 0.3) {
   const [y0, y1] = gaps(ws.height, obs.map((o) => [o.y, o.y + o.h]));
   const column = { x: x0, y: 0, w: x1 - x0, h: ws.height },
     row = { x: 0, y: y0, w: ws.width, h: y1 - y0 };
-  const best = column.w * column.h >= row.w * row.h ? column : row;
+  const best = Math.min(column.w, column.h) >= Math.min(row.w, row.h) ? column : row;
   return best.w * best.h >= minShare * ws.width * ws.height ? best : full;
+}
+
+/** Whether expanded palettes leave an unobstructed, useful stage. Used
+ *  both before offering Keep open and after responsive viewport changes. */
+export function supportsKeptWindows(ws, rects) {
+  const clear = stageRect(ws, rects);
+  return Math.min(clear.w, clear.h) >= 320 && !rects.some((r) => overlaps(clear, r));
 }
 
 /** Fraction of the workspace not covered by the given windows. */
@@ -374,6 +382,7 @@ const svg = (paths) =>
 export function createToolWindows(options) {
   const { viewport, app, rail, menuButton, tidyButton, metrics, onLayout, onVisibility = () => {}, onChange = () => {} } = options;
   let state = initialState("pairs");
+  let parked = false;
   let profile = "float",
     launcher = "rail",
     ws = { width: 1, height: 1 },
@@ -431,7 +440,7 @@ export function createToolWindows(options) {
     head.addEventListener("pointerdown", (e) => startDrag(e, tool.id, "move"));
     grip.addEventListener("pointerdown", (e) => startDrag(e, tool.id, "resize"));
     head.addEventListener("dblclick", (e) => {
-      if (profile !== "float" || e.target.closest("button")) return;
+      if (profile !== "float" || parked || e.target.closest("button")) return;
       commit(moveTool(state, tool.id, null)); // back to its default place
     });
     // Clicking a kept window brings it to the front (no layout change).
@@ -489,6 +498,14 @@ export function createToolWindows(options) {
     true,
   );
   rail.addEventListener("keydown", (e) => {
+    if (launcher === "menu" && rail.classList.contains("menu-open") && ["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+      const choices = [...rail.querySelectorAll("button:not(:disabled)")].filter((b) => b.getClientRects().length);
+      const index = choices.indexOf(document.activeElement);
+      const next = e.key === "Home" ? 0 : e.key === "End" ? choices.length - 1 : (index + (e.key === "ArrowDown" ? 1 : -1) + choices.length) % choices.length;
+      e.preventDefault();
+      choices[next]?.focus({ preventScroll: true });
+      return;
+    }
     if (e.key === "Escape" && rail.classList.contains("menu-open")) {
       e.preventDefault();
       setMenu(false);
@@ -528,7 +545,8 @@ export function createToolWindows(options) {
   function canPin() {
     if (profile !== "float" || !state.main || state.pinned.length >= 1) return false;
     const occupied = [...state.pinned, state.main].map((t) => rectFor(t));
-    return Boolean(placeWindow(defaultRect("float", ws, metrics()), occupied, ws));
+    const next = placeWindow(defaultRect("float", ws, metrics()), occupied, ws);
+    return Boolean(next && supportsKeptWindows(ws, [...occupied, next]));
   }
 
   // ---- Tune (bottom sheets) ----
@@ -585,7 +603,7 @@ export function createToolWindows(options) {
 
   // ---- Move / resize (floating palettes) ----
   function startDrag(e, tool, kind) {
-    if (profile !== "float" || drag || (e.button !== undefined && e.button !== 0)) return;
+    if (profile !== "float" || parked || drag || (e.button !== undefined && e.button !== 0)) return;
     if (kind === "move" && e.target.closest("button")) return;
     const win = windows.get(tool);
     e.preventDefault();
@@ -634,6 +652,7 @@ export function createToolWindows(options) {
   // ---- Layout ----
   function rectFor(tool) {
     if (profile !== "float") return defaultRect(profile, ws, metrics());
+    if (parked) return clampRect(defaultRect("float", ws, metrics()), ws);
     const key = state.main === tool ? "main" : tool;
     const saved = state.rects[key];
     if (saved) return clampRect(resolveRect(saved, ws), ws);
@@ -662,7 +681,17 @@ export function createToolWindows(options) {
   }
   function apply() {
     measureWorkspace();
-    const shown = profile === "float" ? openTools(state) : [frontTool(state)].filter(Boolean);
+    parked = false;
+    const open = openTools(state);
+    if (profile === "float" && open.filter((t) => !state.minimized.includes(t)).length > 1) {
+      // Viewport capacity controls responsive parking. Deliberately moving
+      // a palette on a spacious desktop must not snap it back or hide it.
+      const base = clampRect(defaultRect("float", ws, metrics()), ws);
+      const next = placeWindow(base, [base], ws);
+      parked = !next || !supportsKeptWindows(ws, [base, next]);
+    }
+    app.dataset.parked = String(parked);
+    const shown = profile === "float" && !parked ? open : [frontTool(state)].filter(Boolean);
     const rects = new Map();
     // Hide first (remember scroll), then show (restore it).
     for (const [id, win] of windows) {
@@ -751,6 +780,7 @@ export function createToolWindows(options) {
       offset,
       sheetLift,
       rightShift,
+      parked,
       clearFraction: clearFraction(ws, obstacles),
       windows: [...rects].map(([tool, r]) => ({ tool, ...r })),
     };
@@ -802,6 +832,7 @@ export function createToolWindows(options) {
         offset: info.offset,
         clearFraction: info.clearFraction,
         rects: Object.fromEntries(info.windows.map(({ tool, ...r }) => [tool, r])),
+        parked: info.parked,
         menuOpen: rail.classList.contains("menu-open"),
       };
     },
