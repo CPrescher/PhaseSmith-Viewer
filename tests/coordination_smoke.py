@@ -59,7 +59,7 @@ async def run(browser_type, touch):
     )
     while await page.locator("#pair-rules .pair-rule").count():
         await click_control(
-            page, page.locator("#pair-rules .pair-rule button").first, touch
+            page, page.locator('#pair-rules button[aria-label^="Delete "]').first, touch
         )
     await click_control(page, page.locator("#add-rule"), touch)
     rows = page.locator("#pair-rules .pair-rule")

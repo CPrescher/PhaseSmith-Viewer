@@ -155,31 +155,27 @@ async def run(browser_type, touch):
     await frames(page, 60)
     assert abs(norm(eye(await diagnostics(page))) - before) > 0.01
     # Real taps remain functional after complete rotations and zoom.
-    d = await diagnostics(page)
-    candidates = [
-        a
-        for a in d["atoms"]
-        if box["x"] + 30 < a["x"] < box["x"] + box["width"] - 30
-        and box["y"] + 100 < a["y"] < box["y"] + box["height"] - 40
-        and all(
-            a["id"] == b["id"] or math.dist((a["x"], a["y"]), (b["x"], b["y"])) > 20
-            for b in d["atoms"]
+    async def exposed_atoms():
+        atoms = (await diagnostics(page))["atoms"]
+        hit_ids = await page.evaluate(
+            """atoms => atoms.filter(a =>
+              document.elementFromPoint(a.x, a.y)?.tagName === 'CANVAS'
+            ).map(a => a.id)""",
+            atoms,
         )
-    ]
+        return [
+            a for a in atoms if a["id"] in hit_ids
+            and all(
+                a["id"] == b["id"] or math.dist((a["x"], a["y"]), (b["x"], b["y"])) > 20
+                for b in atoms
+            )
+        ]
+
+    candidates = await exposed_atoms()
     if len(candidates) < 2:
         await page.locator("#reset").click()
         await frames(page, 30)
-        d = await diagnostics(page)
-        candidates = [
-            a
-            for a in d["atoms"]
-            if box["x"] + 30 < a["x"] < box["x"] + box["width"] - 30
-            and box["y"] + 100 < a["y"] < box["y"] + box["height"] - 40
-            and all(
-                a["id"] == b["id"] or math.dist((a["x"], a["y"]), (b["x"], b["y"])) > 20
-                for b in d["atoms"]
-            )
-        ]
+        candidates = await exposed_atoms()
     assert len(candidates) >= 2, "No unobscured test pair"
     candidates.sort(
         key=lambda a: math.dist(

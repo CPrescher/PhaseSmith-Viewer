@@ -47,7 +47,7 @@ async def run(browser_type, touch):
     assert "wollaston" in (await diagnostics(page))["block"].lower()
     rows = page.locator("#pair-rules .pair-rule")
     while await rows.count():
-        await click_control(page, rows.first.locator("button"), touch)
+        await click_control(page, rows.first.locator('button[aria-label^="Delete "]'), touch)
     await click_control(page, page.locator("#add-rule"), touch)
     row = rows.first
     await row.locator('[data-field="center"]').select_option("Si")

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { TrackballControls } from "three/addons/controls/TrackballControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import "./style.css";
 import {
   defaultRanges,
@@ -9,6 +10,14 @@ import {
 } from "./plot-range.js";
 import { latticeViewDirection } from "./view-direction.js";
 import { buildCoordinationEnvironments, convexHull } from "./coordination.js";
+import {
+  createAppearance,
+  clearAppearance,
+  atomStyle,
+  polyhedronStyle,
+  polyKey,
+  createAppearanceEditor,
+} from "./appearance.js";
 const $ = (id) => document.getElementById(id),
   viewport = $("viewport");
 function initialize() {
@@ -119,6 +128,23 @@ function initialize() {
     controls.update();
     syncViewCamera();
     renderer.render(scene, viewCamera);
+    // The pressed view button stays lit only while the camera still looks
+    // along that direction; any rotation away from it clears the state.
+    if (
+      activeView &&
+      camera.position.clone().sub(controls.target).normalize().dot(activeView.dir) <
+        0.99995
+    )
+      setActiveView(null);
+  }
+  let activeView = null;
+  function setActiveView(id, dir) {
+    activeView = id ? { id, dir: dir.clone() } : null;
+    for (const axis of ["a", "b", "c"])
+      $(`view-${axis}`).setAttribute("aria-pressed", String(axis === id));
+    document
+      .querySelector(".view-directions details")
+      .classList.toggle("active", id === "uvw");
   }
   function invalidate() {
     if (!frame) frame = requestAnimationFrame(render);
@@ -170,7 +196,54 @@ function initialize() {
     Ca: 0.56,
     Fe: 0.45,
   };
-  const colorFor = (e) => colors[e] || "#acb5cf";
+  const defaultColor = (e) => colors[e] || "#acb5cf";
+  const appearance = createAppearance();
+  let styleEditor = null;
+  // Element-wide colour (used by the element chips and as the inherited
+  // value for individual atoms).
+  const colorFor = (e) => appearance.elements.get(e)?.color ?? defaultColor(e);
+  const styleOf = (a) => atomStyle(appearance, a.element, atomKey(a), defaultColor(a.element));
+  // Drawn radius = element default × global Size × appearance scale. The
+  // same value drives the instance matrix, picking and the selection halo.
+  const atomRadius = (a) =>
+    (radii[a.element] || 0.42) * Number($("size").value) * styleOf(a).scale;
+  const ruleColor = (rule) =>
+    rule.color ??
+    pairColors[Math.max(rules.indexOf(rule), 0) % pairColors.length];
+  // A neutral procedural studio (no remote assets) lights the atoms only:
+  // soft panel reflections give broad highlights, while polyhedra and bonds
+  // keep their existing flat, colour-true shading.
+  const studio = (() => {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const room = new RoomEnvironment();
+    const texture = pmrem.fromScene(room, 0.04).texture;
+    room.dispose();
+    pmrem.dispose();
+    return texture;
+  })();
+  function atomMaterial(color) {
+    // Satin finish: a broad, modest key highlight and only a faint studio
+    // reflection, so saturated element colours are not lifted to white and
+    // the shaded side keeps depth (no clear coat, which added white rims).
+    return new THREE.MeshStandardMaterial({
+      color,
+      // Grazing-angle studio reflection produced a pale rim on the upper
+      // silhouette; a weaker, rougher reflection keeps the edge colored.
+      roughness: 0.56,
+      metalness: 0,
+      envMap: studio,
+      envMapIntensity: 0.08,
+    });
+  }
+  // Segment count follows a fixed triangle budget, so small scenes get
+  // smooth silhouettes at close zoom and large supercells stay light,
+  // without abrupt steps between structure sizes.
+  function sphereDetail(count) {
+    const width = Math.round(
+      THREE.MathUtils.clamp(Math.sqrt(1.2e6 / Math.max(count, 1)), 10, 64),
+    );
+    return [width, Math.max(8, Math.round(width * 0.75))];
+  }
   function cart(frac) {
     return new THREE.Vector3(
       ...structure.basis.map((row) =>
@@ -233,35 +306,30 @@ function initialize() {
       if (!byElement.has(a.element)) byElement.set(a.element, []);
       byElement.get(a.element).push(a);
     });
-    const detail =
-      atoms.length > 10000
-        ? [10, 8]
-        : atoms.length > 2000
-          ? [16, 12]
-          : [28, 20];
-    const sphere = new THREE.SphereGeometry(1, ...detail),
+    const sphere = new THREE.SphereGeometry(1, ...sphereDetail(atoms.length)),
       matrix = new THREE.Matrix4(),
       rotation = new THREE.Quaternion(),
       scale = new THREE.Vector3(),
-      size = Number($("size").value);
+      tint = new THREE.Color();
     for (const [e, list] of byElement) {
+      // One instanced mesh per element; per-copy colours ride on the
+      // instance colour attribute (material colour stays white).
       const mesh = new THREE.InstancedMesh(
         sphere.clone(),
-        new THREE.MeshStandardMaterial({
-          color: colorFor(e),
-          roughness: 0.34,
-          metalness: 0.06,
-        }),
+        atomMaterial(0xffffff),
         list.length,
       );
       mesh.visible = atomVisible(list[0]);
       mesh.userData.atoms = list;
       list.forEach((a, i) => {
-        a.radius = (radii[e] || 0.42) * size;
+        a.radius = atomRadius(a);
+        a.color = styleOf(a).color;
         matrix.compose(a.position, rotation, scale.setScalar(a.radius));
         mesh.setMatrixAt(i, matrix);
+        mesh.setColorAt(i, tint.set(a.color));
       });
       mesh.instanceMatrix.needsUpdate = true;
+      mesh.instanceColor.needsUpdate = true;
       model.add(mesh);
       meshes.push(mesh);
     }
@@ -272,6 +340,13 @@ function initialize() {
     for (const atom of atoms) {
       fitBounds.expandByPoint(atom.position.clone().addScalar(atom.radius));
       fitBounds.expandByPoint(atom.position.clone().addScalar(-atom.radius));
+    }
+    // Enlarged polyhedra (display scale > 100%) reach past their ligand
+    // atoms; their drawn vertices count when fitting the view.
+    for (const faces of faceMeshes.values()) {
+      if (!faces.visible) continue;
+      faces.geometry.computeBoundingBox();
+      fitBounds.union(faces.geometry.boundingBox);
     }
     const points = rangeEdges(plotRanges).map((p) => cart(p).sub(modelCenter));
     cellLines = new THREE.LineSegments(
@@ -292,6 +367,63 @@ function initialize() {
     camera.updateProjectionMatrix();
     updateAtomSummary();
     updateSelection();
+    updatePickMarker();
+    invalidate();
+  }
+  // Unobtrusive marker for an individually picked appearance target: a
+  // thin amber shell around the atom, or amber edges on the polyhedron.
+  // Shown only while the Appearance editor is open.
+  const pickGroup = new THREE.Group();
+  scene.add(pickGroup);
+  function updatePickMarker(target = styleEditor?.open ? styleEditor.target : null) {
+    dispose(pickGroup);
+    pickGroup.clear();
+    const value = target || "";
+    if (value.startsWith("atom:")) {
+      const key = value.slice(5);
+      const atom = atoms.find((a) => atomKey(a) === key && atomVisible(a));
+      if (atom) {
+        const shell = new THREE.Mesh(
+          new THREE.SphereGeometry(atom.radius * 1.09, 48, 32),
+          new THREE.MeshBasicMaterial({
+            color: 0xffc46b,
+            side: THREE.BackSide,
+            transparent: true,
+            opacity: 0.85,
+          }),
+        );
+        shell.position.copy(atom.position);
+        pickGroup.add(shell);
+      }
+    } else if (value.startsWith("poly:")) {
+      const [ruleId, key] = value.slice(5).split("|");
+      const faces = faceMeshes.get(Number(ruleId));
+      const owner = faces?.userData.hulls.findIndex((h) => atomKey(h.center) === key);
+      if (faces?.visible && owner >= 0) {
+        const { center, vertices, hull } = faces.userData.hulls[owner];
+        const s = faces.userData.styles[owner].scale;
+        const points = hull.edges.flatMap((edge) =>
+          edge.map((i) =>
+            vertices[i].position
+              .clone()
+              .sub(center.position)
+              .multiplyScalar(s)
+              .add(center.position),
+          ),
+        );
+        const edges = new THREE.LineSegments(
+          new THREE.BufferGeometry().setFromPoints(points),
+          new THREE.LineBasicMaterial({
+            color: 0xffc46b,
+            transparent: true,
+            opacity: 0.95,
+            depthTest: false,
+          }),
+        );
+        edges.renderOrder = 6;
+        pickGroup.add(edges);
+      }
+    }
     invalidate();
   }
   function resetRules() {
@@ -335,89 +467,443 @@ function initialize() {
     } else $("polyhedra-only").checked = false;
     renderRules();
   }
+  const pairName = (rule) => `${rule.center}–${rule.neighbor}`;
+  const CUTOFF_MIN = 0.1;
+  // At least hundredths are always shown (1.80); typed precision is shown
+  // exactly as entered (2.123456 stays 2.123456, never rounded).
+  const decimals = (value) => String(value).split(".")[1]?.length ?? 0;
+  const formatCutoff = (value) =>
+    decimals(value) < 2 ? value.toFixed(2) : String(value);
+  // Speed track: deflection from centre sets a rate, not a value. A small
+  // dead zone, then an exponential curve from 0.03 Å/s (≈ one 0.01 Å step
+  // every third of a second) to 2 Å/s at full deflection.
+  const SPEED_DEAD_ZONE = 0.07,
+    SPEED_SLOW = 0.03,
+    SPEED_FAST = 2,
+    SPEED_QUANTUM = 0.01;
+  function speedRate(normalized) {
+    const magnitude = Math.abs(normalized);
+    if (magnitude <= SPEED_DEAD_ZONE) return 0;
+    const u = Math.min((magnitude - SPEED_DEAD_ZONE) / (1 - SPEED_DEAD_ZONE), 1);
+    return Math.sign(normalized) * SPEED_SLOW * (SPEED_FAST / SPEED_SLOW) ** u;
+  }
+  function parseCutoff(text) {
+    const t = text.trim().replace(",", ".").replace(/\s*Å$/, "");
+    if (!/^\+?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(t)) return null;
+    const value = Number(t);
+    return Number.isFinite(value) && value >= CUTOFF_MIN ? value : null;
+  }
+  // Discrete steps are exact increments (2.15 → 2.25), floored at the minimum.
+  function stepCutoff(value, sign, size = 0.1) {
+    // Keep the value's own precision: 2.123456 + 0.1 → 2.223456.
+    const places = Math.min(12, Math.max(decimals(value), decimals(size)));
+    return Math.max(CUTOFF_MIN, Number((value + sign * size).toFixed(places)));
+  }
+  let openCutoffRule = null,
+    pendingBuild = null,
+    lastLiveBuild = 0,
+    structureGeneration = 0;
+  // Live cutoff/appearance changes are coalesced: at most one rebuild per
+  // ~60 ms, on an animation frame, with the latest state. A rebuild queued
+  // for a previous document is cancelled on load and never runs.
+  function scheduleBuild() {
+    if (pendingBuild) return;
+    const generation = structureGeneration;
+    const wait = Math.max(0, 60 - (performance.now() - lastLiveBuild));
+    pendingBuild = { timer: 0, frame: 0 };
+    pendingBuild.timer = setTimeout(() => {
+      pendingBuild.frame = requestAnimationFrame(() => {
+        pendingBuild = null;
+        if (generation !== structureGeneration || !structure) return;
+        lastLiveBuild = performance.now();
+        build();
+      });
+    }, wait);
+  }
+  function cancelScheduledBuild() {
+    if (!pendingBuild) return;
+    clearTimeout(pendingBuild.timer);
+    cancelAnimationFrame(pendingBuild.frame);
+    pendingBuild = null;
+  }
+  function closeTuners(except) {
+    for (const tuner of document.querySelectorAll(".cutoff-tuner:not([hidden])"))
+      if (tuner !== except) tuner.close?.();
+  }
+  // Touch-friendly dismissal: a press anywhere outside the open pair closes
+  // its tuner, but only after that press has finished (its click included).
+  // Closing at press time would reflow the panel and move the control under
+  // the pointer before release, so the click would land elsewhere.
+  let pointerPressed = false,
+    suppressTunerOpen = false,
+    pendingDismiss = null;
+  function finishDismiss() {
+    if (!pendingDismiss) return;
+    const { tuner, timer, then } = pendingDismiss;
+    clearTimeout(timer);
+    pendingDismiss = null;
+    window.removeEventListener("click", finishDismiss);
+    if (!tuner.hidden) tuner.close();
+    then?.(); // e.g. open the tuner of a different cutoff field just tapped
+  }
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      pointerPressed = true;
+      const open = document.querySelector(".cutoff-tuner:not([hidden])");
+      if (open && !open.closest(".pair-rule").contains(e.target)) {
+        finishDismiss();
+        pendingDismiss = { tuner: open, timer: 0 };
+      }
+    },
+    true,
+  );
+  const release = () => {
+    pointerPressed = false;
+    if (!pendingDismiss || pendingDismiss.timer) return;
+    // Bubble-phase click on window runs after the target's own handlers.
+    // Drags and presses without a click fall back to a timer long enough
+    // for a delayed touch click (touchend → focus → click).
+    window.addEventListener("click", finishDismiss);
+    pendingDismiss.timer = setTimeout(finishDismiss, 600);
+  };
+  document.addEventListener("pointerup", release, true);
+  document.addEventListener("pointercancel", release, true);
+  const make = (tag, props = {}) =>
+    Object.assign(document.createElement(tag), props);
+  // Each pair is one compact row: element selectors, cutoff and delete on
+  // top; bond/polyhedron toggles, live face opacity and counts below.
   function renderRules() {
     const elements = [...new Set(structure.atoms.map((a) => a.element))];
     $("pair-rules").replaceChildren(
       ...rules.map((rule, index) => {
-        const card = document.createElement("div");
-        card.className = "pair-rule";
-        card.style.setProperty(
-          "--pair-color",
-          pairColors[index % pairColors.length],
-        );
-        const heading = document.createElement("div");
-        heading.className = "pair-heading";
-        const title = document.createElement("span");
-        title.textContent = `${rule.center} → ${rule.neighbor}`;
-        const remove = document.createElement("button");
-        remove.className = "text-button";
-        remove.textContent = "Delete";
+        const card = make("div", { className: "pair-rule" });
+        card.dataset.ruleId = rule.id;
+        card.style.setProperty("--pair-color", ruleColor(rule));
+        card.setAttribute("role", "group");
+        const inputs = {};
+        for (const field of ["center", "neighbor", "cutoff"]) {
+          let input;
+          if (field === "cutoff") {
+            // Plain decimal text: no tiny spinners, exact values like 2.15.
+            input = make("input", {
+              type: "text",
+              value: formatCutoff(rule.cutoff),
+              inputMode: "decimal",
+              autocomplete: "off",
+              spellcheck: false,
+              enterKeyHint: "done",
+              title: "Distance cutoff (Å) · ↑/↓ ±0.1 Å",
+            });
+          } else {
+            input = make("select", {
+              title: field === "center" ? "Center element" : "Neighbor element",
+            });
+            for (const e of elements)
+              input.append(make("option", { value: e, textContent: e }));
+            input.value = rule[field];
+          }
+          input.dataset.field = field;
+          inputs[field] = input;
+          input.onchange = () => {
+            if (field === "cutoff") {
+              const value = parseCutoff(input.value);
+              input.setCustomValidity(
+                value === null ? `Enter a cutoff of at least ${CUTOFF_MIN} Å.` : "",
+              );
+              if (value === null) {
+                input.reportValidity();
+                return;
+              }
+              setCutoff(value, false);
+              return;
+            }
+            rule[field] = input.value;
+            label();
+            build();
+          };
+        }
+        const remove = make("button", {
+          type: "button",
+          className: "icon-button",
+          textContent: "✕",
+        });
         remove.onclick = () => {
           rules = rules.filter((r) => r !== rule);
           renderRules();
           build();
         };
-        heading.append(title, remove);
-        const fields = document.createElement("div");
-        fields.className = "pair-fields";
-        for (const field of ["center", "neighbor", "cutoff"]) {
-          const label = document.createElement("label");
-          label.textContent =
-            field === "cutoff"
-              ? "Distance cutoff (Å)"
-              : field === "center"
-                ? "Center"
-                : "Neighbor";
-          let input;
-          if (field === "cutoff") {
-            label.className = "pair-cutoff";
-            input = document.createElement("input");
-            input.type = "number";
-            input.min = "0.1";
-            input.step = "any";
-            input.value = rule.cutoff;
-          } else {
-            input = document.createElement("select");
-            for (const e of elements) {
-              const o = document.createElement("option");
-              o.value = o.textContent = e;
-              input.append(o);
-            }
-            input.value = rule[field];
-          }
-          input.dataset.field = field;
-          input.setAttribute("aria-label", label.textContent);
-          input.onchange = () => {
-            if (
-              field === "cutoff" &&
-              (!input.checkValidity() || !Number.isFinite(Number(input.value)))
-            ) {
-              input.reportValidity();
-              return;
-            }
-            rule[field] =
-              field === "cutoff" ? Number(input.value) : input.value;
-            title.textContent = `${rule.center} → ${rule.neighbor}`;
-            card
-              .querySelector('[data-field="opacity"]')
-              .setAttribute(
-                "aria-label",
-                `${rule.center} to ${rule.neighbor} polyhedra face opacity`,
-              );
-            build();
-          };
-          label.append(input);
-          fields.append(label);
+        const dash = make("span", { className: "dash", textContent: "–" });
+        dash.setAttribute("aria-hidden", "true");
+        const cutoff = make("label", { className: "pair-cutoff" });
+        const cutoffCaption = make("span", {
+          className: "micro",
+          textContent: "cutoff Å",
+        });
+        cutoffCaption.setAttribute("aria-hidden", "true");
+        cutoff.append(cutoffCaption, inputs.cutoff);
+        const main = make("div", { className: "pair-main" });
+        main.append(inputs.center, dash, inputs.neighbor, cutoff, remove);
+        // Cutoff tuner: opens directly below the field with a spring-loaded
+        // speed track and exact ±0.1 Å buttons. A first touch opens it
+        // without raising the software keyboard; a second tap focuses the
+        // field for exact typing.
+        const field = inputs.cutoff;
+        const tuner = make("div", {
+          className: "cutoff-tuner",
+          id: `pair-cutoff-tuner-${rule.id}`,
+          hidden: true,
+        });
+        const row = make("div", { className: "tuner-row" });
+        const track = make("div", { className: "speed-track", tabIndex: 0 });
+        track.dataset.field = "cutoff-speed";
+        track.setAttribute("role", "slider");
+        const hint = make("p", {
+          className: "tuner-hint",
+          id: `pair-cutoff-hint-${rule.id}`,
+          textContent: "Hold & drag · farther = faster · ←/→ ±0.01 Å",
+        });
+        track.setAttribute("aria-describedby", hint.id);
+        const knob = make("span", { className: "speed-knob" });
+        const fill = make("span", { className: "speed-fill" });
+        for (const [cls, text] of [
+          ["slow-left", "−"],
+          ["slow-right", "+"],
+        ]) {
+          const mark = make("span", { className: `speed-mark ${cls}`, textContent: text });
+          mark.setAttribute("aria-hidden", "true");
+          track.append(mark);
         }
-        const switches = document.createElement("div");
-        switches.className = "pair-switches";
+        knob.setAttribute("aria-hidden", "true");
+        fill.setAttribute("aria-hidden", "true");
+        track.append(fill, knob);
+        const stepButton = (sign) => {
+          const button = make("button", {
+            type: "button",
+            className: "step-button",
+            textContent: sign < 0 ? "−" : "+",
+          });
+          button.onclick = () => setCutoff(stepCutoff(rule.cutoff, sign), true);
+          return button;
+        };
+        const down = stepButton(-1),
+          up = stepButton(1);
+        const done = make("button", {
+          type: "button",
+          className: "icon-button done-button",
+          textContent: "✓",
+          title: "Close",
+        });
+        row.append(down, track, up, done);
+        tuner.append(row, hint);
+        field.setAttribute("aria-controls", tuner.id);
+        field.setAttribute("aria-expanded", "false");
+        const syncSlider = () => {
+          track.setAttribute("aria-valuenow", String(rule.cutoff));
+          track.setAttribute("aria-valuemin", String(CUTOFF_MIN));
+          track.setAttribute("aria-valuetext", `${formatCutoff(rule.cutoff)} Å`);
+        };
+        // Drag state. The rate loop runs on animation frames with a capped
+        // time step, so it is independent of pointer-event cadence and never
+        // catches up after a stalled or background tab.
+        let drag = null;
+        function showDeflection(px) {
+          track.style.setProperty("--deflect", `${px}px`);
+          fill.style.left = px < 0 ? `calc(50% - ${-px}px)` : "50%";
+          fill.style.width = `${Math.abs(px)}px`;
+          track.classList.toggle("dragging", Boolean(drag));
+        }
+        function stopDrag() {
+          if (!drag) return;
+          cancelAnimationFrame(drag.frame);
+          if (track.hasPointerCapture?.(drag.pointer))
+            track.releasePointerCapture(drag.pointer);
+          drag = null;
+          window.removeEventListener("blur", stopDrag);
+          document.removeEventListener("visibilitychange", stopOnHidden);
+          showDeflection(0); // springs back via CSS transition
+        }
+        const stopOnHidden = () => {
+          if (document.hidden) stopDrag();
+        };
+        function tick(now) {
+          if (!drag) return;
+          if (!track.isConnected || tuner.hidden) return stopDrag();
+          const dt = Math.min((now - drag.last) / 1000, 0.05);
+          drag.last = now;
+          const half = track.clientWidth / 2 || 1;
+          const rate = drag.moved ? speedRate(drag.offset / half) : 0;
+          if (rate) {
+            drag.carry += rate * dt;
+            let value = rule.cutoff;
+            while (Math.abs(drag.carry) >= SPEED_QUANTUM) {
+              const sign = Math.sign(drag.carry);
+              drag.carry -= sign * SPEED_QUANTUM;
+              value = stepCutoff(value, sign, SPEED_QUANTUM);
+              if (value <= CUTOFF_MIN) {
+                drag.carry = 0;
+                break;
+              }
+            }
+            if (value !== rule.cutoff) setCutoff(value, true);
+          } else drag.carry = 0;
+          drag.frame = requestAnimationFrame(tick);
+        }
+        track.addEventListener("pointerdown", (e) => {
+          if (e.button !== 0 || drag) return;
+          e.preventDefault(); // no text selection, scrolling or focus jump
+          track.focus({ preventScroll: true });
+          track.setPointerCapture(e.pointerId);
+          const rect = track.getBoundingClientRect();
+          drag = {
+            pointer: e.pointerId,
+            centre: rect.left + rect.width / 2,
+            startX: e.clientX,
+            offset: 0,
+            moved: false,
+            carry: 0,
+            last: performance.now(),
+            frame: 0,
+          };
+          window.addEventListener("blur", stopDrag);
+          document.addEventListener("visibilitychange", stopOnHidden);
+          drag.frame = requestAnimationFrame(tick);
+        });
+        track.addEventListener("pointermove", (e) => {
+          if (!drag || e.pointerId !== drag.pointer) return;
+          // Nothing changes until the pointer actually moves, so pressing
+          // never jumps the value.
+          if (!drag.moved && Math.abs(e.clientX - drag.startX) < 3) return;
+          drag.moved = true;
+          const half = track.clientWidth / 2;
+          drag.offset = Math.max(-half, Math.min(half, e.clientX - drag.centre));
+          showDeflection(drag.offset);
+        });
+        for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
+          track.addEventListener(type, (e) => {
+            if (drag && e.pointerId === drag.pointer) stopDrag();
+          });
+        track.addEventListener("keydown", (e) => {
+          const fine = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1 }[e.key];
+          const coarse = { PageDown: -1, PageUp: 1 }[e.key];
+          if (fine || coarse) {
+            e.preventDefault();
+            setCutoff(stepCutoff(rule.cutoff, fine || coarse, fine ? 0.01 : 0.1), true);
+          }
+        });
+        function setCutoff(value, live) {
+          rule.cutoff = value;
+          field.value = formatCutoff(value);
+          field.setCustomValidity("");
+          syncSlider();
+          if (live) scheduleBuild();
+          else build();
+        }
+        const openTuner = () => {
+          if (!tuner.hidden || suppressTunerOpen) return;
+          // Another pair's tuner is being dismissed by this very press:
+          // switch only after the click is delivered, in one reflow.
+          if (pendingDismiss && pendingDismiss.tuner !== tuner) {
+            pendingDismiss.then = openTuner;
+            return;
+          }
+          closeTuners(tuner);
+          syncSlider();
+          tuner.hidden = false;
+          field.setAttribute("aria-expanded", "true");
+          card.classList.add("tuning");
+          openCutoffRule = rule.id;
+        };
+        tuner.close = () => {
+          stopDrag();
+          tuner.hidden = true;
+          field.setAttribute("aria-expanded", "false");
+          card.classList.remove("tuning");
+          if (openCutoffRule === rule.id) openCutoffRule = null;
+        };
+        // Any press on a closed field opens its tuner. Touch/pen open it
+        // without focusing (no software keyboard; a second tap types);
+        // a mouse press also places the caret for exact editing, even
+        // when the field already has focus (e.g. after Done).
+        //
+        // Touch/pen: the tuner opens only once this tap's click has been
+        // delivered to the field. Opening at pointerdown grew the portrait
+        // dock under the finger, so the compatibility click landed on the
+        // newly exposed "+" and changed the cutoff. Long holds without a
+        // click open after a clean release; pans and cancels never open.
+        let touchOpen = null;
+        const openFromTouch = () => {
+          if (!touchOpen) return;
+          clearTimeout(touchOpen.timer);
+          touchOpen = null;
+          openTuner();
+        };
+        field.addEventListener("pointerdown", (e) => {
+          if (!tuner.hidden) return;
+          if (e.pointerType === "mouse") {
+            openTuner();
+            return;
+          }
+          e.preventDefault(); // no focus, so no software keyboard yet
+          clearTimeout(touchOpen?.timer);
+          touchOpen = { id: e.pointerId, x: e.clientX, y: e.clientY, timer: 0 };
+        });
+        field.addEventListener("pointerup", (e) => {
+          if (!touchOpen || e.pointerId !== touchOpen.id) return;
+          if (Math.hypot(e.clientX - touchOpen.x, e.clientY - touchOpen.y) > 10) {
+            touchOpen = null;
+            return;
+          }
+          touchOpen.timer = setTimeout(openFromTouch, 400);
+        });
+        field.addEventListener("pointercancel", () => {
+          clearTimeout(touchOpen?.timer);
+          touchOpen = null;
+        });
+        field.addEventListener("click", openFromTouch);
+        field.addEventListener("focus", openTuner);
+        field.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+            e.preventDefault();
+            const typed = parseCutoff(field.value) ?? rule.cutoff;
+            openTuner();
+            setCutoff(stepCutoff(typed, e.key === "ArrowUp" ? 1 : -1), true);
+          } else if (e.key === "Escape") tuner.close();
+        });
+        // Returning focus to the field after Done/Escape must not reopen it.
+        const closeAndRefocus = () => {
+          tuner.close();
+          suppressTunerOpen = true;
+          field.focus({ preventScroll: true });
+          suppressTunerOpen = false;
+        };
+        done.onclick = closeAndRefocus;
+        tuner.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") closeAndRefocus();
+        });
+        // Keyboard focus leaving the pair closes the tuner. Pointer presses
+        // are handled by the deferred outside-press logic instead, so the
+        // panel does not reflow under a control between press and release.
+        card.addEventListener("focusout", (e) => {
+          // Touch moves focus after pointerup/touchend, so also wait while
+          // a deferred outside-press dismissal for this tuner is pending.
+          if (pointerPressed || pendingDismiss?.tuner === tuner) return;
+          if (e.relatedTarget && !card.contains(e.relatedTarget)) tuner.close();
+        });
+        if (openCutoffRule === rule.id) {
+          openCutoffRule = null;
+          openTuner();
+        }
+        const sub = make("div", { className: "pair-sub" });
+        const toggles = {};
         for (const field of ["bonds", "polyhedra"]) {
-          const label = document.createElement("label");
-          label.className = "toggle";
-          const input = document.createElement("input");
-          input.type = "checkbox";
-          input.checked = rule[field];
+          const chip = make("label", { className: "chip small" });
+          const input = make("input", {
+            type: "checkbox",
+            checked: rule[field],
+          });
           input.dataset.field = field;
+          toggles[field] = input;
           input.onchange = () => {
             if (
               field === "polyhedra" &&
@@ -426,55 +912,90 @@ function initialize() {
             )
               $("polyhedra-only").checked = true;
             rule[field] = input.checked;
+            card.classList.toggle("no-faces", !rule.polyhedra);
             build();
           };
-          label.append(
+          chip.append(
             input,
-            document.createTextNode(field === "bonds" ? "Bonds" : "Polyhedra"),
+            make("span", {
+              textContent: field === "bonds" ? "Bonds" : "Polyhedra",
+            }),
           );
-          switches.append(label);
+          sub.append(chip);
         }
-        const counts = document.createElement("p");
-        counts.className = "pair-counts";
-        counts.id = `pair-count-${rule.id}`;
-        const opacityLabel = document.createElement("label");
-        opacityLabel.className = "polyhedra-opacity";
-        const opacityHeading = document.createElement("span");
-        opacityHeading.textContent = "Face opacity";
-        const opacityValue = document.createElement("output");
-        opacityValue.id = `pair-opacity-value-${rule.id}`;
-        const opacityInput = document.createElement("input");
-        opacityInput.type = "range";
-        opacityInput.min = "0";
-        opacityInput.max = "100";
-        opacityInput.step = "1";
-        opacityInput.value = Math.round((rule.opacity ?? 0.34) * 100);
-        opacityInput.id = `pair-opacity-${rule.id}`;
+        const opacityLabel = make("label", { className: "polyhedra-opacity" });
+        const opacityValue = make("output", {
+          id: `pair-opacity-value-${rule.id}`,
+        });
+        const opacityInput = make("input", {
+          type: "range",
+          min: "0",
+          max: "100",
+          step: "1",
+          value: Math.round((rule.opacity ?? 0.34) * 100),
+          id: `pair-opacity-${rule.id}`,
+          title: "Polyhedron face opacity",
+        });
         opacityInput.dataset.field = "opacity";
-        opacityInput.setAttribute(
-          "aria-label",
-          `${rule.center} to ${rule.neighbor} polyhedra face opacity`,
-        );
         opacityInput.setAttribute("aria-describedby", opacityValue.id);
         opacityValue.htmlFor = opacityInput.id;
-        const updateOpacity = () => {
-          rule.opacity = Number(opacityInput.value) / 100;
+        const showOpacity = () => {
           opacityValue.value = `${opacityInput.value}%`;
           opacityInput.setAttribute("aria-valuetext", `${opacityInput.value}%`);
+        };
+        opacityInput.oninput = () => {
+          rule.opacity = Number(opacityInput.value) / 100;
+          showOpacity();
           const stat = coordinationStats.find((s) => s.id === rule.id);
           if (stat) stat.opacity = rule.opacity;
           const mesh = faceMeshes.get(rule.id);
           if (mesh) setFaceOpacity(mesh, rule.opacity);
           invalidate();
         };
-        opacityInput.oninput = updateOpacity;
-        opacityValue.value = `${opacityInput.value}%`;
-        opacityInput.setAttribute("aria-valuetext", `${opacityInput.value}%`);
-        opacityLabel.append(opacityHeading, opacityValue, opacityInput);
-        card.append(heading, fields, switches, opacityLabel, counts);
+        showOpacity();
+        const opacityCaption = make("span", {
+          className: "caption",
+          textContent: "Opacity",
+        });
+        opacityCaption.setAttribute("aria-hidden", "true");
+        opacityLabel.append(opacityCaption, opacityInput, opacityValue);
+        sub.append(opacityLabel);
+        const counts = make("p", {
+          className: "pair-counts",
+          id: `pair-count-${rule.id}`,
+        });
+        function label() {
+          const name = pairName(rule);
+          card.setAttribute("aria-label", `${name} pair`);
+          inputs.center.setAttribute("aria-label", `${name} center element`);
+          inputs.neighbor.setAttribute("aria-label", `${name} neighbor element`);
+          inputs.cutoff.setAttribute(
+            "aria-label",
+            `${name} distance cutoff (Å)`,
+          );
+          track.setAttribute(
+            "aria-label",
+            `${name} cutoff speed control (Å)`,
+          );
+          down.setAttribute("aria-label", `Decrease ${name} cutoff by 0.1 Å`);
+          up.setAttribute("aria-label", `Increase ${name} cutoff by 0.1 Å`);
+          done.setAttribute("aria-label", `Close ${name} cutoff slider`);
+          remove.setAttribute("aria-label", `Delete ${name} pair`);
+          remove.title = `Delete ${name}`;
+          toggles.bonds.setAttribute("aria-label", `${name} bonds`);
+          toggles.polyhedra.setAttribute("aria-label", `${name} polyhedra`);
+          opacityInput.setAttribute(
+            "aria-label",
+            `${rule.center} to ${rule.neighbor} polyhedra face opacity`,
+          );
+        }
+        label();
+        card.classList.toggle("no-faces", !rule.polyhedra);
+        card.append(main, tuner, sub, counts);
         return card;
       }),
     );
+    styleEditor?.refresh();
   }
   $("add-rule").onclick = () => {
     if (!structure) return;
@@ -549,7 +1070,8 @@ function initialize() {
         outsideAtomCount: 0,
       };
       const plan = {
-        color: pairColors[index % pairColors.length],
+        color: ruleColor(rule),
+        rule,
         hulls: [],
         bonds: [],
         stat,
@@ -656,37 +1178,83 @@ function initialize() {
         cylinders.instanceMatrix.needsUpdate = true;
         model.add(cylinders);
       }
+      // All polyhedra of a pair share one face mesh and one edge mesh.
+      // Per-polyhedron colour is a vertex colour; per-polyhedron display
+      // scale moves face and edge vertices together toward the central
+      // atom. Atom positions themselves are never moved.
       const positions = [],
-        edges = [];
-      for (const { vertices, hull } of plan.hulls) {
-        for (const face of hull.faces)
-          for (const i of face)
-            positions.push(...vertices[i].position.toArray());
+        faceColors = [],
+        edges = [],
+        edgeColors = [],
+        owners = [],
+        styles = [],
+        tint = new THREE.Color(),
+        point = new THREE.Vector3();
+      plan.hulls.forEach(({ center, vertices, hull }, owner) => {
+        const key = atomKey(center);
+        const style = polyhedronStyle(appearance, plan.rule, key, plan.color);
+        styles.push({ center: key, color: style.color, scale: style.scale });
+        tint.set(style.color);
+        const place = (atom) =>
+          point
+            .copy(atom.position)
+            .sub(center.position)
+            .multiplyScalar(style.scale)
+            .add(center.position);
+        for (const face of hull.faces) {
+          owners.push(owner);
+          for (const i of face) {
+            positions.push(...place(vertices[i]).toArray());
+            faceColors.push(tint.r, tint.g, tint.b);
+          }
+        }
         for (const edge of hull.edges)
-          for (const i of edge) edges.push(vertices[i].position);
-      }
+          for (const i of edge) {
+            edges.push(...place(vertices[i]).toArray());
+            edgeColors.push(tint.r, tint.g, tint.b);
+          }
+      });
       if (positions.length) {
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute(
           "position",
           new THREE.Float32BufferAttribute(positions, 3),
         );
+        geometry.setAttribute(
+          "color",
+          new THREE.Float32BufferAttribute(faceColors, 3),
+        );
         geometry.computeVertexNormals();
         const faces = new THREE.Mesh(
           geometry,
           new THREE.MeshStandardMaterial({
-            color: plan.color,
+            color: 0xffffff,
+            vertexColors: true,
             side: THREE.DoubleSide,
             roughness: 0.8,
           }),
         );
         setFaceOpacity(faces, plan.stat.opacity ?? 0.34);
+        faces.userData.rule = plan.rule;
+        faces.userData.color = plan.color;
+        faces.userData.owners = owners;
+        faces.userData.hulls = plan.hulls;
+        faces.userData.styles = styles;
         faceMeshes.set(plan.stat.id, faces);
         model.add(faces);
+        const edgeGeometry = new THREE.BufferGeometry();
+        edgeGeometry.setAttribute(
+          "position",
+          new THREE.Float32BufferAttribute(edges, 3),
+        );
+        edgeGeometry.setAttribute(
+          "color",
+          new THREE.Float32BufferAttribute(edgeColors, 3),
+        );
         const outline = new THREE.LineSegments(
-          new THREE.BufferGeometry().setFromPoints(edges),
+          edgeGeometry,
           new THREE.LineBasicMaterial({
-            color: plan.color,
+            vertexColors: true,
             transparent: true,
             opacity: 0.9,
           }),
@@ -715,30 +1283,35 @@ function initialize() {
       const siteCounts = Object.entries(stat.siteCounts)
         .map(([label, counts]) => `${label}: ${counts.join(", ")}`)
         .join(" · ");
+      p.title = siteCounts ? `Neighbors per site · ${siteCounts}` : "";
+      p.classList.toggle("error", Boolean(stat.error));
       p.textContent =
         stat.error ||
         (!(stat.bonds || stat.polyhedra)
-          ? "Enable Bonds or Polyhedra to inspect coordination."
-          : `${stat.counts.join(", ") || "0"} neighbors per center (${stat.centerCount || 0} centers) · ${stat.polyhedronCount} polyhedra · ${stat.bondCount} bonds. ${siteCounts}`);
+          ? "Off · enable bonds or polyhedra"
+          : `CN ${stat.counts.join(", ") || "0"} · ${stat.centerCount || 0} centers · ${stat.polyhedronCount} poly · ${stat.bondCount} bonds`);
     }
-    $("isolation-note").textContent = isolated
-      ? polyhedronCount
-        ? "Includes completed polyhedra, their centers, and all ligand atoms. Unconnected atoms are excluded; Show atoms and Elements control sphere visibility."
-        : "No complete polyhedra at these cutoffs. Adjust the cutoff, enable another pair, or turn off Polyhedra only to inspect the full structure."
-      : "All atoms are included. Polyhedra only keeps completed polyhedra and their atoms; Show atoms and Elements control sphere visibility.";
+    const note = $("isolation-note");
+    note.textContent =
+      isolated && !polyhedronCount
+        ? "No complete polyhedra at these cutoffs."
+        : rules.length
+          ? ""
+          : "Add a pair to draw bonds or polyhedra.";
+    note.hidden = !note.textContent;
   }
-  function orient(indices) {
+  function orient(indices, viewId = "uvw") {
     if (!structure) return;
     try {
       const { direction, up } = latticeViewDirection(structure.basis, indices);
       const target = controls.target.clone();
       const zoomDistance = camera.position.distanceTo(target);
+      const dir = new THREE.Vector3(...direction).normalize();
       stopMotion();
       camera.up.set(...up);
-      camera.position
-        .copy(target)
-        .addScaledVector(new THREE.Vector3(...direction), zoomDistance);
+      camera.position.copy(target).addScaledVector(dir, zoomDistance);
       controls.update();
+      setActiveView(viewId, dir);
       $("direction-error").textContent = "";
       invalidate();
     } catch (error) {
@@ -750,8 +1323,9 @@ function initialize() {
     ["b", [0, 1, 0]],
     ["c", [0, 0, 1]],
   ]) {
-    $(`view-${axis}`).onclick = () => orient(indices);
+    $(`view-${axis}`).onclick = () => orient(indices, axis);
   }
+  setActiveView(null);
   $("direction-form").onsubmit = (event) => {
     event.preventDefault();
     const text = $("view-direction")
@@ -773,15 +1347,29 @@ function initialize() {
     }
     orient(fields.map(Number));
   };
+  function overlayReserve() {
+    const view = viewport.getBoundingClientRect();
+    const top = document.querySelector(".view-top").getBoundingClientRect();
+    const bottom = document
+      .querySelector(".view-bottom")
+      .getBoundingClientRect();
+    return Math.max(top.bottom - view.top, view.bottom - bottom.top, 0);
+  }
   function reset(keepOrientation = false) {
     if (!keepOrientation) selection = [];
     updateSelection();
     const sphere = fitBounds.getBoundingSphere(new THREE.Sphere());
     const vertical = THREE.MathUtils.degToRad(camera.fov / 2);
     const horizontal = Math.atan(Math.tan(vertical) * camera.aspect);
+    // Canvas toolbars sit along the top and bottom edges; fit the crystal
+    // between them so no control covers it after a reset.
+    const height = viewport.clientHeight || 1;
+    const usable = Math.max(height - 2 * overlayReserve(), height * 0.7);
+    const clearVertical = Math.atan((Math.tan(vertical) * usable) / height);
     fitDistance =
-      (Math.max(sphere.radius, 1) / Math.sin(Math.min(vertical, horizontal))) *
-      1.12;
+      (Math.max(sphere.radius, 1) /
+        Math.sin(Math.min(clearVertical, horizontal))) *
+      1.05;
     const target = sphere.center;
     const direction = keepOrientation
       ? camera.position.clone().sub(controls.target).normalize()
@@ -801,18 +1389,20 @@ function initialize() {
   function updateSelection() {
     dispose(selectionGroup);
     selectionGroup.clear();
+    // Selection is a crisp back-face shell: from any direction it reads as
+    // an even halo around the atom's silhouette and never covers its face.
     for (const a of selection) {
-      const ring = new THREE.Mesh(
-        new THREE.SphereGeometry(a.radius * 1.16, 24, 16),
+      const halo = new THREE.Mesh(
+        new THREE.SphereGeometry(a.radius * 1.13, 64, 48),
         new THREE.MeshBasicMaterial({
-          color: 0x65f3cf,
-          wireframe: true,
+          color: 0x79ffdc,
+          side: THREE.BackSide,
           transparent: true,
-          opacity: 0.65,
+          opacity: 0.92,
         }),
       );
-      ring.position.copy(a.position);
-      selectionGroup.add(ring);
+      halo.position.copy(a.position);
+      selectionGroup.add(halo);
     }
     distance = null;
     if (selection.length === 2) {
@@ -821,35 +1411,103 @@ function initialize() {
         new THREE.BufferGeometry().setFromPoints(
           selection.map((a) => a.position),
         ),
-        new THREE.LineBasicMaterial({ color: 0x79ffdc, depthTest: false }),
+        new THREE.LineDashedMaterial({
+          color: 0x79ffdc,
+          depthTest: false,
+          dashSize: Math.max(distance / 24, 0.04),
+          gapSize: Math.max(distance / 48, 0.02),
+        }),
       );
+      line.computeLineDistances();
       line.renderOrder = 5;
       selectionGroup.add(line);
     }
-    const overlay = $("measure-overlay");
-    overlay.hidden = selection.length === 0;
-    overlay.textContent =
-      distance === null
-        ? `${selection[0]?.label || ""} · Select a second atom`
-        : `${selection.map((a) => a.label).join(" ↔ ")}  ·  ${distance.toFixed(4)} Å`;
+    const picking = Boolean(styleEditor?.picking);
+    $("measure-overlay").classList.toggle("active", selection.length > 0 || picking);
+    $("measure-overlay").classList.toggle("picking", picking);
+    $("clear").disabled = !selection.length;
     $("distance").replaceChildren(
       document.createTextNode(
         distance === null ? "— " : `${distance.toFixed(4)} `,
       ),
       Object.assign(document.createElement("span"), { textContent: "Å" }),
     );
-    $("selection").textContent = selection.length
-      ? selection
-          .map(
-            (a) => `${a.label} [${a.frac.map((v) => v.toFixed(3)).join(", ")}]`,
-          )
-          .join(" ↔ ") +
-        (selection.length === 1 ? " · Select a second atom." : "")
+    $("selection").textContent = picking
+      ? "Style picking: tap one atom or polyhedron."
+      : selection.length
+      ? selection.map((a) => a.label).join(" ↔ ") +
+        (selection.length === 1 ? " · tap a second atom" : "")
       : $("show-atoms").checked
-        ? "Tap two atoms to measure their separation."
-        : "Show atoms to measure their separation.";
+        ? "Tap two atoms to measure."
+        : "Show atoms to measure.";
+    $("selection").title = selection
+      .map((a) => `${a.label} [${a.frac.map((v) => v.toFixed(4)).join(", ")}]`)
+      .join("\n");
     invalidate();
   }
+  // Right-button grab panning, 1:1 with the pointer. Runs in the capture
+  // phase on the canvas, ahead of TrackballControls, which never sees the
+  // right button. The rendered camera is orthographic with a visible
+  // height of 2·d·tan(fov/2) world units over the canvas's CSS height, so
+  // one CSS pixel of pointer motion moves the camera (and target) by that
+  // many world units along the view's right/up axes: the grabbed point
+  // stays under the cursor at any zoom, orientation, aspect or DPI.
+  // Movement stops on release; there is no inertia.
+  let pan = null;
+  const panRight = new THREE.Vector3(),
+    panUp = new THREE.Vector3();
+  function endPan(e) {
+    if (!pan || (e && e.pointerId !== pan.id)) return;
+    const { id } = pan;
+    pan = null;
+    if (renderer.domElement.hasPointerCapture(id))
+      renderer.domElement.releasePointerCapture(id);
+    e?.stopImmediatePropagation();
+  }
+  renderer.domElement.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (e.button !== 2 || e.pointerType !== "mouse" || pan) return;
+      e.stopImmediatePropagation(); // Trackball and atom picking ignore it
+      e.preventDefault();
+      stopMotion(); // cancel any rotation/zoom inertia first
+      renderer.domElement.setPointerCapture(e.pointerId);
+      pan = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    },
+    true,
+  );
+  renderer.domElement.addEventListener(
+    "pointermove",
+    (e) => {
+      if (!pan || e.pointerId !== pan.id) return;
+      e.stopImmediatePropagation();
+      const dx = e.clientX - pan.x,
+        dy = e.clientY - pan.y;
+      pan.x = e.clientX;
+      pan.y = e.clientY;
+      if (!dx && !dy) return;
+      const height = renderer.domElement.getBoundingClientRect().height || 1;
+      const worldPerPixel =
+        (2 *
+          camera.position.distanceTo(controls.target) *
+          Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) /
+        height;
+      camera.updateMatrixWorld();
+      panRight.setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+      panUp.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+      // Content follows the cursor, so the camera moves the opposite way.
+      const shift = panRight
+        .multiplyScalar(-dx * worldPerPixel)
+        .addScaledVector(panUp, dy * worldPerPixel);
+      camera.position.add(shift);
+      controls.target.add(shift);
+      invalidate();
+    },
+    true,
+  );
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
+    renderer.domElement.addEventListener(type, endPan, true);
+  window.addEventListener("blur", () => endPan());
   const raycaster = new THREE.Raycaster(),
     pointer = new THREE.Vector2(),
     active = new Set();
@@ -892,6 +1550,11 @@ function initialize() {
     );
     syncViewCamera();
     raycaster.setFromCamera(pointer, viewCamera);
+    // Explicit appearance picking replaces distance picking while active.
+    if (styleEditor.picking) {
+      pickStyleTarget();
+      return;
+    }
     if (!$("show-atoms").checked) return;
     const hit = raycaster.intersectObjects(
       meshes.filter((mesh) => mesh.visible),
@@ -904,6 +1567,184 @@ function initialize() {
       updateSelection();
     }
   });
+  // ---- Appearance editor host -------------------------------------------
+  // Targets: "element:Mg", "pair:<rule id>", "atom:<atom key>",
+  // "poly:<rule id>|<centre atom key>". Picked individuals keep their
+  // element, label and rule in `targetMeta`, so they stay editable while a
+  // range or cutoff change temporarily removes that copy.
+  const targetMeta = new Map();
+  const fracText = (a) => `[${a.frac.map((v) => v.toFixed(3)).join(", ")}]`;
+  const ruleById = (id) => rules.find((r) => String(r.id) === String(id));
+  function parseTarget(value) {
+    const cut = value.indexOf(":");
+    return { type: value.slice(0, cut), id: value.slice(cut + 1) };
+  }
+  function restyle(final) {
+    if (final) {
+      cancelScheduledBuild();
+      build();
+    } else scheduleBuild();
+  }
+  function merge(map, key, patch) {
+    map.set(key, { ...map.get(key), ...patch });
+  }
+  function refreshElementDot(element) {
+    const dot = document.querySelector(`[data-element="${element}"] .dot`);
+    if (dot) dot.style.background = colorFor(element);
+  }
+  function refreshPairColor(rule) {
+    document
+      .querySelector(`.pair-rule[data-rule-id="${rule.id}"]`)
+      ?.style.setProperty("--pair-color", ruleColor(rule));
+  }
+  styleEditor = createAppearanceEditor({
+    targets() {
+      if (!structure) return [];
+      const elements = [...new Set(structure.atoms.map((a) => a.element))];
+      return [
+        ...elements.map((e) => ({
+          value: `element:${e}`,
+          label: `${e} atoms`,
+          group: "All atoms of element",
+        })),
+        ...rules.map((r) => ({
+          value: `pair:${r.id}`,
+          label: `${pairName(r)} polyhedra`,
+          group: "All polyhedra of pair",
+        })),
+      ];
+    },
+    describe(value) {
+      const { type, id } = parseTarget(value);
+      if (type === "element") {
+        const own = appearance.elements.get(id);
+        return {
+          title: `All ${id} atoms`,
+          kind: "atom",
+          color: colorFor(id),
+          scale: own?.scale ?? 1,
+          overridden: Boolean(own),
+        };
+      }
+      if (type === "atom") {
+        const meta = targetMeta.get(value);
+        if (!meta) return null;
+        const style = atomStyle(appearance, meta.element, id, defaultColor(meta.element));
+        return {
+          title: `${meta.label} ${meta.frac} · this copy only`,
+          kind: "atom",
+          ...style,
+          overridden: appearance.atoms.has(id),
+        };
+      }
+      const [ruleId, centerKey] = type === "poly" ? id.split("|") : [id];
+      const rule = ruleById(ruleId);
+      if (!rule) return null;
+      if (type === "pair")
+        return {
+          title: `All ${pairName(rule)} polyhedra`,
+          kind: "poly",
+          color: ruleColor(rule),
+          scale: rule.scale ?? 1,
+          overridden: rule.color != null || rule.scale != null,
+        };
+      const meta = targetMeta.get(value);
+      const style = polyhedronStyle(appearance, rule, centerKey, ruleColor(rule));
+      return {
+        title: `${pairName(rule)} polyhedron around ${meta?.label ?? "centre"} ${meta?.frac ?? ""} · this one only`,
+        kind: "poly",
+        ...style,
+        overridden: appearance.polyhedra.has(polyKey(rule.id, centerKey)),
+      };
+    },
+    apply(value, patch, final) {
+      const { type, id } = parseTarget(value);
+      if (type === "element") {
+        merge(appearance.elements, id, patch);
+        refreshElementDot(id);
+      } else if (type === "atom") merge(appearance.atoms, id, patch);
+      else if (type === "pair") {
+        const rule = ruleById(id);
+        if (!rule) return;
+        Object.assign(rule, patch);
+        refreshPairColor(rule);
+      } else if (type === "poly") merge(appearance.polyhedra, id, patch);
+      restyle(final);
+    },
+    reset(value) {
+      const { type, id } = parseTarget(value);
+      if (type === "element") {
+        appearance.elements.delete(id);
+        refreshElementDot(id);
+      } else if (type === "atom") appearance.atoms.delete(id);
+      else if (type === "pair") {
+        const rule = ruleById(id);
+        if (rule) {
+          delete rule.color;
+          delete rule.scale;
+          refreshPairColor(rule);
+        }
+      } else if (type === "poly") appearance.polyhedra.delete(id);
+      restyle(true);
+    },
+    onPickMode(active) {
+      viewport.classList.toggle("style-picking", active);
+      updateSelection();
+    },
+    // Marker follows editor visibility: cleared on close, restored on open.
+    onOpen(open) {
+      updatePickMarker(open ? styleEditor?.target : null);
+    },
+    onTarget(value) {
+      updatePickMarker(value);
+    },
+  });
+  // In explicit picking mode a tap chooses one atom copy or one
+  // polyhedron. An atom wins when it is in front of the nearest face, or
+  // when it is the centre of the polyhedron that face belongs to.
+  function pickStyleTarget() {
+    const atomHit = $("show-atoms").checked
+      ? raycaster.intersectObjects(
+          meshes.filter((mesh) => mesh.visible),
+          false,
+        )[0]
+      : undefined;
+    const faceHit = raycaster.intersectObjects(
+      [...faceMeshes.values()].filter((mesh) => mesh.visible),
+      false,
+    )[0];
+    const atom = atomHit?.object.userData.atoms[atomHit.instanceId];
+    let poly = null;
+    if (faceHit) {
+      const data = faceHit.object.userData;
+      const hull = data.hulls[data.owners[faceHit.faceIndex]];
+      if (hull) poly = { rule: data.rule, center: hull.center };
+    }
+    if (
+      atom &&
+      (!poly ||
+        atomHit.distance <= faceHit.distance ||
+        atomKey(poly.center) === atomKey(atom))
+    ) {
+      const key = atomKey(atom);
+      const value = `atom:${key}`;
+      targetMeta.set(value, {
+        element: atom.element,
+        label: atom.label,
+        frac: fracText(atom),
+      });
+      styleEditor.choose({ value, label: `${atom.label} ${fracText(atom)}`, group: "Picked" });
+    } else if (poly) {
+      const key = atomKey(poly.center);
+      const value = `poly:${polyKey(poly.rule.id, key)}`;
+      targetMeta.set(value, { label: poly.center.label, frac: fracText(poly.center) });
+      styleEditor.choose({
+        value,
+        label: `${pairName(poly.rule)} around ${poly.center.label}`,
+        group: "Picked",
+      });
+    }
+  }
   function textStat(label, value) {
     const d = document.createElement("div");
     d.className = "stat";
@@ -915,32 +1756,34 @@ function initialize() {
     return d;
   }
   function display(data) {
+    // A new file or data block starts clean: queued rebuilds from the
+    // previous document are cancelled and appearance overrides forgotten.
+    structureGeneration++;
+    cancelScheduledBuild();
+    clearAppearance(appearance);
+    openCutoffRule = null;
     structure = data;
     hiddenElements.clear();
     $("show-atoms").checked = true;
     $("name").textContent = data.name || data.block || "Crystal structure";
     $("source").textContent = currentFilename || "Example structure · built in";
     $("stats").replaceChildren(
-      textStat("UNIT-CELL VOLUME", `${Number(data.volume).toFixed(2)} Å³`),
-      textStat("ATOMIC SITES", data.atoms.length.toLocaleString()),
+      textStat("V", `${Number(data.volume).toFixed(2)} Å³`),
+      textStat("Sites", data.atoms.length.toLocaleString()),
     );
     const counts = new Map();
     data.atoms.forEach((a) =>
       counts.set(a.element, (counts.get(a.element) || 0) + 1),
     );
-    $("element-count").textContent = counts.size;
     $("elements").replaceChildren(
       ...[...counts].map(([e, n]) => {
         const d = document.createElement("button");
         d.type = "button";
         d.className = "element";
         d.dataset.element = e;
-        d.setAttribute(
-          "aria-label",
-          `Show ${e} atoms; remembered when Show atoms is off`,
-        );
+        d.setAttribute("aria-label", `Show ${e} atoms (${n} sites)`);
         d.setAttribute("aria-pressed", "true");
-        d.title = `Toggle ${e} spheres. Bonds and polyhedra stay visible; Show atoms preserves this choice.`;
+        d.title = `Show or hide ${e} spheres; bonds and polyhedra stay`;
         d.onclick = () => {
           if (hiddenElements.has(e)) hiddenElements.delete(e);
           else hiddenElements.add(e);
@@ -970,13 +1813,16 @@ function initialize() {
     const warnings = data.warnings || [];
     $("warnings").hidden = !warnings.length;
     $("warnings").textContent = warnings.join(" ");
+    $("warnings").title = warnings.join(" ");
+    $("warnings").setAttribute("aria-expanded", "false");
     plotRanges = defaultRanges();
     if (currentFilename === "Wollastonite example") plotRanges[1] = [0, 3];
     writeRanges();
     resetRules();
     build(false);
     reset();
-    if (currentFilename === "Wollastonite example") orient([0, 0, 1]);
+    if (currentFilename === "Wollastonite example") orient([0, 0, 1], "c");
+    styleEditor.clear();
   }
   const worker = new Worker(new URL("./import-worker.js", import.meta.url), {
     type: "module",
@@ -1045,6 +1891,18 @@ function initialize() {
     updateSelection();
   };
   $("reset").onclick = () => reset();
+  // CIF warnings stay to two lines until opened, keeping controls in reach.
+  const toggleWarnings = () => {
+    const open = $("warnings").getAttribute("aria-expanded") !== "true";
+    $("warnings").setAttribute("aria-expanded", String(open));
+  };
+  $("warnings").onclick = toggleWarnings;
+  $("warnings").onkeydown = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggleWarnings();
+    }
+  };
   function writeRanges() {
     for (const [i, axis] of ["a", "b", "c"].entries())
       for (const [j, end] of ["min", "max"].entries())
@@ -1054,6 +1912,12 @@ function initialize() {
   function applyRanges(next) {
     try {
       next = validateRanges(next);
+      // Blur-commit followed by Apply submits the same bounds twice; an
+      // unchanged extent needs no rebuild or refit.
+      if (next.every((r, i) => r[0] === plotRanges[i][0] && r[1] === plotRanges[i][1])) {
+        writeRanges();
+        return;
+      }
       const sites = translatedSites(
         structure.atoms,
         next,
@@ -1079,6 +1943,12 @@ function initialize() {
       ),
     );
   };
+  // Committing a bound (Enter, blur or stepper) applies the extent directly;
+  // the Apply button remains for explicit submission.
+  for (const input of document.querySelectorAll("#range-form input"))
+    input.addEventListener("change", () => {
+      if (structure) $("range-form").requestSubmit();
+    });
   $("range-reset").onclick = () => {
     if (structure) applyRanges(defaultRanges());
   };
@@ -1098,6 +1968,10 @@ function initialize() {
     }
   };
   $("size").oninput = () => {
+    $("size").setAttribute(
+      "aria-valuetext",
+      `${Math.round(Number($("size").value) * 100)}%`,
+    );
     if (!structure) return;
     const size = Number($("size").value);
     const matrix = new THREE.Matrix4(),
@@ -1105,7 +1979,7 @@ function initialize() {
       scale = new THREE.Vector3();
     for (const m of meshes) {
       m.userData.atoms.forEach((a, i) => {
-        a.radius = (radii[a.element] || 0.42) * size;
+        a.radius = atomRadius(a);
         matrix.compose(a.position, rotation, scale.setScalar(a.radius));
         m.setMatrixAt(i, matrix);
       });
@@ -1130,6 +2004,10 @@ function initialize() {
           frac: [...a.frac],
           cartesian: [...a.cartesian],
           sourceIndex: a.sourceIndex,
+          key: atomKey(a),
+          // Rendered (= picking and halo) radius and instance colour.
+          radius: a.radius,
+          color: a.color,
           outsideCell: a.frac.some(
             (v, i) =>
               v < plotRanges[i][0] - 1e-8 || v > plotRanges[i][1] + 1e-8,
@@ -1157,7 +2035,19 @@ function initialize() {
         material: mesh.material.uuid,
         outlineVisible: mesh.userData.outline?.visible,
         vertexCount: mesh.geometry.attributes.position.count,
+        color: mesh.userData.color,
+        // Per-polyhedron display styles: centre atom key, colour, scale.
+        styles: mesh.userData.styles.map((s) => ({ ...s })),
       })),
+      appearance: {
+        elements: Object.fromEntries(appearance.elements),
+        atomOverrides: appearance.atoms.size,
+        polyhedronOverrides: appearance.polyhedra.size,
+        editorOpen: styleEditor.open,
+        picking: styleEditor.picking,
+        target: styleEditor.target,
+        pickMarkerCount: pickGroup.children.length,
+      },
       selectedIds: selection.map((a) => a.id),
       distance,
       camera: {

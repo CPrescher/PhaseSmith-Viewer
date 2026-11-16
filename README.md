@@ -15,7 +15,7 @@ Open the local address printed by Vite. Pick **Open CIF** to load a file from th
 
 ## Orientation
 
-Drag continuously in any direction to turn the model over its poles. Use the **a**, **b**, or **c** views to align the camera with a direct lattice axis. For a custom direction, enter the three indices of [uvw]. The camera looks toward the structure from the positive side of the vector u**a** + v**b** + w**c**. The parallel projection aligns rows of atoms along that direction. These are direct lattice directions. In a nonorthogonal cell a direct direction and the normal to the plane with the same indices generally differ.
+Left-drag continuously in any direction to turn the model over its poles. Right-drag to pan with the point you grab held under the cursor. Use the **a**, **b**, or **c** views to align the camera with a direct lattice axis. For a custom direction, enter the three indices of [uvw]. The camera looks toward the structure from the positive side of the vector u**a** + v**b** + w**c**. The parallel projection aligns rows of atoms along that direction. These are direct lattice directions. In a nonorthogonal cell a direct direction and the normal to the plane with the same indices generally differ.
 
 ## Displaying more than one unit cell
 
@@ -27,13 +27,23 @@ Open `/?example=wollastonite` to follow the Si–O chains through three cells al
 
 Choose the central element, its neighboring element, and their maximum distance in ångströms. Bonds and polyhedra can be switched independently for each pair. A center inside the displayed cell can have neighbors in adjacent cells. The viewer includes these periodic images and measures distances to the actual image selected.
 
-The **Face opacity** slider controls each pair’s polyhedron faces. At 0% only the outlines remain visible. At 100% the faces are opaque. Turn off **Show atoms** to remove the spheres from the view, or toggle an element in the legend to hide only its spheres. Bonds, polyhedra, and their coordination counts are independent of sphere visibility.
+Tap or click a pair’s cutoff to open its speed slider. Hold the knob a little left or right for fine changes in 0.01 Å increments. Drag farther to change the cutoff faster and release to stop. The − and + buttons change it by 0.1 Å. On touch screens, tap the field again to type an exact cutoff.
+
+The **Opacity** slider controls each pair’s polyhedron faces. At 0% only the outlines remain visible. At 100% the faces are opaque. Turn off **Atoms** to remove the spheres from the view, or toggle an element in the legend to hide only its spheres. Bonds, polyhedra, and their coordination counts are independent of sphere visibility.
 
 Use **Polyhedra only** to show the centers and vertices of visible polyhedra. Turn it off to see the surrounding structure. Changing the cutoff changes which neighbors qualify for the display; the imported atom positions stay fixed.
 
 Open `/?example=forsterite` for a worked example using the Mg end member of olivine (Boström, 1987, *American Mineralogist* 72, 965–972, AMCSD 0001118). The Si–O and Mg–O cutoffs of 1.80 Å and 2.30 Å include the complete first coordination shells. Hide one rule to examine the other. Lower the Mg–O cutoff to 2.15 Å to retain all six neighbors around Mg1 and three around Mg2.
 
-## Try on a tablet
+## Changing colors and sizes
+
+Open **Style** on the crystal toolbar. Choose an element to change all its spheres, or choose a pair to change all its polyhedra. Choose a swatch or a custom color, then adjust **Radius** or **Scale**. A polyhedron at 100% has its vertices at the coordinating atoms. Changing the display scale moves its faces and edges about the central atom. Distances use the original coordinates at every scale.
+
+To highlight one copy, enable **Pick one** and tap a sphere or a polyhedron face. **Reset** restores the inherited style for the selected target. Close the editor to return to measuring distances.
+
+## Try on a tablet or phone
+
+The crystal stays in view while you edit the structure. The controls sit beside it on a landscape tablet and below it in portrait. On a phone, scroll the lower panel to reach the extent controls.
 
 Build the application, then serve the compiled directory over your local network.
 
@@ -65,4 +75,4 @@ Run the JavaScript geometry tests with `node --test tests/*.test.mjs`. The coord
 cargo test --locked --manifest-path engine/Cargo.toml
 ```
 
-The browser smoke test needs Python Playwright and its Chromium and WebKit browsers. It uploads a known CIF through the file picker, selects two periodic images, and exercises navigation using mouse and touch events. With the viewer running, set `VIEWER_URL` to its address and run `python tests/smoke.py`.
+The browser smoke test needs Python Playwright and its Chromium and WebKit browsers. It uploads a known CIF through the file picker, selects two periodic images, and exercises navigation using mouse and touch events. With the viewer running, set `VIEWER_URL` to its address and run `python tests/smoke.py`. Run `python tests/workbench_smoke.py` to check control placement on desktop and tablet and distance measurement on a phone-sized touch screen.

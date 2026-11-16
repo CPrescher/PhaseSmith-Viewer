@@ -9,164 +9,31 @@
   <body>
     <div id="app">
       <header>
-        <a class="brand" href="./"
-          ><span class="brand-mark">◇</span
-          ><span>PhaseSmith <b>Viewer</b></span></a
-        ><button id="open" class="primary">
-          ＋ Open CIF <span class="desktop">file</span></button
+        <a class="brand" href="./" aria-label="PhaseSmith Viewer"
+          ><span class="brand-mark" aria-hidden="true">◇</span
+          ><span class="brand-name">PhaseSmith <b>Viewer</b></span></a
+        >
+        <div class="structure">
+          <h1 id="name">Loading example…</h1>
+          <p id="source" class="muted">Local, private, in your browser.</p>
+        </div>
+        <div id="stats" class="stats"></div>
+        <label id="block-wrap" hidden
+          ><span class="sr-only">Data block</span><select id="block"></select
+        ></label>
+        <button id="open" class="primary">
+          ＋ Open CIF<span class="desktop"> file</span></button
         ><input id="file" type="file" accept=".cif,.mcif,text/plain" hidden />
       </header>
       <main>
-        <aside>
-          <div class="eyebrow">STRUCTURE</div>
-          <h1 id="name">Loading example…</h1>
-          <p id="source" class="muted">Local, private, in your browser.</p>
-          <label id="block-wrap" hidden
-            >Data block<select id="block"></select
-          ></label>
-          <div id="stats" class="stats"></div>
-          <section class="plot-range">
-            <div class="section-title">Fractional plotting range</div>
-            <form id="range-form" novalidate>
-              <div class="range-grid">
-                <span>Axis</span><span>Minimum</span><span>Maximum</span>
-                <strong>a</strong
-                ><input
-                  id="range-a-min"
-                  type="number"
-                  step="any"
-                  value="0"
-                  aria-label="a minimum"
-                /><input
-                  id="range-a-max"
-                  type="number"
-                  step="any"
-                  value="1"
-                  aria-label="a maximum"
-                />
-                <strong>b</strong
-                ><input
-                  id="range-b-min"
-                  type="number"
-                  step="any"
-                  value="0"
-                  aria-label="b minimum"
-                /><input
-                  id="range-b-max"
-                  type="number"
-                  step="any"
-                  value="1"
-                  aria-label="b maximum"
-                />
-                <strong>c</strong
-                ><input
-                  id="range-c-min"
-                  type="number"
-                  step="any"
-                  value="0"
-                  aria-label="c minimum"
-                /><input
-                  id="range-c-max"
-                  type="number"
-                  step="any"
-                  value="1"
-                  aria-label="c maximum"
-                />
-              </div>
-              <div class="range-actions">
-                <button type="submit" class="primary">Apply range</button
-                ><button type="button" id="range-reset">Reset range</button>
-              </div>
-              <p id="range-error" role="alert"></p>
-            </form>
-            <p class="coordination-help">
-              Negative and fractional bounds are allowed. Lower faces are
-              included; Boundary atoms includes the exact upper faces. Polyhedra
-              remain complete beyond these bounds.
-            </p>
-          </section>
-          <section class="coordination">
-            <div class="section-title">
-              Bonds &amp; polyhedra
-              <button id="add-rule" class="text-button">＋ Add pair</button>
-            </div>
-            <p class="coordination-help">
-              Choose a central element, its neighbors, and a distance cutoff.
-              Periodic neighbors complete each coordination shell.
-            </p>
-            <label class="toggle"
-              ><span>Polyhedra only</span
-              ><input id="polyhedra-only" type="checkbox"
-            /></label>
-            <p id="isolation-note" class="coordination-help">
-              All atoms are included. Polyhedra only keeps completed polyhedra
-              and their atoms; Show atoms and Elements control sphere
-              visibility.
-            </p>
-            <label class="toggle"
-              ><span>Show atoms</span
-              ><input
-                id="show-atoms"
-                type="checkbox"
-                checked
-                aria-label="Show atoms; preserves individual element visibility choices"
-                title="Show or hide all spheres, preserving choices in Elements"
-            /></label>
-            <div id="pair-rules"></div>
-            <p class="coordination-help">
-              New structures reset the pairs. Suggested oxide cutoffs are
-              starting points; adjust them for your structure. Polyhedra need
-              four noncoplanar neighbors. Neighbors outside the cell are
-              included at their actual element size.
-            </p>
-          </section>
-          <section>
-            <div class="section-title">
-              Elements <span id="element-count"></span>
-            </div>
-            <div id="elements" class="elements"></div>
-          </section>
-          <section class="measurement">
-            <div class="section-title">
-              Measure distance
-              <button id="clear" class="text-button">Clear</button>
-            </div>
-            <div id="distance" class="distance" aria-live="polite">
-              — <span>Å</span>
-            </div>
-            <p id="selection">Tap two atoms to measure their separation.</p>
-            <div class="measurement-note">
-              Distance follows the selected visible atoms, including
-              cell-boundary images.
-            </div>
-          </section>
-          <section class="display">
-            <div class="section-title">Display</div>
-            <label class="toggle"
-              ><span>Unit cell</span
-              ><input id="cell" type="checkbox" checked /></label
-            ><label class="toggle"
-              ><span>Boundary atoms</span
-              ><input id="boundary" type="checkbox" checked /></label
-            ><label class="slider-label"
-              >Atom size<input
-                id="size"
-                type="range"
-                min="0.5"
-                max="1.5"
-                value="1"
-                step="0.05"
-            /></label>
-          </section>
-          <div id="warnings" class="warnings" hidden></div>
-        </aside>
         <div id="viewport">
           <div class="view-top">
             <div
-              class="view-directions"
+              class="view-directions toolbar"
+              role="group"
               aria-label="View along lattice direction"
             >
-              <span>View along</span>
+              <span class="tool-label" aria-hidden="true">View</span>
               <button id="view-a" class="view-button" title="Look along +a">
                 a
               </button>
@@ -177,34 +44,274 @@
                 c
               </button>
               <details>
-                <summary>[u v w]</summary>
+                <summary title="Look along a lattice direction">[uvw]</summary>
                 <form id="direction-form">
                   <label for="view-direction">Lattice direction [u v w]</label>
                   <div>
                     <input
                       id="view-direction"
                       value="1 1 1"
+                      autocomplete="off"
                       aria-describedby="direction-error"
                     /><button class="view-button" type="submit">View</button>
                   </div>
                   <p id="direction-error" role="status"></p>
                 </form>
               </details>
+              <button
+                id="reset"
+                class="view-button"
+                title="Reset view"
+                aria-label="Reset view"
+              >
+                ↺
+              </button>
+              <button
+                id="style-open"
+                class="view-button style-open"
+                aria-controls="style-editor"
+                aria-expanded="false"
+                aria-pressed="false"
+                title="Colors and sizes of atoms and polyhedra"
+              >
+                Style
+              </button>
             </div>
-            <button id="reset" class="view-button" title="Reset view">
-              ↺ Reset view
-            </button>
+            <section
+              id="measure-overlay"
+              class="measurement"
+              aria-label="Distance measurement"
+            >
+              <div class="measure-row">
+                <div id="distance" class="distance" aria-live="polite">
+                  — <span>Å</span>
+                </div>
+                <button
+                  id="clear"
+                  class="view-button"
+                  aria-label="Clear measurement"
+                  title="Clear measurement"
+                >
+                  ✕
+                </button>
+              </div>
+              <p id="selection">Tap two atoms to measure.</p>
+            </section>
           </div>
-          <div id="measure-overlay" aria-live="polite" hidden></div>
           <div id="error" role="alert" hidden></div>
           <div id="loading">Reading crystal structure…</div>
           <div class="view-bottom">
-            <span
-              ><b>Drag</b> rotate <i>·</i> <b>Pinch / scroll</b> zoom <i>·</i>
-              <b>Tap atom</b> measure</span
-            ><span id="atom-summary"></span>
+            <div class="atoms-bar toolbar" role="group" aria-label="Atoms">
+              <label class="chip master" title="Show or hide all spheres"
+                ><input
+                  id="show-atoms"
+                  type="checkbox"
+                  checked
+                  aria-label="Show atoms; preserves individual element visibility choices"
+                /><span>Atoms</span></label
+              >
+              <div id="elements" class="elements"></div>
+              <label class="size-control" title="Atom size (50–150%)"
+                ><span>Size</span
+                ><input
+                  id="size"
+                  type="range"
+                  min="0.5"
+                  max="1.5"
+                  value="1"
+                  step="0.05"
+                  aria-label="Atom size"
+              /></label>
+            </div>
+            <span id="atom-summary"></span>
           </div>
         </div>
+        <aside aria-label="Structure controls">
+          <section
+            id="style-editor"
+            class="style-editor"
+            aria-labelledby="style-title"
+            hidden
+          >
+            <div class="section-title">
+              <button
+                id="style-close"
+                type="button"
+                class="back-button"
+                aria-label="Close appearance and return to pairs"
+                title="Back to pairs"
+              >
+                ‹ Pairs
+              </button>
+              <h2 id="style-title">Appearance</h2>
+              <button
+                id="style-pick"
+                type="button"
+                class="toggle-button"
+                aria-pressed="false"
+                title="Tap one atom or polyhedron in the crystal to style just that copy"
+              >
+                ⌖ Pick one
+              </button>
+            </div>
+            <label class="style-target"
+              ><span class="sr-only">Style target</span
+              ><select id="style-target"></select
+            ></label>
+            <p id="style-label" class="style-label" aria-live="polite"></p>
+            <div class="style-colors">
+              <div
+                id="style-swatches"
+                class="swatches"
+                role="group"
+                aria-label="Color"
+              ></div>
+              <label class="custom-color" title="Custom color"
+                ><span class="sr-only">Custom color</span
+                ><input id="style-color" type="color"
+              /></label>
+            </div>
+            <div class="style-size-row">
+              <label class="style-size"
+                ><span id="style-size-name">Radius</span
+                ><input
+                  id="style-size"
+                  type="range"
+                  step="5"
+                  list="style-size-ticks"
+                  aria-describedby="style-size-hint" /><datalist
+                  id="style-size-ticks"
+                  ><option value="100"></option></datalist
+                ><output
+                  id="style-size-value"
+                  for="style-size"
+                ></output></label
+              ><button id="style-reset" type="button" class="secondary">
+                Reset
+              </button>
+            </div>
+            <p id="style-size-hint" class="style-size-hint"></p>
+          </section>
+          <section class="coordination" aria-labelledby="coord-title">
+            <div class="section-title">
+              <h2 id="coord-title" title="Bonds and coordination polyhedra">
+                Pairs
+              </h2>
+              <label
+                class="chip"
+                title="Keep only completed polyhedra and their atoms"
+                ><input id="polyhedra-only" type="checkbox" /><span
+                  >Polyhedra only</span
+                ></label
+              ><button
+                id="add-rule"
+                class="text-button"
+                aria-label="Add bond pair"
+              >
+                ＋ Add
+              </button>
+            </div>
+            <div id="pair-rules"></div>
+            <p id="isolation-note" class="note" role="status" hidden></p>
+          </section>
+          <section class="plot-range" aria-labelledby="range-title">
+            <div class="section-title">
+              <h2
+                id="range-title"
+                title="Fractional plotting range; polyhedra stay complete"
+              >
+                Extent
+              </h2>
+              <label class="chip" title="Show unit-cell edges"
+                ><input id="cell" type="checkbox" checked /><span
+                  >Cell</span
+                ></label
+              ><label
+                class="chip"
+                title="Include atoms on the exact upper faces of the extent"
+                ><input id="boundary" type="checkbox" checked /><span
+                  >Boundary</span
+                ></label
+              >
+            </div>
+            <form id="range-form" novalidate>
+              <div class="range-grid">
+                <span></span><span class="col-label">Min</span><span></span
+                ><span class="col-label">Max</span>
+                <strong>a</strong
+                ><input
+                  id="range-a-min"
+                  type="number"
+                  step="any"
+                  inputmode="decimal"
+                  value="0"
+                  aria-label="a minimum"
+                /><span aria-hidden="true">–</span
+                ><input
+                  id="range-a-max"
+                  type="number"
+                  step="any"
+                  inputmode="decimal"
+                  value="1"
+                  aria-label="a maximum"
+                />
+                <strong>b</strong
+                ><input
+                  id="range-b-min"
+                  type="number"
+                  step="any"
+                  inputmode="decimal"
+                  value="0"
+                  aria-label="b minimum"
+                /><span aria-hidden="true">–</span
+                ><input
+                  id="range-b-max"
+                  type="number"
+                  step="any"
+                  inputmode="decimal"
+                  value="1"
+                  aria-label="b maximum"
+                />
+                <strong>c</strong
+                ><input
+                  id="range-c-min"
+                  type="number"
+                  step="any"
+                  inputmode="decimal"
+                  value="0"
+                  aria-label="c minimum"
+                /><span aria-hidden="true">–</span
+                ><input
+                  id="range-c-max"
+                  type="number"
+                  step="any"
+                  inputmode="decimal"
+                  value="1"
+                  aria-label="c maximum"
+                />
+              </div>
+              <div class="range-actions">
+                <button type="submit" class="primary">Apply</button
+                ><button
+                  type="button"
+                  id="range-reset"
+                  class="secondary"
+                  title="Reset to one unit cell"
+                >
+                  1 cell
+                </button>
+              </div>
+              <p id="range-error" role="alert"></p>
+            </form>
+          </section>
+          <div
+            id="warnings"
+            class="warnings"
+            role="button"
+            tabindex="0"
+            hidden
+          ></div>
+        </aside>
       </main>
     </div>
     <script type="module" src="/web/main.js"></script>
