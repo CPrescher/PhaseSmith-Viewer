@@ -5,7 +5,7 @@ from playwright.async_api import async_playwright
 from smoke import URL, diagnostics, settle, choose_tool
 
 TOOLS=['#mode-pairs','#mode-lattice','#style-open','#mode-sites','#mode-extent','#mode-export']
-SIZES=[(1440,900),(1920,1080),(1024,768),(768,1024),(390,844),(375,667),(844,390),(960,1050)]
+SIZES=[(1440,900),(1920,1080),(1024,768),(768,1024),(390,844),(375,667),(844,390),(667,375),(960,1050)]
 async def ready(page):
  await page.goto(URL+'/?example=forsterite')
  await page.wait_for_function('window.viewerDiagnostics?.().coordination.polyhedronCount===12 && !viewerDiagnostics().session.suspended')
@@ -68,6 +68,9 @@ async def matrix(browser):
      for selector in ['.view-bottom','#view-readout','.axis-compass','#tools-menu']:
       control=await page.locator(selector).bounding_box()
       if control:assert rect['y']+rect['height']<=control['y']-7,(w,h,selector,rect,control)
+    if d['windows']['profile']=='side':
+     for selector in ['#history-undo','#history-redo','.tool-window:not([hidden]) .tool-window-title']:
+      assert await page.locator(selector).evaluate("el=>{const r=el.getBoundingClientRect();const h=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return el===h||el.contains(h)}"),(w,h,'History/editor collision',selector)
    if w<=640:
     # All three default element chips must be visible without sideways scrolling.
     assert await page.locator('#elements button').count()==3

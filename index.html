@@ -119,6 +119,11 @@
               >
                 ↺
               </button>
+              <div id="history-controls" class="history-controls" role="group" aria-label="Undo and redo">
+                <button id="history-undo" class="secondary" type="button" disabled title="Undo">↶<span class="history-label"> Undo</span></button>
+                <button id="history-redo" class="secondary" type="button" disabled title="Redo">↷<span class="history-label"> Redo</span></button>
+                <span id="history-status" class="sr-only" role="status" aria-live="polite"></span>
+              </div>
             </div>
             <!-- Step turns. A popover under the view toolbar on larger
                  screens; on phones it opens along the bottom edge, clear of
