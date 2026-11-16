@@ -77,7 +77,12 @@ export function createAppearanceEditor(host) {
     sizeName = $("style-size-name"),
     sizeValue = $("style-size-value"),
     hint = $("style-size-hint"),
+    opacityRow = $("style-opacity-row"),
+    opacityName = $("style-opacity-name"),
+    opacity = $("style-opacity"),
+    opacityValue = $("style-opacity-value"),
     reset = $("style-reset"),
+    resetIndividual = $("style-reset-individual"),
     pick = $("style-pick"),
     open = $("style-open"),
     close = $("style-close");
@@ -115,6 +120,23 @@ export function createAppearanceEditor(host) {
     if (target) host.apply(target, { scale: Number(size.value) / 100 }, true);
     refresh();
   };
+  // Polyhedron face opacity: live on the existing face material; the
+  // editor list is refreshed only on release (reset enablement).
+  const showOpacity = () => {
+    opacityValue.value = `${opacity.value}%`;
+    opacity.setAttribute("aria-valuetext", `${opacity.value}%`);
+  };
+  opacity.oninput = () => {
+    showOpacity();
+    if (target) host.setOpacity?.(target, Number(opacity.value) / 100);
+  };
+  opacity.onchange = () => refresh();
+  resetIndividual.onclick = () => {
+    host.resetIndividuals?.();
+    // A one-copy target now inherits again; fall back to its broad scope.
+    if (target.startsWith("atom:") || target.startsWith("poly:")) picked = null;
+    refresh();
+  };
   reset.onclick = () => {
     if (target) host.reset(target);
     refresh();
@@ -142,6 +164,9 @@ export function createAppearanceEditor(host) {
   function setPicking(active) {
     picking = active && !root.hidden;
     pick.setAttribute("aria-pressed", String(picking));
+    // The pressed button carries the instruction, so no card covers the
+    // crystal while picking.
+    pick.textContent = picking ? "⌖ Tap the crystal" : "⌖ Pick one";
     host.onPickMode(picking);
   }
   function setOpen(show) {
@@ -190,10 +215,12 @@ export function createAppearanceEditor(host) {
     );
     select.value = target;
     const info = target ? host.describe(target) : null;
-    for (const control of [custom, size, reset, ...swatches.children])
+    for (const control of [custom, size, opacity, reset, ...swatches.children])
       control.disabled = !info;
+    if (!info) opacityRow.hidden = true;
     if (!info) {
       title.textContent = "Open a structure to edit colors and sizes.";
+      resetIndividual.hidden = true;
       return;
     }
     title.textContent = info.title;
@@ -219,7 +246,24 @@ export function createAppearanceEditor(host) {
     sizeValue.value = `${size.value}%`;
     size.setAttribute("aria-valuetext", `${size.value}%`);
     size.setAttribute("aria-label", atom ? "Atom radius" : "Polyhedron display scale");
+    // Opacity only for polyhedron targets (never atoms).
+    const hasOpacity = !atom && info.opacity != null;
+    opacityRow.hidden = !hasOpacity;
+    if (hasOpacity) {
+      opacityName.textContent = info.opacityLabel ?? "Opacity";
+      opacity.setAttribute("aria-label", info.opacityLabel === "Pair opacity" ? "Pair face opacity (applies to the whole pair)" : "Polyhedron face opacity");
+      opacity.value = String(Math.round(info.opacity * 100));
+      showOpacity();
+    }
     reset.disabled = !info.overridden;
+    // Every individually styled copy can be reset in one action.
+    const individual = host.individualCount?.() ?? 0;
+    resetIndividual.hidden = !individual;
+    resetIndividual.textContent = `Reset all ${individual} individual`;
+    resetIndividual.setAttribute(
+      "aria-label",
+      `Reset all ${individual} individually styled atom and polyhedron copies to their element or pair style`,
+    );
   }
   return {
     get open() {
@@ -230,6 +274,10 @@ export function createAppearanceEditor(host) {
     },
     get target() {
       return target;
+    },
+    /** Sidebar modes open/close the editor explicitly. */
+    setOpen(show) {
+      if (show !== !root.hidden) setOpen(show);
     },
     /** Select an explicitly picked atom or polyhedron as the target. */
     choose(item) {

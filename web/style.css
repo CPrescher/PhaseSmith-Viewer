@@ -16,6 +16,35 @@
   --accent-ink: #062521;
   --accent-soft: #39c6b026;
   --danger: #ff9f8c;
+  --accent-hover: #4fd8c2;
+  /* Canvas and on-canvas overlays */
+  --canvas-1: #24384d;
+  --canvas-2: #15263a;
+  --canvas-3: #0e1b2a;
+  --overlay-bg: #0d1a29cc;
+  --overlay-line: #8297ac4d;
+  --overlay-text: #c9d6e2;
+  --hover: #ffffff12;
+  --popover-bg: #0f1d2df5;
+  --shadow: #0006;
+  --measure: #a5ffe7;
+  --summary-shadow: 0 1px 2px #0008;
+  --label-bg: #0b1622b0;
+  --label-text: #f2f6fa;
+  --label-halo: #0b1622;
+  --compass-bg: #0d1a2999;
+  --axis-a: #ff6b6b;
+  --axis-b: #5fd87a;
+  --axis-c: #5aa9ff;
+  /* Status */
+  --warn-bg: #3b2e14;
+  --warn-line: #6d5627;
+  --warn-text: #f2d49a;
+  --error-bg: #783f35ef;
+  --error-line: #ba796a;
+  --error-text: #ffe3da;
+  --select-soft: #ffc46b26;
+  --select-line: #ffc46b;
   --touch: 44px;
   --radius: 8px;
   font-family:
@@ -29,6 +58,51 @@
   background: var(--bg);
   font-synthesis: none;
   color-scheme: dark;
+}
+/* Light theme: the same layout with an overridden palette. Element and
+   pair colors in the scene are scientific choices and stay unchanged. */
+:root[data-theme="light"] {
+  --bg: #eef2f5;
+  --panel: #ffffff;
+  --raised: #f4f7f9;
+  --raised-2: #e6edf2;
+  --line: #dbe3ea;
+  --line-strong: #aebccb;
+  --text: #15263a;
+  --muted: #4b5e70;
+  --faint: #5f7184;
+  --accent: #0b7f70;
+  --accent-ink: #ffffff;
+  --accent-soft: #0b7f701f;
+  --danger: #b3261e;
+  --accent-hover: #096b5e;
+  --canvas-1: #ffffff;
+  --canvas-2: #eef2f6;
+  --canvas-3: #e1e8ee;
+  --overlay-bg: #ffffffdb;
+  --overlay-line: #8aa0b55c;
+  --overlay-text: #22364b;
+  --hover: #0f2a4512;
+  --popover-bg: #fffffff7;
+  --shadow: #0f2a4533;
+  --measure: #07705f;
+  --summary-shadow: none;
+  --label-bg: #ffffffd9;
+  --label-text: #15263a;
+  --label-halo: #ffffff;
+  --compass-bg: #ffffffd0;
+  --axis-a: #cf3030;
+  --axis-b: #188a33;
+  --axis-c: #1c68c8;
+  --warn-bg: #fff3d6;
+  --warn-line: #e2bf6e;
+  --warn-text: #5f4100;
+  --error-bg: #fde7e2f5;
+  --error-line: #dd9a8a;
+  --error-text: #82200f;
+  --select-soft: #f0a5002e;
+  --select-line: #c27c00;
+  color-scheme: light;
 }
 * {
   box-sizing: border-box;
@@ -176,7 +250,22 @@ select {
   white-space: nowrap;
 }
 .primary:hover {
-  background: #4fd8c2;
+  background: var(--accent-hover);
+}
+/* Header theme switch: compact, always visible (also on phones). */
+.theme-toggle {
+  flex: none;
+  width: var(--touch);
+  height: var(--touch);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--raised);
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+}
+.theme-toggle:hover {
+  background: var(--raised-2);
 }
 .secondary {
   background: var(--raised);
@@ -204,9 +293,9 @@ main {
   overflow: hidden;
   background: radial-gradient(
     ellipse at 50% 42%,
-    #24384d 0%,
-    #15263a 55%,
-    #0e1b2a 100%
+    var(--canvas-1) 0%,
+    var(--canvas-2) 55%,
+    var(--canvas-3) 100%
   );
 }
 canvas {
@@ -219,7 +308,7 @@ aside {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 12px 14px 16px;
+  padding: 8px 14px 12px;
   background: var(--panel);
   border-left: 1px solid var(--line);
   scrollbar-width: thin;
@@ -232,8 +321,8 @@ aside section > * {
 }
 aside section + section {
   border-top: 1px solid var(--line);
-  margin-top: 14px;
-  padding-top: 12px;
+  margin-top: 10px;
+  padding-top: 8px;
 }
 .section-title {
   display: flex;
@@ -272,18 +361,28 @@ h2 {
   border-radius: var(--radius);
   white-space: nowrap;
 }
-.text-button:hover {
-  background: var(--accent-soft);
+/* Touch browsers keep :hover after a tap; a filled "+ Arrow" would then
+   read as a pressed toggle, so the fill is for real pointers only. */
+@media (hover: hover) {
+  .text-button:hover {
+    background: var(--accent-soft);
+  }
 }
 .warnings {
   font-size: 12px;
   line-height: 1.5;
-  background: #3b2e14;
-  border: 1px solid #6d5627;
+  background: var(--warn-bg);
+  /* Bottom spacing is a transparent border, not padding: overflow clips at
+     the padding edge, so no sliver of a third line shows below the clamp.
+     The frame is an inset outline. */
+  border: 0;
+  border-bottom: 8px solid transparent;
+  outline: 1px solid var(--warn-line);
+  outline-offset: -1px;
   border-radius: var(--radius);
-  padding: 8px 10px;
+  padding: 8px 10px 0;
   margin-top: 14px;
-  color: #f2d49a;
+  color: var(--warn-text);
   overflow-wrap: anywhere;
   cursor: pointer;
   display: -webkit-box;
@@ -296,6 +395,10 @@ h2 {
   display: block;
   -webkit-line-clamp: unset;
   line-clamp: none;
+}
+.warnings:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* Toggle chips: the native checkbox covers the chip, so the whole chip is
@@ -388,8 +491,11 @@ h2 {
   font-size: 14px;
   background: var(--panel);
 }
+/* Selector text uses the normal foreground (any custom pair color stays
+   readable); the pair color lives in the card's stripe and a left border. */
 .pair-main select[data-field="center"] {
-  color: var(--pair-color);
+  color: var(--text);
+  border-left: 3px solid var(--pair-color);
 }
 .dash {
   color: var(--muted);
@@ -407,9 +513,9 @@ h2 {
   position: absolute;
   top: 3px;
   left: 7px;
-  font-size: 9px;
-  letter-spacing: 0.3px;
-  color: var(--faint);
+  font-size: 10px;
+  letter-spacing: 0.2px;
+  color: var(--muted);
   pointer-events: none;
   white-space: nowrap;
 }
@@ -614,8 +720,8 @@ h2 {
 }
 .pair-counts {
   margin: 4px 0 0 2px;
-  font-size: 11px;
-  color: var(--faint);
+  font-size: 12px;
+  color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -712,9 +818,9 @@ h2 {
   align-items: center;
   gap: 4px;
   padding: 4px;
-  border: 1px solid #8297ac30;
+  border: 1px solid var(--overlay-line);
   border-radius: 10px;
-  background: #0d1a29cc;
+  background: var(--overlay-bg);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   min-width: 0;
@@ -734,12 +840,12 @@ h2 {
   border: 1px solid transparent;
   border-radius: 7px;
   background: transparent;
-  color: #c9d6e2;
+  color: var(--overlay-text);
   font-size: 14px;
 }
 .view-button:hover,
 .view-directions summary:hover {
-  background: #ffffff12;
+  background: var(--hover);
 }
 .view-directions .view-button[id^="view-"] {
   font-style: italic;
@@ -748,7 +854,7 @@ h2 {
 }
 #reset {
   font-size: 18px;
-  border-left: 1px solid #8297ac30;
+  border-left: 1px solid var(--overlay-line);
   border-radius: 0 7px 7px 0;
 }
 .view-directions details {
@@ -761,7 +867,7 @@ h2 {
   min-height: var(--touch);
   padding: 0 10px;
   border-radius: 7px;
-  color: #c9d6e2;
+  color: var(--overlay-text);
   font-size: 13px;
   cursor: pointer;
   font-variant-numeric: tabular-nums;
@@ -781,8 +887,8 @@ h2 {
   padding: 10px;
   border: 1px solid var(--line-strong);
   border-radius: 10px;
-  background: #0f1d2df5;
-  box-shadow: 0 8px 24px #0006;
+  background: var(--popover-bg);
+  box-shadow: 0 8px 24px var(--shadow);
   font-size: 12px;
   color: var(--muted);
   z-index: 4;
@@ -811,7 +917,7 @@ h2 {
   font-weight: 650;
 }
 #direction-error {
-  color: #ffd4ac;
+  color: var(--warn-text);
   line-height: 1.4;
   margin: 6px 0 0;
 }
@@ -823,14 +929,14 @@ h2 {
   min-width: 190px;
   max-width: min(320px, 46%);
   padding: 6px 6px 8px 12px;
-  border: 1px solid #8297ac30;
+  border: 1px solid var(--overlay-line);
   border-radius: 10px;
-  background: #0d1a29cc;
+  background: var(--overlay-bg);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
 .measurement.active {
-  border-color: #70d9bd80;
+  border-color: var(--accent);
 }
 .measure-row {
   display: flex;
@@ -841,7 +947,7 @@ h2 {
 .distance {
   font-size: 24px;
   letter-spacing: -0.6px;
-  color: #a5ffe7;
+  color: var(--measure);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -851,8 +957,18 @@ h2 {
   color: var(--muted);
   letter-spacing: 0;
 }
-.measurement:not(.active) .distance {
-  color: var(--faint);
+/* Before a pick the card shows only the distance/angle switch and the
+   hint; the value and Clear appear with the first picked atom. */
+.measurement:not(.active) .distance,
+.measurement:not(.active) #clear {
+  display: none;
+}
+/* Idle card hugs its switch and hint (no empty strip on the left). */
+.measurement:not(.active) {
+  min-width: 0;
+}
+.measurement:not(.active) .measure-mode {
+  margin-left: 0;
 }
 #selection {
   margin: 0;
@@ -878,7 +994,7 @@ h2 {
 }
 .atoms-bar .chip:has(input:checked) {
   background: var(--accent-soft);
-  border-color: #39c6b066;
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .elements {
   display: flex;
@@ -886,7 +1002,7 @@ h2 {
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
-  border-left: 1px solid #8297ac30;
+  border-left: 1px solid var(--overlay-line);
   padding-left: 4px;
 }
 .element {
@@ -904,7 +1020,7 @@ h2 {
   font-weight: 600;
 }
 .element:hover {
-  background: #ffffff12;
+  background: var(--hover);
 }
 .element small {
   color: var(--faint);
@@ -932,7 +1048,7 @@ button.element[aria-pressed="false"] .dot {
   align-items: center;
   gap: 4px;
   padding: 0 8px 0 10px;
-  border-left: 1px solid #8297ac30;
+  border-left: 1px solid var(--overlay-line);
   color: var(--muted);
   font-size: 12px;
   min-height: var(--touch);
@@ -950,9 +1066,9 @@ button.element[aria-pressed="false"] .dot {
   flex: none;
   padding: 4px 6px;
   font-size: 11px;
-  color: #8ea3b8;
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 1px 2px #0008;
+  text-shadow: var(--summary-shadow);
 }
 
 #loading {
@@ -960,7 +1076,7 @@ button.element[aria-pressed="false"] .dot {
   top: 50%;
   width: 100%;
   text-align: center;
-  color: #bfd2e4;
+  color: var(--overlay-text);
   font-size: 13px;
   pointer-events: none;
 }
@@ -970,9 +1086,9 @@ button.element[aria-pressed="false"] .dot {
   left: 12px;
   right: 12px;
   padding: 12px 16px;
-  color: #ffe3da;
-  background: #783f35ef;
-  border: 1px solid #ba796a;
+  color: var(--error-text);
+  background: var(--error-bg);
+  border: 1px solid var(--error-line);
   border-radius: var(--radius);
   font-size: 13px;
   z-index: 3;
@@ -1007,29 +1123,21 @@ button.element[aria-pressed="false"] .dot {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto;
   }
+  /* One full-width pane for the selected mode (Extent is its own tab), so
+     no column sits empty; wide docks lay pair cards and tool rows out side
+     by side. */
   aside {
     max-height: 44dvh;
     border-left: 0;
     border-top: 1px solid var(--line);
-    display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-    gap: 0 18px;
-    align-items: start;
   }
   aside section + section {
-    border-top: 0;
-    margin-top: 0;
-    padding-top: 0;
-    border-left: 1px solid var(--line);
-    padding-left: 16px;
-  }
-  .warnings {
-    grid-column: 1 / -1;
-  }
-  /* The editor takes the Pairs column; Extent keeps its column. */
-  aside .style-editor + section {
     border-left: 0;
     padding-left: 0;
+  }
+  #pair-rules,
+  .tool-list {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   }
   .desktop,
   .muted {
@@ -1046,7 +1154,7 @@ button.element[aria-pressed="false"] .dot {
   }
   aside {
     grid-template-columns: minmax(0, 1fr);
-    max-height: 46dvh;
+    max-height: 45dvh;
   }
   aside section + section {
     border-left: 0;
@@ -1058,20 +1166,40 @@ button.element[aria-pressed="false"] .dot {
   .tool-label {
     display: none;
   }
+  /* Phone: the ↔/∠ switch sits beside the view toolbar (one row), the
+     readout wraps below it only while atoms are picked. */
   .view-top {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .view-top > * {
-    align-self: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    left: 8px;
+    right: 8px;
+    top: 8px;
+    gap: 6px;
   }
   .measurement {
     max-width: 100%;
     min-width: 0;
+    margin-left: auto;
   }
-  /* On phones the readout appears only once an atom is picked. */
-  .measurement:not(.active) {
+  #atom-summary {
     display: none;
+  }
+  /* On phones, before any pick, the card shrinks to the compact Å | ∠
+     selector; the readout appears once an atom is picked. */
+  .measurement:not(.active) {
+    padding: 3px;
+    min-width: 0;
+  }
+  .measurement:not(.active) .distance,
+  .measurement:not(.active) #selection,
+  .measurement:not(.active) #clear {
+    display: none;
+  }
+  /* Idle: ↔ ∠ i stacked at the top right, beside the toolbar and the
+     centered crystal. */
+  .measurement:not(.active) .measure-mode {
+    flex-direction: column;
   }
   .view-bottom {
     left: 8px;
@@ -1098,6 +1226,11 @@ button.element[aria-pressed="false"] .dot {
   .atoms-bar .chip {
     padding: 0 9px;
   }
+  /* Phone: opacity stays on the Bonds/Polyhedra row so both pair cards
+     (Si–O and Mg–O) fit the panel without scrolling. */
+  .polyhedra-opacity {
+    flex-basis: 130px;
+  }
 }
 /* Compact 36px targets only for mouse-only devices; any touch capability
    (e.g. a tablet with a trackpad attached) keeps 44px targets. */
@@ -1113,19 +1246,6 @@ button.element[aria-pressed="false"] .dot {
 }
 
 /* Appearance editor ------------------------------------------------------ */
-.style-open {
-  font-size: 13px;
-  border-left: 1px solid #8297ac30;
-  border-radius: 0 7px 7px 0;
-}
-#reset {
-  border-radius: 0;
-}
-.style-open[aria-pressed="true"] {
-  background: var(--accent-soft);
-  color: var(--text);
-  box-shadow: inset 0 -2px 0 var(--accent);
-}
 .style-editor {
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
@@ -1144,13 +1264,524 @@ aside .style-editor[hidden] + section {
 /* While editing, Appearance replaces Pairs so the inspector keeps one
    screen (Extent, Apply and 1 cell stay visible). Only roomy desktop
    windows show both. */
-aside.editing-style .coordination {
+
+/* Sidebar modes: Pairs · Style · Lattice · Sites. One mode is shown at a
+   time; Extent (and warnings) always stay. */
+/* The mode bar stays pinned at the top of the locally scrolling panel. Its
+   panel-colored shadows cover the padding strip above it and the gap below,
+   so scrolled content never shows through or sits under it as a tappable
+   sliver; it is opaque and above section content. */
+.mode-bar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  margin-bottom: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+  box-shadow:
+    0 -8px 0 8px var(--panel),
+    0 8px 0 0 var(--panel);
+}
+/* Five labelled tabs plus the Export icon tab: widths follow the labels so
+   all six fit a 320px panel. */
+.mode-tab {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--touch);
+  padding: 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  /* Readable sentence-case labels (13px); all six still fit 320px. */
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+.mode-icon {
+  flex: none;
+  width: 38px;
+  font-size: 17px;
+  letter-spacing: 0;
+}
+.mode-tab:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+.mode-tab[aria-pressed="true"] {
+  color: var(--text);
+  background: var(--accent-soft);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+/* Panes shown = the open (pinned) set; one on tablets/phones. */
+aside:not([data-modes~="pairs"]) .coordination,
+aside:not([data-modes~="lattice"]) .lattice-panel,
+aside:not([data-modes~="sites"]) .sites-panel,
+aside:not([data-modes~="extent"]) .plot-range,
+aside:not([data-modes~="export"]) .export-panel {
   display: none;
 }
-@media (orientation: landscape) and (min-width: 1200px) and (min-height: 860px) {
-  aside.editing-style .coordination {
-    display: block;
+/* Wide desktops: two pinned panes side by side under the shared tab bar. */
+@media (min-width: 1500px) and (min-height: 760px) {
+  main.two-panels {
+    grid-template-columns: minmax(0, 1fr) 720px;
   }
+  main.two-panels aside {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 18px;
+    align-items: start;
+    /* Rows hug their content; without this they stretch to the panel
+       height and push both panes far below the tab bar. */
+    align-content: start;
+  }
+  main.two-panels .mode-bar,
+  main.two-panels .warnings {
+    grid-column: 1 / -1;
+  }
+  main.two-panels aside section + section {
+    border-left: 0;
+  }
+}
+aside .coordination,
+aside .lattice-panel,
+aside .sites-panel,
+aside .plot-range,
+aside .export-panel {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+/* Lattice tools: plane and arrow rows. */
+.tool-list {
+  display: grid;
+  gap: 6px;
+}
+.tool-row {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--tool-color);
+  border-radius: var(--radius);
+  background: var(--raised);
+  padding: 4px 6px;
+}
+.tool-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.tool-line + .tool-line {
+  margin-top: 4px;
+}
+.tool-caption {
+  font-size: 11px;
+  color: var(--muted);
+}
+.tool-field {
+  min-height: var(--touch);
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--panel);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+}
+.tool-field.hkl,
+.tool-field.uvw {
+  width: 62px;
+}
+.tool-field.length {
+  width: 52px;
+}
+/* Fields with an always-visible caption inside their box. */
+.tool-capfield {
+  position: relative;
+  display: block;
+}
+.tool-capfield .tool-field {
+  padding-top: 11px;
+}
+.tool-capfield .micro {
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  font-size: 10px;
+  letter-spacing: 0.2px;
+  color: var(--muted);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.tool-field.offset {
+  width: 58px;
+}
+/* Plane and direction labels on the canvas, edged in the entry's color. */
+.lattice-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0 4px;
+  border-radius: 3px;
+  border-left: 3px solid var(--tool-color);
+  background: var(--label-bg);
+  color: var(--label-text);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  will-change: transform;
+}
+.tool-field.origin {
+  width: 96px;
+}
+.tool-field:invalid {
+  border-color: var(--danger);
+}
+.tool-color {
+  width: 30px;
+  height: 30px;
+  padding: 1px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--panel);
+}
+.tool-row .icon-button {
+  margin-left: auto;
+}
+.tool-readout {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.tool-readout.error {
+  color: var(--danger);
+}
+.sym-filters {
+  margin: 4px 0;
+}
+.sym-filter {
+  border-left: 3px solid var(--sym-color);
+}
+.sym-filter small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.sym-opacity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sym-opacity input {
+  flex: 1 1 auto;
+  min-height: var(--touch);
+  accent-color: var(--accent);
+  margin: 0;
+}
+.sym-opacity output {
+  width: 36px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sym-ops {
+  max-height: 180px;
+  overflow: auto;
+  margin: 4px 0 0;
+  padding-left: 26px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.sym-ops li {
+  margin: 2px 0;
+}
+.sym-ops code {
+  color: var(--text);
+  margin-right: 6px;
+}
+.sym-op-type {
+  white-space: nowrap;
+}
+
+/* Sites: tables with sticky headers in local scrollers. */
+.table-scroll {
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-top: 4px;
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.data-table th {
+  position: sticky;
+  top: 0;
+  background: var(--raised);
+  color: var(--muted);
+  font-weight: 600;
+  text-align: left;
+  padding: 4px 6px;
+}
+.data-table td {
+  padding: 5px 6px;
+  border-top: 1px solid var(--line);
+  white-space: nowrap;
+}
+.data-table tbody tr {
+  cursor: pointer;
+}
+.data-table tbody tr:hover {
+  background: var(--hover);
+}
+.data-table tbody tr.selected {
+  background: var(--select-soft);
+  box-shadow: inset 3px 0 0 var(--select-line);
+}
+.data-table tbody tr:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.table-title {
+  margin: 10px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Export pane. */
+.export-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.export-row .primary {
+  margin-left: auto;
+}
+.export-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.export-select select {
+  min-height: var(--touch);
+}
+.tool-field.export-dpi {
+  width: 72px;
+}
+.dpi-preset {
+  min-width: var(--touch);
+  justify-content: center;
+}
+.dpi-preset[aria-pressed="true"] {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+#export-progress {
+  width: 100%;
+  height: 10px;
+  margin-top: 8px;
+  accent-color: var(--accent);
+}
+/* While exporting, the canvas ignores input so the camera stays put. */
+#viewport.exporting canvas {
+  pointer-events: none;
+}
+
+/* Measurement: distance/angle switch and multi-line selection. */
+.measure-mode {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+.measure-mode .view-button {
+  min-width: var(--touch);
+  padding: 0 6px;
+  font-size: 19px;
+  line-height: 1;
+}
+/* Extent fields use typed values; native spinners are hidden. */
+.range-grid input::-webkit-inner-spin-button,
+.range-grid input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.range-grid input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.measure-mode .view-button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+#selection {
+  white-space: pre-line;
+}
+.info-button {
+  font: italic 700 18px Georgia, "Times New Roman", serif;
+}
+.measurement.info-mode .distance {
+  font-size: 20px;
+  font-weight: 600;
+}
+/* Atom details in the bottom panel (phones only; elsewhere the card next
+   to the crystal shows them). */
+.atom-info {
+  display: none;
+}
+/* Translucency overflow notice: phones only (elsewhere the atom summary
+   under the view carries it); hidden unless layers actually overflowed. */
+.peel-note {
+  display: none;
+}
+@media (max-width: 640px) {
+  .peel-note:not([hidden]) {
+    display: block;
+    margin: 0 0 10px;
+    padding: 6px 10px;
+    border-radius: var(--radius);
+    background: var(--warn-bg);
+    outline: 1px solid var(--warn-line);
+    outline-offset: -1px;
+    color: var(--warn-text);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+}
+@media (max-width: 640px) {
+  .atom-info:not([hidden]) {
+    display: grid;
+    gap: 2px;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    background: var(--accent-soft);
+    font-size: 13px;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+    /* Clear of the sticky mode bar when scrolled into view. */
+    scroll-margin-top: 64px;
+  }
+  .atom-info strong {
+    font-size: 15px;
+  }
+  .atom-info .atom-info-hint {
+    color: var(--muted);
+  }
+  /* Phone, any mode with picked atoms: the details live in the panel
+     below, so the card over the crystal stays the narrow right-hand column
+     (value, ↔ ∠ i, ✕) and never covers the selected atoms in the middle. */
+  .measurement.active #selection,
+  .measurement.info-mode.active .distance {
+    display: none;
+  }
+  .measurement.active {
+    padding: 3px;
+    min-width: 0;
+    max-width: 88px;
+  }
+  .measurement.active .measure-row,
+  .measurement.active .measure-mode {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .measurement.active .measure-mode {
+    margin-left: 0;
+  }
+  /* The distance/angle value heads the column, compact but readable. */
+  .measurement.active .distance {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0;
+    padding: 4px 2px 2px;
+    text-align: center;
+    white-space: normal;
+    line-height: 1.15;
+  }
+  .measurement.active .distance span {
+    font-size: 12px;
+  }
+}
+
+/* Lattice-axis compass: bottom-right above the atom count (top-right on
+   phones). Display only; it never takes pointer events. */
+.axis-compass {
+  position: absolute;
+  right: 12px;
+  bottom: 36px;
+  width: 72px;
+  height: 72px;
+  pointer-events: none;
+  z-index: 2;
+  border-radius: 50%;
+  background: var(--compass-bg);
+  border: 1px solid var(--overlay-line);
+}
+.axis-compass svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.compass-origin {
+  fill: var(--overlay-text);
+}
+.compass-label {
+  font: italic 700 13px Georgia, "Times New Roman", serif;
+  paint-order: stroke;
+  stroke: var(--label-halo);
+  stroke-width: 3px;
+}
+@media (max-width: 640px) {
+  /* Phone: compass at the right, just above the atom bar, beside the
+     centered crystal rather than above it. */
+  .axis-compass {
+    top: auto;
+    right: 8px;
+    bottom: 70px;
+    width: 58px;
+    height: 58px;
+  }
+}
+
+/* Projected CIF site labels. */
+.atom-labels {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+.atom-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--label-bg);
+  color: var(--label-text);
+  font-size: 11px;
+  line-height: 15px;
+  white-space: nowrap;
+  will-change: transform;
 }
 .back-button {
   min-height: var(--touch);
@@ -1164,7 +1795,7 @@ aside.editing-style .coordination {
   white-space: nowrap;
 }
 .back-button:hover {
-  background: #39c6b040;
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
 }
 .style-editor h2 {
   margin-right: auto;
@@ -1270,13 +1901,19 @@ aside.editing-style .coordination {
   font-variant-numeric: tabular-nums;
   color: var(--text);
 }
+.style-opacity {
+  margin-top: 4px;
+}
+.style-opacity input {
+  accent-color: var(--accent);
+}
 .style-size-hint {
   margin: 2px 2px 0;
   font-size: 11px;
   color: var(--muted);
 }
 .style-size-hint.off-true {
-  color: #f2d49a;
+  color: var(--warn-text);
 }
 #viewport.style-picking canvas {
   cursor: crosshair;
@@ -1299,7 +1936,7 @@ aside.editing-style .coordination {
 .view-directions .view-button[aria-pressed="true"],
 .view-directions details.active summary {
   background: var(--accent-soft);
-  border-color: #39c6b066;
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
   color: var(--text);
   box-shadow: inset 0 -2px 0 var(--accent);
 }

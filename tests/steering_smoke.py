@@ -165,6 +165,8 @@ async def run(browser_type, touch):
         )
         return [
             a for a in atoms if a["id"] in hit_ids
+            and -1 < a["z"] < 1
+            and box["y"] + 160 < a["y"] < box["y"] + box["height"] - 80
             and all(
                 a["id"] == b["id"] or math.dist((a["x"], a["y"]), (b["x"], b["y"])) > 20
                 for b in atoms

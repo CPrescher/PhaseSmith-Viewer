@@ -270,7 +270,25 @@ fn structure(text: &str, requested: Option<&str>) -> Result<Value, String> {
         .zip(expanded.source_site)
         .map(|(xyz, index)| {
             let s = &structure.sites[index];
-            json!({"label":s.site_id,"element":s.element_symbol,"frac":xyz,"occupancy":s.occupancy})
+            json!({"label":s.site_id,"element":s.element_symbol,"frac":xyz,"occupancy":s.occupancy,"siteIndex":index})
+        })
+        .collect::<Vec<_>>();
+    let independent_sites = structure
+        .sites
+        .iter()
+        .enumerate()
+        .map(|(index, site)| {
+            json!({"label":site.site_id,"element":site.element_symbol,
+                "frac":site.fractional_xyz,"occupancy":site.occupancy,"siteIndex":index})
+        })
+        .collect::<Vec<_>>();
+    let symmetry_operations = structure
+        .space_group
+        .operations()
+        .iter()
+        .map(|operation| {
+            json!({"rotation":operation.rotation(),
+                "translation":operation.translation().map(|value| value.as_f64())})
         })
         .collect::<Vec<_>>();
     let mut warnings = result
@@ -287,6 +305,7 @@ fn structure(text: &str, requested: Option<&str>) -> Result<Value, String> {
     Ok(
         json!({"name":structure.name,"block":result.selected_block,"blocks":result.available_blocks,
         "basis":geometry.direct_basis,"volume":geometry.volume_angstrom3,"atoms":atoms,
+        "independentSites":independent_sites,"symmetryOperations":symmetry_operations,
         "metadata":structure.metadata,"warnings":warnings}),
     )
 }
@@ -366,6 +385,16 @@ mod tests {
         let value = structure(&text, None).unwrap();
         let atoms = value["atoms"].as_array().unwrap();
         assert_eq!(atoms.len(), 2);
+        assert_eq!(value["independentSites"].as_array().unwrap().len(), 1);
+        assert_eq!(value["independentSites"][0]["frac"][0], 0.25);
+        assert_eq!(value["independentSites"][0]["occupancy"], 0.5);
+        assert_eq!(value["symmetryOperations"].as_array().unwrap().len(), 2);
+        assert_eq!(atoms[0]["siteIndex"], 0);
+        assert_eq!(atoms[1]["siteIndex"], 0);
+        let operations = value["symmetryOperations"].as_array().unwrap();
+        assert!(operations
+            .iter()
+            .any(|op| op["rotation"] == json!([[-1, 0, 0], [0, -1, 0], [0, 0, -1]])));
         assert_eq!(atoms[0]["occupancy"], 0.5);
         assert_eq!(atoms[1]["occupancy"], 0.5);
         assert_eq!(atoms[0]["frac"][0], 0.25);

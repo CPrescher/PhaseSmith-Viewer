@@ -32,7 +32,7 @@ export function translatedSites(
   atoms,
   ranges,
   boundary,
-  limit = Math.max(50000, atoms.length * 8),
+  limit = Math.max(500000, atoms.length * 8),
 ) {
   validateRanges(ranges);
   const plans = atoms.map((atom, sourceIndex) => {

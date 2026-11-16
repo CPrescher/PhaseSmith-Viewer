@@ -3,7 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#101d2d" />
+    <meta name="theme-color" content="#0b1622" />
+    <meta name="color-scheme" content="dark light" />
+    <script>
+      // Apply the theme before first paint: explicit choice, else system.
+      (function () {
+        var theme = null;
+        try {
+          theme = localStorage.getItem("psv-theme");
+        } catch (error) {}
+        if (theme !== "light" && theme !== "dark")
+          theme =
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: light)").matches
+              ? "light"
+              : "dark";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
     <title>PhaseSmith · Crystal Viewer</title>
   </head>
   <body>
@@ -21,6 +39,16 @@
         <label id="block-wrap" hidden
           ><span class="sr-only">Data block</span><select id="block"></select
         ></label>
+        <button
+          id="theme-toggle"
+          type="button"
+          class="theme-toggle"
+          aria-label="Light mode"
+          aria-pressed="false"
+          title="Switch to light mode"
+        >
+          <span aria-hidden="true">☀</span>
+        </button>
         <button id="open" class="primary">
           ＋ Open CIF<span class="desktop"> file</span></button
         ><input id="file" type="file" accept=".cif,.mcif,text/plain" hidden />
@@ -66,25 +94,44 @@
               >
                 ↺
               </button>
-              <button
-                id="style-open"
-                class="view-button style-open"
-                aria-controls="style-editor"
-                aria-expanded="false"
-                aria-pressed="false"
-                title="Colors and sizes of atoms and polyhedra"
-              >
-                Style
-              </button>
             </div>
             <section
               id="measure-overlay"
               class="measurement"
-              aria-label="Distance measurement"
+              aria-label="Measurement"
             >
               <div class="measure-row">
                 <div id="distance" class="distance" aria-live="polite">
                   — <span>Å</span>
+                </div>
+                <div class="measure-mode" role="group" aria-label="Measure">
+                  <button
+                    id="measure-distance"
+                    class="view-button"
+                    aria-pressed="true"
+                    aria-label="Distance"
+                    title="Distance between two atoms"
+                  >
+                    ↔
+                  </button>
+                  <button
+                    id="measure-angle"
+                    class="view-button"
+                    aria-pressed="false"
+                    aria-label="Angle"
+                    title="Angle A–B–C at the second atom"
+                  >
+                    ∠
+                  </button>
+                  <button
+                    id="measure-info"
+                    class="view-button info-button"
+                    aria-pressed="false"
+                    aria-label="Info"
+                    title="Details of one atom: label, occupancy, coordinates, CN and volume"
+                  >
+                    i
+                  </button>
                 </div>
                 <button
                   id="clear"
@@ -97,6 +144,20 @@
               </div>
               <p id="selection">Tap two atoms to measure.</p>
             </section>
+          </div>
+          <div id="atom-labels" class="atom-labels" aria-hidden="true"></div>
+          <div id="lattice-labels" class="atom-labels" aria-hidden="true"></div>
+          <div
+            class="axis-compass"
+            title="Directions of the lattice vectors a (red), b (green) and c (blue) in the current view. ⊙ points toward you, ⊗ away."
+          >
+            <svg
+              id="axis-compass"
+              role="img"
+              aria-label="Lattice axes compass"
+              aria-describedby="axis-compass-text"
+            ></svg>
+            <span id="axis-compass-text" class="sr-only"></span>
           </div>
           <div id="error" role="alert" hidden></div>
           <div id="loading">Reading crystal structure…</div>
@@ -126,7 +187,65 @@
             <span id="atom-summary"></span>
           </div>
         </div>
-        <aside aria-label="Structure controls">
+        <aside aria-label="Structure controls" data-mode="pairs">
+          <nav class="mode-bar" aria-label="Sidebar view">
+            <button id="mode-pairs" class="mode-tab" aria-pressed="true">
+              Pairs
+            </button>
+            <button
+              id="style-open"
+              type="button"
+              class="mode-tab"
+              aria-controls="style-editor"
+              aria-expanded="false"
+              aria-pressed="false"
+              title="Colors and sizes of atoms and polyhedra"
+            >
+              Style
+            </button>
+            <button
+              id="mode-lattice"
+              class="mode-tab"
+              aria-pressed="false"
+              title="Lattice planes, directions and symmetry elements"
+            >
+              Lattice
+            </button>
+            <button
+              id="mode-sites"
+              class="mode-tab"
+              aria-pressed="false"
+              title="CIF sites, asymmetric unit, labels and polyhedron volumes"
+            >
+              Sites
+            </button>
+            <button
+              id="mode-extent"
+              class="mode-tab"
+              aria-pressed="false"
+              title="Fractional plotting range, cell edges and boundary atoms"
+            >
+              Extent
+            </button>
+            <button
+              id="mode-export"
+              class="mode-tab mode-icon"
+              aria-pressed="false"
+              aria-label="Export image or movie"
+              title="Export a PNG image or a turntable movie"
+            >
+              <span aria-hidden="true">⤓</span>
+            </button>
+          </nav>
+          <div
+            id="atom-info"
+            class="atom-info"
+            role="status"
+            aria-live="polite"
+            aria-label="Selected atom"
+            hidden
+          ></div>
+          <p id="peel-note" class="peel-note" role="status" hidden></p>
           <section
             id="style-editor"
             class="style-editor"
@@ -191,6 +310,24 @@
               </button>
             </div>
             <p id="style-size-hint" class="style-size-hint"></p>
+            <label id="style-opacity-row" class="style-size style-opacity" hidden
+              ><span id="style-opacity-name">Opacity</span
+              ><input
+                id="style-opacity"
+                type="range"
+                min="0"
+                max="100"
+                step="1" /><output
+                id="style-opacity-value"
+                for="style-opacity"
+              ></output
+            ></label>
+            <button
+              id="style-reset-individual"
+              type="button"
+              class="text-button reset-individual"
+              hidden
+            ></button>
           </section>
           <section class="coordination" aria-labelledby="coord-title">
             <div class="section-title">
@@ -207,12 +344,132 @@
                 id="add-rule"
                 class="text-button"
                 aria-label="Add bond pair"
+                title="Add pair"
               >
                 ＋ Add
               </button>
             </div>
             <div id="pair-rules"></div>
             <p id="isolation-note" class="note" role="status" hidden></p>
+          </section>
+          <section class="lattice-panel" aria-labelledby="plane-title">
+            <div class="section-title">
+              <h2 id="plane-title">Planes (hkl)</h2>
+              <label
+                class="chip small"
+                title="Labels on drawn planes and direction arrows"
+                ><input
+                  id="lattice-labels-toggle"
+                  type="checkbox"
+                  checked
+                  aria-label="Plane and direction labels"
+                /><span>Labels</span></label
+              ><button
+                id="plane-add"
+                class="text-button"
+                aria-label="Add lattice plane (hkl)"
+              >
+                ＋ Plane
+              </button>
+            </div>
+            <div id="plane-list" class="tool-list"></div>
+            <div class="section-title">
+              <h2 id="arrow-title">Directions [uvw]</h2>
+              <button
+                id="arrow-add"
+                class="text-button"
+                aria-label="Add direction arrow [uvw]"
+              >
+                ＋ Arrow
+              </button>
+            </div>
+            <div id="arrow-list" class="tool-list"></div>
+            <div class="section-title">
+              <h2 id="sym-title">Symmetry</h2>
+              <label
+                class="chip"
+                title="Rotation and screw axes, rotoinversion axes, inversion centers, mirror and glide planes from the CIF operations"
+                ><input id="sym-toggle" type="checkbox" /><span
+                  >Elements</span
+                ></label
+              ><button
+                id="sym-ops-toggle"
+                class="text-button"
+                aria-expanded="false"
+                aria-controls="sym-ops"
+                title="List the CIF symmetry operations with their element type"
+              >
+                Ops
+              </button>
+            </div>
+            <div id="sym-controls" hidden>
+              <div id="sym-filters" class="chip-row sym-filters"></div>
+              <label class="sym-opacity"
+                ><span>Plane opacity</span
+                ><input
+                  id="sym-opacity"
+                  type="range"
+                  min="5"
+                  max="80"
+                  value="30" /><output id="sym-opacity-value"></output
+              ></label>
+            </div>
+            <p id="sym-note" class="note" role="status" hidden></p>
+            <ol id="sym-ops" class="sym-ops" hidden></ol>
+          </section>
+          <section class="sites-panel" aria-labelledby="sites-title">
+            <div class="section-title">
+              <h2 id="sites-title">Sites</h2>
+              <label
+                class="chip"
+                title="Show each independent CIF site once, before symmetry expansion"
+                ><input id="asym-toggle" type="checkbox" /><span
+                  >Asymmetric unit</span
+                ></label
+              ><label class="chip" title="CIF site labels on visible atoms"
+                ><input id="labels-toggle" type="checkbox" /><span
+                  >Labels</span
+                ></label
+              >
+            </div>
+            <p id="asym-note" class="note" role="status" hidden></p>
+            <div class="table-scroll">
+              <table id="site-table" class="data-table">
+                <caption class="sr-only">
+                  Independent CIF sites
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Site</th>
+                    <th scope="col">El</th>
+                    <th scope="col">x</th>
+                    <th scope="col">y</th>
+                    <th scope="col">z</th>
+                    <th scope="col">Occ</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <h3 class="table-title">Polyhedra</h3>
+            <div class="table-scroll">
+              <table id="poly-table" class="data-table">
+                <caption class="sr-only">
+                  Coordination polyhedra by central site: neighbor count
+                  and physical volume
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Center</th>
+                    <th scope="col">Pair</th>
+                    <th scope="col">CN</th>
+                    <th scope="col">V (Å³)</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <p id="poly-note" class="note"></p>
           </section>
           <section class="plot-range" aria-labelledby="range-title">
             <div class="section-title">
@@ -303,6 +560,85 @@
               </div>
               <p id="range-error" role="alert"></p>
             </form>
+          </section>
+          <section class="export-panel" aria-labelledby="export-title">
+            <div class="section-title">
+              <h2 id="export-title">Export</h2>
+            </div>
+            <div class="export-row" role="radiogroup" aria-label="Export resolution">
+              <span class="tool-caption">Size</span>
+              <label class="chip small"
+                ><input type="radio" name="export-scale" value="1" /><span
+                  >1×</span
+                ></label
+              ><label class="chip small"
+                ><input type="radio" name="export-scale" value="2" checked /><span
+                  >2×</span
+                ></label
+              ><label class="chip small"
+                ><input type="radio" name="export-scale" value="4" /><span
+                  >4×</span
+                ></label
+              >
+            </div>
+            <div class="export-row" role="group" aria-label="PNG print resolution">
+              <label class="export-select"
+                ><span class="tool-caption">DPI</span
+                ><input
+                  id="export-dpi"
+                  class="tool-field export-dpi"
+                  type="number"
+                  min="30"
+                  max="2400"
+                  step="1"
+                  value="300"
+                  inputmode="numeric"
+                  aria-describedby="export-dims"
+                  title="Print resolution stored in the PNG (metadata only; pixels are not resampled)"
+              /></label>
+              <button type="button" class="chip small dpi-preset" data-dpi="96">96</button
+              ><button type="button" class="chip small dpi-preset" data-dpi="150">150</button
+              ><button type="button" class="chip small dpi-preset" data-dpi="300">300</button
+              ><button type="button" class="chip small dpi-preset" data-dpi="600">600</button>
+            </div>
+            <p id="export-dims" class="note"></p>
+            <div class="export-row">
+              <label class="chip small" title="PNG without the canvas background"
+                ><input id="export-transparent" type="checkbox" /><span
+                  >Transparent</span
+                ></label
+              ><button id="export-png" type="button" class="primary">
+                Save PNG
+              </button>
+            </div>
+            <h3 class="table-title">Movie</h3>
+            <div class="export-row">
+              <label class="export-select"
+                ><span class="tool-caption">Length</span
+                ><select id="export-seconds">
+                  <option value="4">4 s</option>
+                  <option value="8" selected>8 s</option>
+                  <option value="12">12 s</option>
+                </select></label
+              ><label class="export-select"
+                ><span class="tool-caption">Rate</span
+                ><select id="export-fps">
+                  <option value="24">24 fps</option>
+                  <option value="30" selected>30 fps</option>
+                </select></label
+              >
+            </div>
+            <div class="export-row">
+              <button id="export-video" type="button" class="primary">
+                Record turntable
+              </button>
+              <button id="export-cancel" type="button" class="secondary" hidden>
+                Cancel
+              </button>
+            </div>
+            <progress id="export-progress" max="1" value="0" hidden></progress>
+            <p id="export-video-note" class="note"></p>
+            <p id="export-status" class="note" role="status" aria-live="polite"></p>
           </section>
           <div
             id="warnings"

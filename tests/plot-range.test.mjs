@@ -132,3 +132,14 @@ test("upper decimal face compares the actual translated coordinate", () => {
   assert.deepEqual(translatedSites([atom], bounds, true).map(a => a.frac[0]), [1.01, 2.01]);
   assert.deepEqual(translatedSites([atom], bounds, false).map(a => a.frac[0]), [1.01]);
 });
+
+test("default repetition budget permits structures beyond fifty thousand atoms", () => {
+  const sites = Array.from({ length: 32 }, (_, i) => ({
+    element: "C",
+    label: "C" + i,
+    frac: [(i % 4) / 4, (Math.floor(i / 4) % 4) / 4, Math.floor(i / 16) / 2],
+  }));
+  const atoms = translatedSites(sites, [[0, 20], [0, 20], [0, 20]], false);
+  assert.equal(atoms.length, 256000);
+  assert.equal(atoms.at(-1).frac[2], 19.5);
+});

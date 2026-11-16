@@ -10,6 +10,13 @@ import {
 } from "./plot-range.js";
 import { latticeViewDirection } from "./view-direction.js";
 import { buildCoordinationEnvironments, convexHull } from "./coordination.js";
+import { angleAt, hullVolume } from "./crystal-math.js";
+import { createLatticeTools } from "./lattice-tools.js";
+import { createAxisCompass } from "./axis-compass.js";
+import { createThemeSwitch } from "./theme.js";
+import { createExporter, validDpi } from "./export.js";
+import { createFaceSorter } from "./face-sort.js";
+import { createDepthPeeler } from "./peel.js";
 import {
   createAppearance,
   clearAppearance,
@@ -56,14 +63,38 @@ function initialize() {
     viewCamera.right = halfHeight * camera.aspect;
     viewCamera.top = halfHeight;
     viewCamera.bottom = -halfHeight;
-    viewCamera.near = camera.near;
-    viewCamera.far = camera.far;
-    viewCamera.position.copy(camera.position);
+    // Depth is decoupled from the logical (zoom) distance: when zoomed into
+    // a long structure the logical camera can sit inside it, which would
+    // clip near atoms and let rays start behind them. Move only the
+    // rendered camera back along its own view axis until the scene's
+    // bounding sphere (cached bounds, O(1)) is in front of the near plane,
+    // and extend far past its back. Screen x/y are unchanged (orthographic),
+    // so pan/zoom anchoring, labels and picking stay pixel-exact.
+    viewAxis.set(0, 0, 1).applyQuaternion(camera.quaternion); // toward viewer
+    const near = camera.near;
+    let shift = 0,
+      far = camera.far;
+    sceneBox.copy(fitBounds).union(latticeTools.bounds());
+    if (!sceneBox.isEmpty()) {
+      sceneBox.getBoundingSphere(sceneSphere);
+      const along = sceneDelta.copy(sceneSphere.center).sub(camera.position).dot(viewAxis);
+      // Margin also covers selection halos and labels just outside atoms.
+      const margin = Math.max(near * 4, sceneSphere.radius * 0.02, 0.5);
+      shift = Math.max(0, along + sceneSphere.radius + near + margin);
+      far = Math.max(far, shift - along + sceneSphere.radius + margin);
+    }
+    viewCamera.near = near;
+    viewCamera.far = far;
+    viewCamera.position.copy(camera.position).addScaledVector(viewAxis, shift);
     viewCamera.quaternion.copy(camera.quaternion);
     viewCamera.up.copy(camera.up);
     viewCamera.updateProjectionMatrix();
     viewCamera.updateMatrixWorld();
   }
+  const viewAxis = new THREE.Vector3(),
+    sceneBox = new THREE.Box3(),
+    sceneSphere = new THREE.Sphere(),
+    sceneDelta = new THREE.Vector3();
   function createControls(target = new THREE.Vector3()) {
     const next = new TrackballControls(camera, renderer.domElement);
     next.rotateSpeed = 2.2;
@@ -87,13 +118,33 @@ function initialize() {
     controls.minDistance = minDistance;
     controls.maxDistance = maxDistance;
   }
-  scene.add(new THREE.HemisphereLight(0xe4f1ff, 0x324353, 2.4));
+  // Studio lighting fixed to the view: the lights live in a rig whose
+  // orientation follows the rendered camera every frame, so the crystal
+  // turns under stationary screen lighting (in the turntable, too). The rig
+  // only rotates, so pan and zoom never change light directions. Positions
+  // are view-space directions: key upper-right-front, fill lower-left-back,
+  // sky from screen-up.
+  const lightRig = new THREE.Group();
+  scene.add(lightRig);
+  lightRig.add(new THREE.HemisphereLight(0xe4f1ff, 0x324353, 2.4));
   const light = new THREE.DirectionalLight(0xffffff, 3);
   light.position.set(5, 8, 10);
-  scene.add(light);
   const fill = new THREE.DirectionalLight(0x99baff, 1.4);
   fill.position.set(-6, -2, -5);
-  scene.add(fill);
+  for (const directional of [light, fill]) {
+    lightRig.add(directional, directional.target); // target at rig origin
+  }
+  const studioEuler = new THREE.Euler();
+  function syncStudio() {
+    lightRig.quaternion.copy(viewCamera.quaternion);
+    lightRig.updateMatrixWorld(true);
+    // Environment reflections in view space too. three samples the map
+    // with M · worldDir, M = R(−e) in e's order; camera XYZ angles given
+    // with order ZYX make M = R_camera⁻¹ exactly.
+    studioEuler.setFromQuaternion(viewCamera.quaternion, "XYZ");
+    for (const mesh of meshes)
+      mesh.material.envMapRotation?.set(studioEuler.x, studioEuler.y, studioEuler.z, "ZYX");
+  }
   let model = new THREE.Group();
   scene.add(model);
   let rules = [],
@@ -102,6 +153,50 @@ function initialize() {
     nextRule = 0;
   const pairColors = ["#62d5df", "#efa04c", "#c6a0ef", "#8cdf9b", "#ef95b3"];
   const faceMeshes = new Map();
+  const phoneLayout = matchMedia("(max-width: 640px)");
+  // Batch faces of all pairs; the peeler establishes their per-pixel order.
+  const faceSorter = createFaceSorter(THREE);
+  scene.add(faceSorter.mesh);
+  // Per-pixel ordered translucency (depth peeling) for the face batch and
+  // translucent planes. A frame whose depth complexity exceeded the layer
+  // budget is re-rendered with a larger budget; beyond the maximum the
+  // approximate remainder is reported in the atom summary.
+  let peelOverflow = false;
+  const peeler = createDepthPeeler({
+    // Only what peel.js uses: handing over the whole namespace would stop
+    // the bundler from dropping unused three.js classes.
+    THREE: {
+      Vector2: THREE.Vector2,
+      Color: THREE.Color,
+      WebGLRenderTarget: THREE.WebGLRenderTarget,
+      DepthTexture: THREE.DepthTexture,
+      OrthographicCamera: THREE.OrthographicCamera,
+      Scene: THREE.Scene,
+      ShaderMaterial: THREE.ShaderMaterial,
+      MeshBasicMaterial: THREE.MeshBasicMaterial,
+      Mesh: THREE.Mesh,
+      PlaneGeometry: THREE.PlaneGeometry,
+      UnsignedByteType: THREE.UnsignedByteType,
+      FloatType: THREE.FloatType,
+      NearestFilter: THREE.NearestFilter,
+      CustomBlending: THREE.CustomBlending,
+      NoBlending: THREE.NoBlending,
+      NormalBlending: THREE.NormalBlending,
+      OneFactor: THREE.OneFactor,
+      OneMinusDstAlphaFactor: THREE.OneMinusDstAlphaFactor,
+      OneMinusSrcAlphaFactor: THREE.OneMinusSrcAlphaFactor,
+      DoubleSide: THREE.DoubleSide,
+      SRGBColorSpace: THREE.SRGBColorSpace,
+    },
+    renderer,
+    onStatus: (status) => {
+      if (status.rerender) invalidate();
+      if (status.overflow !== peelOverflow) {
+        peelOverflow = status.overflow;
+        updateAtomSummary();
+      }
+    },
+  });
   const hiddenElements = new Set();
   const atomVisible = (a) =>
     $("show-atoms").checked && !hiddenElements.has(a.element);
@@ -118,8 +213,11 @@ function initialize() {
     frame = 0,
     fitDistance = 20,
     fitBounds = new THREE.Box3(),
+    fitCorners = [],
     modelCenter = new THREE.Vector3(),
-    distance = null;
+    distance = null,
+    angle = null,
+    measureMode = "distance";
   scene.add(selectionGroup);
   function render() {
     frame = 0;
@@ -127,7 +225,17 @@ function initialize() {
     // schedules the next frame; once settled, no animation frames remain.
     controls.update();
     syncViewCamera();
-    renderer.render(scene, viewCamera);
+    syncStudio();
+    faceSorter.sync([...faceMeshes.values()], viewCamera);
+    peeler.render(scene, viewCamera);
+    if (labelsOn || shownLabels) updateLabels();
+    latticeTools.updateLabels(viewCamera, renderer.domElement);
+    // Lattice-axis compass follows the rendered camera's rotation.
+    compassState = compass.update(
+      structure?.basis,
+      compassInverse.copy(viewCamera.quaternion).invert(),
+      compassVector,
+    );
     // The pressed view button stays lit only while the camera still looks
     // along that direction; any rotation away from it clears the state.
     if (
@@ -137,6 +245,64 @@ function initialize() {
     )
       setActiveView(null);
   }
+  // CIF site labels projected onto visible atoms. A small reused pool of
+  // spans (front-most first, overlaps skipped, capped) keeps the DOM light
+  // while rotating on tablets.
+  const compass = createAxisCompass($("axis-compass"), $("axis-compass-text"));
+  const compassInverse = new THREE.Quaternion(),
+    compassVector = new THREE.Vector3();
+  let compassState = null;
+  const LABEL_LIMIT = 150,
+    LABEL_ATOM_LIMIT = 20000;
+  let labelsOn = false,
+    shownLabels = 0;
+  const labelPool = [],
+    projected = new THREE.Vector3();
+  function updateLabels() {
+    const layer = $("atom-labels");
+    const { width, height } = renderer.domElement.getBoundingClientRect();
+    let placed = [];
+    if (labelsOn && atoms.length <= LABEL_ATOM_LIMIT) {
+      const candidates = [];
+      // Screen pixels per world unit of the orthographic view: labels sit
+      // at the upper right of each sphere instead of covering it.
+      const pixelsPerUnit = height / (viewCamera.top - viewCamera.bottom || 1);
+      for (const a of atoms) {
+        if (!atomVisible(a)) continue;
+        projected.copy(a.position).project(viewCamera);
+        if (Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1 || Math.abs(projected.z) > 1) continue;
+        const offset = a.radius * pixelsPerUnit * 0.7;
+        candidates.push({
+          label: a.label,
+          x: ((projected.x + 1) * width) / 2 + offset,
+          y: ((1 - projected.y) * height) / 2 - offset,
+          z: projected.z,
+        });
+      }
+      candidates.sort((p, q) => p.z - q.z);
+      for (const c of candidates) {
+        if (placed.length >= LABEL_LIMIT) break;
+        if (placed.some((p) => Math.abs(p.x - c.x) < 28 && Math.abs(p.y - c.y) < 13)) continue;
+        placed.push(c);
+      }
+    }
+    while (labelPool.length < placed.length) {
+      const span = document.createElement("span");
+      span.className = "atom-label";
+      layer.append(span);
+      labelPool.push(span);
+    }
+    labelPool.forEach((span, i) => {
+      const c = placed[i];
+      span.hidden = !c;
+      if (!c) return;
+      if (span.textContent !== c.label) span.textContent = c.label;
+      span.style.transform = `translate(${c.x.toFixed(1)}px, ${c.y.toFixed(1)}px) translate(-20%, -80%)`;
+    });
+    shownLabels = placed.length;
+    lastAtomLabels = placed;
+  }
+  let lastAtomLabels = [];
   let activeView = null;
   function setActiveView(id, dir) {
     activeView = id ? { id, dir: dir.clone() } : null;
@@ -197,8 +363,17 @@ function initialize() {
     Fe: 0.45,
   };
   const defaultColor = (e) => colors[e] || "#acb5cf";
+  // Overlay colors (selection, measurement, pick marker, cell edges) per
+  // theme; element and pair colors are scientific choices and never change.
+  const SCENE_PALETTES = {
+    dark: { select: 0x79ffdc, arc: 0xffe08a, pick: 0xffc46b, cell: 0x7fa6c5 },
+    light: { select: 0x0a8f7b, arc: 0xc06d00, pick: 0xd08300, cell: 0x587690 },
+  };
+  const scenePalette = () =>
+    SCENE_PALETTES[document.documentElement.dataset.theme === "light" ? "light" : "dark"];
   const appearance = createAppearance();
-  let styleEditor = null;
+  let styleEditor = null,
+    sidebarMode = "pairs";
   // Element-wide colour (used by the element chips and as the inherited
   // value for individual atoms).
   const colorFor = (e) => appearance.elements.get(e)?.color ?? defaultColor(e);
@@ -264,14 +439,28 @@ function initialize() {
   function atomKey(a) {
     return `${a.sourceIndex}:${a.frac.map((v) => Math.round(v * 1e9)).join(",")}`;
   }
-  function build(
-    preserve = true,
-    plottedSites = translatedSites(
-      structure.atoms,
-      plotRanges,
-      $("boundary").checked,
-    ),
-  ) {
+  // ---- Asymmetric unit ----------------------------------------------------
+  // Independent CIF sites exactly once, before space-group expansion. No
+  // geometric "asymmetric-unit boundary" is drawn or invented.
+  let asymmetric = false;
+  function independentSites() {
+    if (Array.isArray(structure?.independentSites)) return structure.independentSites;
+    // Older engine builds: first expanded copy of each label (approximate).
+    const seen = new Map();
+    for (const a of structure?.atoms ?? [])
+      if (!seen.has(a.label)) seen.set(a.label, { ...a, siteIndex: seen.size });
+    return [...seen.values()];
+  }
+  function plotSites(ranges = plotRanges) {
+    if (asymmetric)
+      return independentSites().map((s, i) => ({
+        ...s,
+        siteIndex: s.siteIndex ?? i,
+        sourceIndex: `asym${i}`,
+      }));
+    return translatedSites(structure.atoms, ranges, $("boundary").checked);
+  }
+  function build(preserve = true, plottedSites = plotSites()) {
     const selectedKeys = preserve ? selection.map(atomKey) : [];
     faceMeshes.clear();
     dispose(model);
@@ -334,9 +523,8 @@ function initialize() {
       meshes.push(mesh);
     }
     sphere.dispose();
-    fitBounds = new THREE.Box3().setFromPoints(
-      corners.map((p) => p.clone().sub(modelCenter)),
-    );
+    fitCorners = corners.map((p) => p.clone().sub(modelCenter));
+    fitBounds = new THREE.Box3().setFromPoints(fitCorners);
     for (const atom of atoms) {
       fitBounds.expandByPoint(atom.position.clone().addScalar(atom.radius));
       fitBounds.expandByPoint(atom.position.clone().addScalar(-atom.radius));
@@ -352,7 +540,7 @@ function initialize() {
     cellLines = new THREE.LineSegments(
       new THREE.BufferGeometry().setFromPoints(points),
       new THREE.LineBasicMaterial({
-        color: 0x7fa6c5,
+        color: scenePalette().cell,
         transparent: true,
         opacity: 0.48,
       }),
@@ -368,8 +556,19 @@ function initialize() {
     updateAtomSummary();
     updateSelection();
     updatePickMarker();
+    // Overlays follow the new model center, ranges and atom list.
+    latticeTools.rebuild();
+    highlightSite(highlightedSite);
     invalidate();
   }
+  const latticeTools = createLatticeTools({
+    THREE,
+    scene,
+    invalidate,
+    getStructure: () => structure,
+    getRanges: () => plotRanges,
+    toScene: (frac) => cart(frac).sub(modelCenter),
+  });
   // Unobtrusive marker for an individually picked appearance target: a
   // thin amber shell around the atom, or amber edges on the polyhedron.
   // Shown only while the Appearance editor is open.
@@ -386,7 +585,7 @@ function initialize() {
         const shell = new THREE.Mesh(
           new THREE.SphereGeometry(atom.radius * 1.09, 48, 32),
           new THREE.MeshBasicMaterial({
-            color: 0xffc46b,
+            color: scenePalette().pick,
             side: THREE.BackSide,
             transparent: true,
             opacity: 0.85,
@@ -414,7 +613,7 @@ function initialize() {
         const edges = new THREE.LineSegments(
           new THREE.BufferGeometry().setFromPoints(points),
           new THREE.LineBasicMaterial({
-            color: 0xffc46b,
+            color: scenePalette().pick,
             transparent: true,
             opacity: 0.95,
             depthTest: false,
@@ -944,13 +1143,8 @@ function initialize() {
           opacityInput.setAttribute("aria-valuetext", `${opacityInput.value}%`);
         };
         opacityInput.oninput = () => {
-          rule.opacity = Number(opacityInput.value) / 100;
-          showOpacity();
-          const stat = coordinationStats.find((s) => s.id === rule.id);
-          if (stat) stat.opacity = rule.opacity;
-          const mesh = faceMeshes.get(rule.id);
-          if (mesh) setFaceOpacity(mesh, rule.opacity);
-          invalidate();
+          setRuleOpacity(rule, Number(opacityInput.value) / 100);
+          styleEditor?.refresh();
         };
         showOpacity();
         const opacityCaption = make("span", {
@@ -1015,6 +1209,24 @@ function initialize() {
   $("polyhedra-only").onchange = () => {
     if (structure) build();
   };
+  // One path for a pair's face opacity, used by the pair slider and the
+  // Style editor: rule state, the live face material (no geometry
+  // rebuild) and the pair card's slider/readout stay in sync.
+  const DEFAULT_FACE_OPACITY = 0.34;
+  function setRuleOpacity(rule, opacity) {
+    rule.opacity = Math.min(1, Math.max(0, opacity));
+    const stat = coordinationStats.find((s) => s.id === rule.id);
+    if (stat) stat.opacity = rule.opacity;
+    const mesh = faceMeshes.get(rule.id);
+    if (mesh) setFaceOpacity(mesh, rule.opacity);
+    const percent = String(Math.round(rule.opacity * 100));
+    const input = $(`pair-opacity-${rule.id}`);
+    if (input && input.value !== percent) input.value = percent;
+    if (input) input.setAttribute("aria-valuetext", `${percent}%`);
+    const output = $(`pair-opacity-value-${rule.id}`);
+    if (output) output.value = `${percent}%`;
+    invalidate();
+  }
   function setFaceOpacity(mesh, opacity) {
     mesh.visible = opacity > 0;
     mesh.material.opacity = opacity;
@@ -1027,7 +1239,16 @@ function initialize() {
     const visible = atoms.filter(atomVisible).length;
     const hidden = atoms.length - visible;
     $("atom-summary").textContent =
-      `${visible.toLocaleString()} visible atoms${hidden ? ` · ${hidden.toLocaleString()} hidden` : ""}`;
+      `${visible.toLocaleString()} visible atoms${hidden ? ` · ${hidden.toLocaleString()} hidden` : ""}` +
+      (peelOverflow ? " · deepest translucent layers approximated" : "");
+    const explanation =
+      "More translucent faces overlap here than the 24 exactly ordered layers; the ones farthest back are blended in approximate order.";
+    $("atom-summary").title = peelOverflow ? explanation : "";
+    // Phones hide the atom summary; the same notice appears under the
+    // mode bar there (CSS shows it on phones only), and only on overflow.
+    const note = $("peel-note");
+    note.hidden = !peelOverflow;
+    note.textContent = peelOverflow ? `Approximate translucency: ${explanation}` : "";
   }
   function updateAtomVisibility() {
     meshes.forEach((mesh) => {
@@ -1039,7 +1260,10 @@ function initialize() {
     invalidate();
   }
   $("show-atoms").onchange = updateAtomVisibility;
+  // Central atom key → [{ pair, coordination, volume }] for inspection.
+  const polyInfo = new Map();
   function buildCoordination() {
+    polyInfo.clear();
     const base = [...atoms];
     const all = new Map(base.map((a) => [atomKey(a), a]));
     const used = new Set();
@@ -1076,7 +1300,10 @@ function initialize() {
         bonds: [],
         stat,
       };
-      if (rule.bonds || rule.polyhedra) {
+      // In the asymmetric-unit view, pairs are paused (rules kept intact)
+      // so completed shells cannot re-add expanded atoms.
+      stat.paused = asymmetric;
+      if (!asymmetric && (rule.bonds || rule.polyhedra)) {
         try {
           const environments = buildCoordinationEnvironments({
             basis: structure.basis,
@@ -1099,7 +1326,15 @@ function initialize() {
             const hull = rule.polyhedra
               ? convexHull(vertices.map((a) => a.cartesian))
               : null;
-            if (hull) plan.hulls.push({ center: env.center, vertices, hull });
+            // Physical volume from the true neighbor coordinates, computed
+            // once; display scale and opacity never enter it.
+            if (hull)
+              plan.hulls.push({
+                center: env.center,
+                vertices,
+                hull,
+                volume: hullVolume(hull.vertices, hull.faces),
+              });
             if (rule.bonds)
               for (const atom of vertices) plan.bonds.push([env.center, atom]);
           }
@@ -1108,11 +1343,21 @@ function initialize() {
             const indices = [...new Set(item.hull.faces.flat())];
             used.add(atomKey(item.center));
             indices.forEach((i) => used.add(atomKey(item.vertices[i])));
+            const centerKey = atomKey(item.center);
             stat.environments.push({
-              center: atomKey(item.center),
+              center: centerKey,
+              centerLabel: item.center.label,
+              coordination: item.vertices.length,
+              volume: item.volume,
               vertices: indices.map((i) => atomKey(item.vertices[i])),
               edgeCount: item.hull.edges.length,
               faceCount: item.hull.faces.length,
+            });
+            if (!polyInfo.has(centerKey)) polyInfo.set(centerKey, []);
+            polyInfo.get(centerKey).push({
+              pair: pairName(rule),
+              coordination: item.vertices.length,
+              volume: item.volume,
             });
           }
           stat.polyhedronCount = plan.hulls.length;
@@ -1124,7 +1369,7 @@ function initialize() {
       }
       coordinationStats.push(stat);
     }
-    const enabledPolyhedra = rules.some((rule) => rule.polyhedra);
+    const enabledPolyhedra = !asymmetric && rules.some((rule) => rule.polyhedra);
     const isolated = $("polyhedra-only").checked && enabledPolyhedra;
     const visible = new Map((isolated ? [] : base).map((a) => [atomKey(a), a]));
     for (const key of used) visible.set(key, all.get(key));
@@ -1287,7 +1532,9 @@ function initialize() {
       p.classList.toggle("error", Boolean(stat.error));
       p.textContent =
         stat.error ||
-        (!(stat.bonds || stat.polyhedra)
+        (stat.paused
+          ? "Paused in asymmetric-unit view"
+          : !(stat.bonds || stat.polyhedra)
           ? "Off · enable bonds or polyhedra"
           : `CN ${stat.counts.join(", ") || "0"} · ${stat.centerCount || 0} centers · ${stat.polyhedronCount} poly · ${stat.bondCount} bonds`);
     }
@@ -1299,6 +1546,111 @@ function initialize() {
           ? ""
           : "Add a pair to draw bonds or polyhedra.";
     note.hidden = !note.textContent;
+    renderPolyTable();
+  }
+  // ---- Sites inspector: CIF sites and polyhedron volumes ----------------
+  const frac3 = (f) => f.map((v) => v.toFixed(4));
+  function renderSiteTable() {
+    const body = $("site-table").tBodies[0];
+    if (!structure) return body.replaceChildren();
+    const sites = independentSites();
+    body.replaceChildren(
+      ...sites.map((s, i) => {
+        const row = document.createElement("tr");
+        row.tabIndex = 0;
+        row.dataset.site = s.label;
+        row.title = `Highlight every visible copy of ${s.label}`;
+        for (const text of [s.label, s.element, ...frac3(s.frac), s.occupancy != null ? Number(s.occupancy).toFixed(3) : "—"]) {
+          const cell = document.createElement("td");
+          cell.textContent = text;
+          row.append(cell);
+        }
+        const choose = () => highlightSite(highlightedSite === s.label ? null : s.label);
+        row.onclick = choose;
+        row.onkeydown = (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            choose();
+          }
+        };
+        row.setAttribute("aria-label", `${s.label}, ${s.element}, ${frac3(s.frac).join(" ")}, occupancy ${s.occupancy ?? "unknown"}`);
+        void i;
+        return row;
+      }),
+    );
+    if (!Array.isArray(structure.independentSites))
+      $("asym-note").textContent = "This engine build does not report independent sites; showing the first copy of each label.";
+  }
+  function renderPolyTable() {
+    const body = $("poly-table")?.tBodies[0];
+    if (!body) return;
+    // Group by pair and central CIF site label: CN set and volume range.
+    const groups = new Map();
+    for (const stat of coordinationStats)
+      for (const env of stat.environments) {
+        const key = `${pairName(stat)}|${env.centerLabel}`;
+        if (!groups.has(key))
+          groups.set(key, { pair: pairName(stat), label: env.centerLabel, cn: new Set(), volumes: [] });
+        const g = groups.get(key);
+        g.cn.add(env.coordination);
+        g.volumes.push(env.volume);
+      }
+    body.replaceChildren(
+      ...[...groups.values()].map((g) => {
+        const row = document.createElement("tr");
+        const lo = Math.min(...g.volumes),
+          hi = Math.max(...g.volumes);
+        const volume = hi - lo < 5e-4 ? lo.toFixed(3) : `${lo.toFixed(3)}–${hi.toFixed(3)}`;
+        for (const text of [g.label, g.pair, [...g.cn].sort((a, b) => a - b).join(", "), volume]) {
+          const cell = document.createElement("td");
+          cell.textContent = text;
+          row.append(cell);
+        }
+        row.tabIndex = 0;
+        row.title = `Highlight ${g.label} centers`;
+        const choose = () => highlightSite(highlightedSite === g.label ? null : g.label);
+        row.onclick = choose;
+        row.onkeydown = (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            choose();
+          }
+        };
+        return row;
+      }),
+    );
+    $("poly-note").textContent = asymmetric
+      ? "Pairs are paused in the asymmetric-unit view."
+      : groups.size
+        ? "Volumes from true neighbor positions; display scale does not change them."
+        : "Enable Polyhedra on a pair to list coordination volumes.";
+  }
+  // Highlight all visible copies of one CIF site (amber shells, capped).
+  let highlightedSite = null;
+  const siteGroup = new THREE.Group();
+  scene.add(siteGroup);
+  function highlightSite(label) {
+    highlightedSite = label;
+    dispose(siteGroup);
+    siteGroup.clear();
+    for (const row of document.querySelectorAll("#site-table tbody tr, #poly-table tbody tr"))
+      row.classList.toggle("selected", Boolean(label) && row.cells[0].textContent === label);
+    if (label) {
+      const copies = atoms.filter((a) => a.label === label && atomVisible(a)).slice(0, 400);
+      if (copies.length) {
+        const shells = new THREE.InstancedMesh(
+          new THREE.SphereGeometry(1, 32, 24),
+          new THREE.MeshBasicMaterial({ color: scenePalette().pick, side: THREE.BackSide, transparent: true, opacity: 0.8 }),
+          copies.length,
+        );
+        const m = new THREE.Matrix4();
+        copies.forEach((a, i) =>
+          shells.setMatrixAt(i, m.compose(a.position, new THREE.Quaternion(), new THREE.Vector3().setScalar(a.radius * 1.12))),
+        );
+        siteGroup.add(shells);
+      }
+    }
+    invalidate();
   }
   function orient(indices, viewId = "uvw") {
     if (!structure) return;
@@ -1347,33 +1699,66 @@ function initialize() {
     }
     orient(fields.map(Number));
   };
+  // Fit room: only the view toolbar (top) and the atom bar (bottom) span the
+  // crystal's column; the measurement card and compass sit beside it.
   function overlayReserve() {
     const view = viewport.getBoundingClientRect();
-    const top = document.querySelector(".view-top").getBoundingClientRect();
-    const bottom = document
-      .querySelector(".view-bottom")
-      .getBoundingClientRect();
-    return Math.max(top.bottom - view.top, view.bottom - bottom.top, 0);
+    const top = document.querySelector(".view-directions").getBoundingClientRect();
+    const bottom = document.querySelector(".atoms-bar").getBoundingClientRect();
+    return Math.max(top.bottom - view.top, view.bottom - bottom.top, 0) + 4;
   }
+  const boxCorners = (box) =>
+    [0, 1, 2, 3, 4, 5, 6, 7].map(
+      (i) =>
+        new THREE.Vector3(
+          i & 1 ? box.max.x : box.min.x,
+          i & 2 ? box.max.y : box.min.y,
+          i & 4 ? box.max.z : box.min.z,
+        ),
+    );
   function reset(keepOrientation = false) {
     if (!keepOrientation) selection = [];
     updateSelection();
-    const sphere = fitBounds.getBoundingSphere(new THREE.Sphere());
-    const vertical = THREE.MathUtils.degToRad(camera.fov / 2);
-    const horizontal = Math.atan(Math.tan(vertical) * camera.aspect);
+    // Fit what is drawn — cell edges, atom spheres, polyhedra (at display
+    // scale) and planes/arrows/symmetry elements — by its projected extent
+    // in the orientation being shown (orthographic view), not by a
+    // bounding sphere, which framed elongated cells far too small.
+    const bounds = fitBounds.clone().union(latticeTools.bounds());
+    const target = bounds.getCenter(new THREE.Vector3());
+    const direction = keepOrientation
+      ? camera.position.clone().sub(controls.target).normalize()
+      : new THREE.Vector3(0.68, 0.48, 0.8).normalize();
+    const viewUp = keepOrientation ? camera.up.clone() : new THREE.Vector3(0, 1, 0);
+    const basis = new THREE.Matrix4().lookAt(direction, new THREE.Vector3(), viewUp);
+    const right = new THREE.Vector3().setFromMatrixColumn(basis, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(basis, 1);
+    let halfRight = 0,
+      halfUp = 0;
+    const offset = new THREE.Vector3();
+    const extend = (point, radius = 0) => {
+      offset.copy(point).sub(target);
+      halfRight = Math.max(halfRight, Math.abs(offset.dot(right)) + radius);
+      halfUp = Math.max(halfUp, Math.abs(offset.dot(up)) + radius);
+    };
+    for (const corner of fitCorners) extend(corner);
+    if (atoms.length <= 200000) for (const a of atoms) extend(a.position, a.radius ?? 0);
+    else for (const corner of boxCorners(fitBounds)) extend(corner);
+    const extra = new THREE.Box3();
+    for (const faces of faceMeshes.values()) {
+      if (!faces.visible) continue;
+      faces.geometry.computeBoundingBox();
+      extra.union(faces.geometry.boundingBox);
+    }
+    extra.union(latticeTools.bounds());
+    if (!extra.isEmpty()) for (const corner of boxCorners(extra)) extend(corner);
+    halfRight = Math.max(halfRight, 0.5);
+    halfUp = Math.max(halfUp, 0.5);
     // Canvas toolbars sit along the top and bottom edges; fit the crystal
     // between them so no control covers it after a reset.
     const height = viewport.clientHeight || 1;
     const usable = Math.max(height - 2 * overlayReserve(), height * 0.7);
-    const clearVertical = Math.atan((Math.tan(vertical) * usable) / height);
-    fitDistance =
-      (Math.max(sphere.radius, 1) /
-        Math.sin(Math.min(clearVertical, horizontal))) *
-      1.05;
-    const target = sphere.center;
-    const direction = keepOrientation
-      ? camera.position.clone().sub(controls.target).normalize()
-      : new THREE.Vector3(0.68, 0.48, 0.8).normalize();
+    const halfHeight = Math.max(halfUp * (height / usable), halfRight / camera.aspect) * 1.06;
+    fitDistance = halfHeight / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     stopMotion();
     if (!keepOrientation) camera.up.set(0, 1, 0);
     camera.position.copy(target).addScaledVector(direction, fitDistance);
@@ -1395,7 +1780,7 @@ function initialize() {
       const halo = new THREE.Mesh(
         new THREE.SphereGeometry(a.radius * 1.13, 64, 48),
         new THREE.MeshBasicMaterial({
-          color: 0x79ffdc,
+          color: scenePalette().select,
           side: THREE.BackSide,
           transparent: true,
           opacity: 0.92,
@@ -1405,14 +1790,57 @@ function initialize() {
       selectionGroup.add(halo);
     }
     distance = null;
-    if (selection.length === 2) {
+    angle = null;
+    if (measureMode === "angle" && selection.length >= 2) {
+      // A–B–C: two solid legs from the vertex B and an arc at B.
+      const [a, b, c] = selection;
+      const legs = new THREE.LineSegments(
+        new THREE.BufferGeometry().setFromPoints(
+          [a, b, ...(c ? [b, c] : [])].map((atom) => atom.position),
+        ),
+        new THREE.LineBasicMaterial({ color: scenePalette().select, depthTest: false }),
+      );
+      legs.renderOrder = 5;
+      selectionGroup.add(legs);
+      if (c) {
+        angle = angleAt(a.position.toArray(), b.position.toArray(), c.position.toArray());
+        if (angle !== null) {
+          const u = a.position.clone().sub(b.position),
+            v = c.position.clone().sub(b.position);
+          const radius = 0.3 * Math.min(u.length(), v.length());
+          u.normalize();
+          v.normalize();
+          let axis = u.clone().cross(v);
+          if (axis.lengthSq() < 1e-12) {
+            // 180°: any axis perpendicular to the legs.
+            axis = new THREE.Vector3(1, 0, 0).cross(u);
+            if (axis.lengthSq() < 1e-12) axis = new THREE.Vector3(0, 1, 0).cross(u);
+          }
+          axis.normalize();
+          const steps = 24,
+            radians = THREE.MathUtils.degToRad(angle);
+          const arc = [];
+          for (let i = 0; i <= steps; i++)
+            arc.push(
+              u.clone().applyAxisAngle(axis, (radians * i) / steps).multiplyScalar(radius).add(b.position),
+            );
+          const curve = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(arc),
+            new THREE.LineBasicMaterial({ color: scenePalette().arc, depthTest: false }),
+          );
+          curve.renderOrder = 6;
+          selectionGroup.add(curve);
+        }
+      }
+    }
+    if (measureMode === "distance" && selection.length === 2) {
       distance = selection[0].position.distanceTo(selection[1].position);
       const line = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(
           selection.map((a) => a.position),
         ),
         new THREE.LineDashedMaterial({
-          color: 0x79ffdc,
+          color: scenePalette().select,
           depthTest: false,
           dashSize: Math.max(distance / 24, 0.04),
           gapSize: Math.max(distance / 48, 0.02),
@@ -1423,28 +1851,135 @@ function initialize() {
       selectionGroup.add(line);
     }
     const picking = Boolean(styleEditor?.picking);
-    $("measure-overlay").classList.toggle("active", selection.length > 0 || picking);
+    // Style picking keeps the card compact (accent frame + hint on larger
+    // screens); the Style panel's pressed "Tap crystal" button says it is on.
+    $("measure-overlay").classList.toggle("active", selection.length > 0 && !picking);
     $("measure-overlay").classList.toggle("picking", picking);
     $("clear").disabled = !selection.length;
+    const angleMode = measureMode === "angle";
+    const value = angleMode ? angle : distance;
     $("distance").replaceChildren(
       document.createTextNode(
-        distance === null ? "— " : `${distance.toFixed(4)} `,
+        value === null
+          ? angleMode && selection.length === 3
+            ? "undefined "
+            : "— "
+          : `${value.toFixed(angleMode ? 2 : 4)} `,
       ),
-      Object.assign(document.createElement("span"), { textContent: "Å" }),
+      Object.assign(document.createElement("span"), { textContent: angleMode ? "°" : "Å" }),
     );
+    const needed = angleMode ? 3 : 2;
+    // Each picked copy with its CIF site label and fractional position;
+    // a polyhedron center also shows its CN and physical volume.
+    const lines = selection.map((a, i) => {
+      const role = angleMode ? `${"ABC"[i]}${i === 1 ? " (vertex)" : ""} ` : "";
+      return `${role}${a.label} (${a.frac.map((v) => v.toFixed(3)).join(", ")})`;
+    });
+    if (selection.length === 1)
+      for (const info of polyInfo.get(atomKey(selection[0])) ?? [])
+        lines.push(`${info.pair}: CN ${info.coordination} · V ${info.volume.toFixed(3)} Å³`);
     $("selection").textContent = picking
       ? "Style picking: tap one atom or polyhedron."
       : selection.length
-      ? selection.map((a) => a.label).join(" ↔ ") +
-        (selection.length === 1 ? " · tap a second atom" : "")
-      : $("show-atoms").checked
-        ? "Tap two atoms to measure."
-        : "Show atoms to measure.";
+        ? lines.join("\n") +
+          (selection.length < needed
+            ? `\nTap ${angleMode ? (selection.length === 1 ? "the vertex atom" : "a third atom") : "a second atom"}`
+            : "")
+        : $("show-atoms").checked
+          ? angleMode
+            ? "Tap three atoms; the second is the vertex."
+            : "Tap two atoms to measure."
+          : "Show atoms to measure.";
     $("selection").title = selection
       .map((a) => `${a.label} [${a.frac.map((v) => v.toFixed(4)).join(", ")}]`)
       .join("\n");
+    if (measureMode === "info" && !picking) showAtomInfo();
+    else if (selection.length && !picking) showMeasureDetails(value, angleMode, lines, selection.length < needed);
+    else $("atom-info").hidden = true;
     invalidate();
   }
+  // Phones show distance/angle details in the bottom panel (CSS hides it
+  // elsewhere), keeping the card over the crystal a narrow column.
+  function showMeasureDetails(value, angleMode, lines, incomplete) {
+    const unit = angleMode ? "°" : " Å";
+    const name = angleMode ? "Angle" : "Distance";
+    const panel = $("atom-info");
+    const wasHidden = panel.hidden;
+    panel.hidden = false;
+    panel.setAttribute("aria-label", `${name} measurement`);
+    // A long sidebar (Lattice, Sites, Export…) may be scrolled down: bring
+    // the details into view once, without moving the page.
+    if (wasHidden && phoneLayout.matches) panel.scrollIntoView({ block: "nearest" });
+    panel.replaceChildren(
+      Object.assign(document.createElement("strong"), {
+        textContent: value === null ? name : `${name} ${value.toFixed(angleMode ? 2 : 4)}${unit}`,
+      }),
+      ...lines.map((line) => Object.assign(document.createElement("span"), { textContent: line })),
+      ...(incomplete
+        ? [
+            Object.assign(document.createElement("span"), {
+              className: "atom-info-hint",
+              textContent: angleMode ? (lines.length === 1 ? "Tap the vertex atom" : "Tap a third atom") : "Tap a second atom",
+            }),
+          ]
+        : []),
+    );
+  }
+  // Info: one atom at a time — label, element, occupancy, fractional and
+  // Cartesian position, and the CN/volume of configured polyhedra around
+  // it. No distance is implied. On phones the details also appear at the
+  // top of the bottom panel so the card stays small over the crystal.
+  function atomInfoLines(a) {
+    const lines = [
+      `${a.element} · occupancy ${a.occupancy != null ? Number(a.occupancy).toFixed(3) : "—"}`,
+      `frac ${a.frac.map((v) => v.toFixed(4)).join("  ")}`,
+      `xyz ${a.cartesian.map((v) => v.toFixed(4)).join("  ")} Å`,
+    ];
+    for (const info of polyInfo.get(atomKey(a)) ?? [])
+      lines.push(`${info.pair}: CN ${info.coordination} · V ${info.volume.toFixed(3)} Å³`);
+    return lines;
+  }
+  function showAtomInfo() {
+    const a = selection[0];
+    $("distance").replaceChildren(document.createTextNode(a ? a.label : "—"));
+    const lines = a ? atomInfoLines(a) : [];
+    $("selection").textContent = a ? lines.join("\n") : $("show-atoms").checked ? "Tap an atom for its details." : "Show atoms to inspect.";
+    const panel = $("atom-info");
+    panel.setAttribute("aria-label", "Selected atom");
+    if (a && panel.hidden && phoneLayout.matches) {
+      panel.hidden = false;
+      panel.scrollIntoView({ block: "nearest" });
+    }
+    panel.hidden = !a;
+    if (a) {
+      panel.replaceChildren(
+        Object.assign(document.createElement("strong"), { textContent: a.label }),
+        ...lines.map((line) => Object.assign(document.createElement("span"), { textContent: line })),
+      );
+    }
+  }
+  // Distance (2 atoms) · Angle (3) · Info (1). Switching keeps the picked
+  // atoms that still fit the new mode.
+  function setMeasureMode(mode) {
+    measureMode = mode;
+    for (const [id, m] of [
+      ["measure-distance", "distance"],
+      ["measure-angle", "angle"],
+      ["measure-info", "info"],
+    ])
+      $(id).setAttribute("aria-pressed", String(mode === m));
+    $("measure-overlay").setAttribute(
+      "aria-label",
+      { angle: "Angle measurement", distance: "Distance measurement", info: "Atom info" }[mode],
+    );
+    $("measure-overlay").classList.toggle("info-mode", mode === "info");
+    const limit = { distance: 2, angle: 3, info: 1 }[mode];
+    if (selection.length > limit) selection = selection.slice(-limit);
+    updateSelection();
+  }
+  $("measure-distance").onclick = () => setMeasureMode("distance");
+  $("measure-angle").onclick = () => setMeasureMode("angle");
+  $("measure-info").onclick = () => setMeasureMode("info");
   // Right-button grab panning, 1:1 with the pointer. Runs in the capture
   // phase on the canvas, ahead of TrackballControls, which never sees the
   // right button. The rendered camera is orthographic with a visible
@@ -1456,13 +1991,37 @@ function initialize() {
   let pan = null;
   const panRight = new THREE.Vector3(),
     panUp = new THREE.Vector3();
+  // Right button: drag = 1:1 pan; a click without movement zooms out one
+  // step about the cursor; a second click within 350 ms and 8 px fits the
+  // whole visible scene, keeping the orientation. Cancel or lost capture
+  // never counts as a click.
+  const CLICK_SLOP = 4,
+    DOUBLE_MS = 350,
+    DOUBLE_PX = 8,
+    CLICK_ZOOM_OUT = 1.25;
+  let lastRightClick = null;
+  function rightClick(e) {
+    const now = performance.now();
+    const isDouble =
+      lastRightClick &&
+      now - lastRightClick.time <= DOUBLE_MS &&
+      Math.hypot(e.clientX - lastRightClick.x, e.clientY - lastRightClick.y) <= DOUBLE_PX;
+    if (isDouble) {
+      lastRightClick = null;
+      reset(true); // fit everything visible, orientation and selection kept
+    } else {
+      lastRightClick = { time: now, x: e.clientX, y: e.clientY };
+      zoomAt(e.clientX, e.clientY, CLICK_ZOOM_OUT);
+    }
+  }
   function endPan(e) {
     if (!pan || (e && e.pointerId !== pan.id)) return;
-    const { id } = pan;
+    const { id, moved } = pan;
     pan = null;
     if (renderer.domElement.hasPointerCapture(id))
       renderer.domElement.releasePointerCapture(id);
     e?.stopImmediatePropagation();
+    if (e?.type === "pointerup" && !moved) rightClick(e);
   }
   renderer.domElement.addEventListener(
     "pointerdown",
@@ -1472,15 +2031,20 @@ function initialize() {
       e.preventDefault();
       stopMotion(); // cancel any rotation/zoom inertia first
       renderer.domElement.setPointerCapture(e.pointerId);
-      pan = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      pan = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
     },
     true,
   );
+  renderer.domElement.addEventListener("contextmenu", (e) => e.preventDefault());
   renderer.domElement.addEventListener(
     "pointermove",
     (e) => {
       if (!pan || e.pointerId !== pan.id) return;
       e.stopImmediatePropagation();
+      // Below the click slop nothing moves; once exceeded, the full offset
+      // from the press is applied, so panning stays exactly 1:1.
+      if (!pan.moved && Math.hypot(e.clientX - pan.x, e.clientY - pan.y) < CLICK_SLOP) return;
+      pan.moved = true;
       const dx = e.clientX - pan.x,
         dy = e.clientY - pan.y;
       pan.x = e.clientX;
@@ -1508,9 +2072,66 @@ function initialize() {
   for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
     renderer.domElement.addEventListener(type, endPan, true);
   window.addEventListener("blur", () => endPan());
+  // Wheel zoom anchored at the cursor. Captured before TrackballControls
+  // (whose own wheel zoom and its inertia never run). The world point on
+  // the view plane under the cursor, target + right·nx·hw + up·ny·hh, stays
+  // put when the half extents scale by f: the target moves by
+  // (right·nx·hw + up·ny·hh)(1 − f) and the camera keeps its direction.
+  const zoomRight = new THREE.Vector3(),
+    zoomUp = new THREE.Vector3(),
+    zoomShift = new THREE.Vector3(),
+    zoomDirection = new THREE.Vector3();
+  renderer.domElement.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (pan) return;
+      const rect = renderer.domElement.getBoundingClientRect();
+      const lines = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? rect.height : 1;
+      const delta = e.deltaY * lines;
+      if (!delta) return;
+      // Smooth exponential scaling; one notch (~100 px) ≈ 16 %, clamped
+      // per event so large trackpad bursts stay controllable.
+      zoomAt(e.clientX, e.clientY, THREE.MathUtils.clamp(Math.exp(delta * 0.0015), 0.5, 2));
+    },
+    { capture: true, passive: false },
+  );
+  /** Scale the view by `factor` (> 1 zooms out) keeping the point under
+   *  (clientX, clientY) fixed; honors the min/max distances. */
+  function zoomAt(clientX, clientY, factor) {
+    {
+      const rect = renderer.domElement.getBoundingClientRect();
+      const distanceNow = camera.position.distanceTo(controls.target);
+      const distanceNext = THREE.MathUtils.clamp(
+        distanceNow * factor,
+        controls.minDistance,
+        controls.maxDistance,
+      );
+      factor = distanceNext / distanceNow;
+      if (Math.abs(factor - 1) < 1e-9) return;
+      const nx = ((clientX - rect.left) / rect.width) * 2 - 1,
+        ny = 1 - ((clientY - rect.top) / rect.height) * 2;
+      const halfHeight = distanceNow * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      const halfWidth = halfHeight * camera.aspect;
+      camera.updateMatrixWorld();
+      zoomRight.setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+      zoomUp.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+      zoomShift
+        .copy(zoomRight)
+        .multiplyScalar(nx * halfWidth)
+        .addScaledVector(zoomUp, ny * halfHeight)
+        .multiplyScalar(1 - factor);
+      zoomDirection.copy(camera.position).sub(controls.target).normalize();
+      controls.target.add(zoomShift);
+      camera.position.copy(controls.target).addScaledVector(zoomDirection, distanceNext);
+      invalidate();
+    }
+  }
   const raycaster = new THREE.Raycaster(),
     pointer = new THREE.Vector2(),
     active = new Set();
+  faceSorter.enablePicking(raycaster);
   let down = null,
     multi = false;
   renderer.domElement.addEventListener("pointerdown", (e) => {
@@ -1562,7 +2183,10 @@ function initialize() {
     )[0];
     if (hit) {
       const atom = hit.object.userData.atoms[hit.instanceId];
-      if (selection.length === 2) selection = [];
+      // Info inspects one atom (a new tap replaces it); a completed
+      // distance (2) or angle (3) starts a new measurement.
+      if (measureMode === "info") selection = [];
+      else if (selection.length === (measureMode === "angle" ? 3 : 2)) selection = [];
       if (!selection.includes(atom)) selection.push(atom);
       updateSelection();
     }
@@ -1573,6 +2197,16 @@ function initialize() {
   // element, label and rule in `targetMeta`, so they stay editable while a
   // range or cutoff change temporarily removes that copy.
   const targetMeta = new Map();
+  const STYLE_KEYS = ["color", "scale"];
+  // Remove the given style properties from narrower overrides in scope;
+  // drop an override once it no longer sets any style property.
+  function clearNarrower(map, inScope, keys) {
+    for (const [key, override] of [...map]) {
+      if (!inScope(key, override)) continue;
+      for (const k of keys) delete override[k];
+      if (!STYLE_KEYS.some((k) => override[k] != null)) map.delete(key);
+    }
+  }
   const fracText = (a) => `[${a.frac.map((v) => v.toFixed(3)).join(", ")}]`;
   const ruleById = (id) => rules.find((r) => String(r.id) === String(id));
   function parseTarget(value) {
@@ -1612,7 +2246,36 @@ function initialize() {
           label: `${pairName(r)} polyhedra`,
           group: "All polyhedra of pair",
         })),
+        // Every individually styled copy stays selectable, so each one can
+        // be adjusted or reset later (not only the last pick).
+        ...[...appearance.atoms.keys()].map((key) => {
+          const meta = targetMeta.get(`atom:${key}`);
+          return {
+            value: `atom:${key}`,
+            label: meta ? `${meta.label} ${meta.frac}` : "Atom copy",
+            group: "Individually styled",
+          };
+        }),
+        ...[...appearance.polyhedra.keys()]
+          .filter((key) => ruleById(key.split("|")[0]))
+          .map((key) => {
+            const meta = targetMeta.get(`poly:${key}`);
+            const rule = ruleById(key.split("|")[0]);
+            return {
+              value: `poly:${key}`,
+              label: `${pairName(rule)} around ${meta?.label ?? "centre"}`,
+              group: "Individually styled",
+            };
+          }),
       ];
+    },
+    individualCount: () => appearance.atoms.size + appearance.polyhedra.size,
+    // Reset every one-copy atom and polyhedron override; element and pair
+    // styles stay as they are.
+    resetIndividuals() {
+      appearance.atoms.clear();
+      appearance.polyhedra.clear();
+      restyle(true);
     },
     describe(value) {
       const { type, id } = parseTarget(value);
@@ -1623,7 +2286,8 @@ function initialize() {
           kind: "atom",
           color: colorFor(id),
           scale: own?.scale ?? 1,
-          overridden: Boolean(own),
+          // Reset is available while the element or any copy of it is styled.
+          overridden: Boolean(own) || [...appearance.atoms.values()].some((o) => o.element === id),
         };
       }
       if (type === "atom") {
@@ -1640,13 +2304,20 @@ function initialize() {
       const [ruleId, centerKey] = type === "poly" ? id.split("|") : [id];
       const rule = ruleById(ruleId);
       if (!rule) return null;
+      const opacity = rule.opacity ?? DEFAULT_FACE_OPACITY;
       if (type === "pair")
         return {
           title: `All ${pairName(rule)} polyhedra`,
           kind: "poly",
           color: ruleColor(rule),
           scale: rule.scale ?? 1,
-          overridden: rule.color != null || rule.scale != null,
+          opacity,
+          opacityLabel: "Opacity",
+          overridden:
+            rule.color != null ||
+            rule.scale != null ||
+            Math.abs(opacity - DEFAULT_FACE_OPACITY) > 1e-9 ||
+            [...appearance.polyhedra.keys()].some((key) => key.startsWith(`${rule.id}|`)),
         };
       const meta = targetMeta.get(value);
       const style = polyhedronStyle(appearance, rule, centerKey, ruleColor(rule));
@@ -1654,27 +2325,43 @@ function initialize() {
         title: `${pairName(rule)} polyhedron around ${meta?.label ?? "centre"} ${meta?.frac ?? ""} · this one only`,
         kind: "poly",
         ...style,
+        // Face opacity is per pair; labelled so it never implies a
+        // one-copy override.
+        opacity,
+        opacityLabel: "Pair opacity",
         overridden: appearance.polyhedra.has(polyKey(rule.id, centerKey)),
       };
     },
+    // A broad edit is honest: setting a property for all Mg atoms (or all
+    // polyhedra of a pair) also applies to individually styled copies, by
+    // clearing just that property from their overrides. Other properties
+    // of those copies (e.g. a custom size when only color changes) stay.
     apply(value, patch, final) {
       const { type, id } = parseTarget(value);
+      const keys = Object.keys(patch);
       if (type === "element") {
         merge(appearance.elements, id, patch);
+        clearNarrower(appearance.atoms, (_, o) => o.element === id, keys);
         refreshElementDot(id);
-      } else if (type === "atom") merge(appearance.atoms, id, patch);
-      else if (type === "pair") {
+      } else if (type === "atom") {
+        const meta = targetMeta.get(value);
+        merge(appearance.atoms, id, { ...patch, element: meta?.element });
+      } else if (type === "pair") {
         const rule = ruleById(id);
         if (!rule) return;
         Object.assign(rule, patch);
+        clearNarrower(appearance.polyhedra, (key) => key.startsWith(`${id}|`), keys);
         refreshPairColor(rule);
       } else if (type === "poly") merge(appearance.polyhedra, id, patch);
       restyle(final);
     },
+    // Broad reset clears the element/pair style and every narrower
+    // override within it; one-copy reset falls back to the inherited style.
     reset(value) {
       const { type, id } = parseTarget(value);
       if (type === "element") {
         appearance.elements.delete(id);
+        clearNarrower(appearance.atoms, (_, o) => o.element === id, STYLE_KEYS);
         refreshElementDot(id);
       } else if (type === "atom") appearance.atoms.delete(id);
       else if (type === "pair") {
@@ -1682,10 +2369,18 @@ function initialize() {
         if (rule) {
           delete rule.color;
           delete rule.scale;
+          clearNarrower(appearance.polyhedra, (key) => key.startsWith(`${id}|`), STYLE_KEYS);
+          setRuleOpacity(rule, DEFAULT_FACE_OPACITY);
           refreshPairColor(rule);
         }
       } else if (type === "poly") appearance.polyhedra.delete(id);
       restyle(true);
+    },
+    // Live face opacity for polyhedron targets (pair-wide), no rebuild.
+    setOpacity(value, opacity) {
+      const { type, id } = parseTarget(value);
+      const rule = type === "pair" ? ruleById(id) : type === "poly" ? ruleById(id.split("|")[0]) : null;
+      if (rule) setRuleOpacity(rule, opacity);
     },
     onPickMode(active) {
       viewport.classList.toggle("style-picking", active);
@@ -1694,11 +2389,93 @@ function initialize() {
     // Marker follows editor visibility: cleared on close, restored on open.
     onOpen(open) {
       updatePickMarker(open ? styleEditor?.target : null);
+      // Style is opened by its tab (or closed by ‹ Pairs / Escape).
+      if (open && !openModes.includes("style")) pinMode("style");
+      else if (!open && openModes.includes("style")) unpinMode("style");
+      applyMode();
     },
     onTarget(value) {
       updatePickMarker(value);
     },
   });
+  // ---- Sidebar modes: Pairs · Style · Lattice · Sites ---------------------
+  // One mode at a time (Extent always stays), so tablets keep one screen.
+  // Tablets and phones show one pane. Wide desktops pin up to two panes
+  // side by side: a tab toggles its pane; opening a third replaces the
+  // oldest. Extent is never pinned by default.
+  const wideInspector = window.matchMedia("(min-width: 1500px) and (min-height: 760px)");
+  const MAX_PINNED = 2;
+  let openModes = wideInspector.matches ? ["pairs", "lattice"] : ["pairs"];
+  function pinMode(mode) {
+    if (!wideInspector.matches) openModes = [mode];
+    else if (!openModes.includes(mode)) {
+      openModes.push(mode);
+      if (openModes.length > MAX_PINNED) openModes.shift();
+    }
+    sidebarMode = mode;
+  }
+  function unpinMode(mode) {
+    openModes = openModes.filter((m) => m !== mode);
+    if (!openModes.length) openModes = ["pairs"];
+    sidebarMode = openModes.at(-1);
+  }
+  function setMode(mode) {
+    if (wideInspector.matches && openModes.includes(mode) && openModes.length > 1) unpinMode(mode);
+    else pinMode(mode);
+    const styleWanted = openModes.includes("style");
+    if (styleWanted !== styleEditor.open) styleEditor.setOpen(styleWanted);
+    applyMode();
+  }
+  function applyMode() {
+    const aside = document.querySelector("aside");
+    aside.dataset.mode = sidebarMode;
+    aside.dataset.modes = openModes.join(" ");
+    document.querySelector("main").classList.toggle("two-panels", openModes.length > 1);
+    for (const [id, mode] of [
+      ["mode-pairs", "pairs"],
+      ["style-open", "style"],
+      ["mode-lattice", "lattice"],
+      ["mode-sites", "sites"],
+      ["mode-extent", "extent"],
+      ["mode-export", "export"],
+    ])
+      $(id).setAttribute("aria-pressed", String(openModes.includes(mode)));
+    if (openModes.includes("export")) updateExportInfo();
+  }
+  wideInspector.addEventListener?.("change", () => {
+    if (!wideInspector.matches) openModes = [sidebarMode];
+    if (styleEditor.open !== openModes.includes("style")) styleEditor.setOpen(openModes.includes("style"));
+    applyMode();
+  });
+  $("mode-pairs").onclick = () => setMode("pairs");
+  $("mode-lattice").onclick = () => setMode("lattice");
+  $("mode-sites").onclick = () => setMode("sites");
+  $("mode-extent").onclick = () => setMode("extent");
+  $("mode-export").onclick = () => {
+    setMode("export");
+    updateExportInfo();
+  };
+  function updateAsymmetricNote() {
+    const note = $("asym-note");
+    note.textContent = asymmetric
+      ? `${independentSites().length} independent sites, each once, before symmetry expansion. Pairs are paused; switch off to return to the full structure.`
+      : Array.isArray(structure?.independentSites) || !structure
+        ? ""
+        : "This engine build does not report independent sites; the asymmetric unit uses the first copy of each label.";
+    note.hidden = !note.textContent;
+  }
+  $("asym-toggle").onchange = () => {
+    if (!structure) return;
+    asymmetric = $("asym-toggle").checked;
+    cancelScheduledBuild();
+    selection = [];
+    build(false);
+    updateAsymmetricNote();
+  };
+  $("labels-toggle").onchange = () => {
+    labelsOn = $("labels-toggle").checked;
+    invalidate();
+  };
   // In explicit picking mode a tap chooses one atom copy or one
   // polyhedron. An atom wins when it is in front of the nearest face, or
   // when it is the centre of the polyhedron that face belongs to.
@@ -1761,8 +2538,15 @@ function initialize() {
     structureGeneration++;
     cancelScheduledBuild();
     clearAppearance(appearance);
+    targetMeta.clear();
     openCutoffRule = null;
+    // Per-structure tool state: asymmetric view, site highlight, planes,
+    // arrows and symmetry elements start fresh.
+    asymmetric = false;
+    $("asym-toggle").checked = false;
+    highlightedSite = null;
     structure = data;
+    latticeTools.reset();
     hiddenElements.clear();
     $("show-atoms").checked = true;
     $("name").textContent = data.name || data.block || "Crystal structure";
@@ -1823,6 +2607,8 @@ function initialize() {
     reset();
     if (currentFilename === "Wollastonite example") orient([0, 0, 1], "c");
     styleEditor.clear();
+    renderSiteTable();
+    updateAsymmetricNote();
   }
   const worker = new Worker(new URL("./import-worker.js", import.meta.url), {
     type: "module",
@@ -1918,11 +2704,7 @@ function initialize() {
         writeRanges();
         return;
       }
-      const sites = translatedSites(
-        structure.atoms,
-        next,
-        $("boundary").checked,
-      );
+      const sites = plotSites(next);
       plotRanges = next;
       build(true, sites);
       reset(true);
@@ -2038,7 +2820,11 @@ function initialize() {
         color: mesh.userData.color,
         // Per-polyhedron display styles: centre atom key, colour, scale.
         styles: mesh.userData.styles.map((s) => ({ ...s })),
+        // Translucent pairs render from the shared sorted batch instead.
+        drawnBy: mesh.visible ? (mesh.material.opacity < 1 ? "sorted-batch" : "own-mesh") : "outline-only",
       })),
+      translucentFaces: faceSorter.diagnostics(),
+      transparency: peeler.diagnostics(),
       appearance: {
         elements: Object.fromEntries(appearance.elements),
         atomOverrides: appearance.atoms.size,
@@ -2050,6 +2836,41 @@ function initialize() {
       },
       selectedIds: selection.map((a) => a.id),
       distance,
+      measureMode,
+      angle,
+      atomInfo: measureMode === "info" && selection[0] ? { label: selection[0].label, lines: atomInfoLines(selection[0]) } : null,
+      selectedSites: selection.map((a) => ({
+        label: a.label,
+        siteIndex: a.siteIndex ?? null,
+        frac: [...a.frac],
+        key: atomKey(a),
+      })),
+      asymmetric,
+      independentSiteCount: structure ? independentSites().length : 0,
+      labels: { enabled: labelsOn, shown: shownLabels, limit: LABEL_LIMIT },
+      sidebarMode,
+      openPanels: [...openModes],
+      highlightedSite,
+      polyhedra: coordinationStats.flatMap((s) =>
+        s.environments.map((e) => ({
+          pair: pairName(s),
+          center: e.center,
+          centerLabel: e.centerLabel,
+          coordination: e.coordination,
+          volume: e.volume,
+        })),
+      ),
+      lattice: latticeTools.diagnostics(),
+      // View-space unit directions of a, b, c as drawn by the compass
+      // (x right, y up, z toward the viewer).
+      axisCompass: compassState,
+      theme: { current: themeSwitch.theme, explicit: themeSwitch.explicit },
+      export: {
+        busy: exporter.busy,
+        dpi: exportDpi(),
+        video: videoFormat.mime ? { mime: videoFormat.mime, extension: videoFormat.extension } : { reason: videoFormat.reason },
+        last: lastExport,
+      },
       camera: {
         projection: "orthographic",
         position: camera.position.toArray(),
@@ -2067,6 +2888,136 @@ function initialize() {
       basis: structure?.basis,
     };
   };
+  // ---- Export: PNG and turntable movie ------------------------------------
+  const exporter = createExporter({
+    renderer,
+    camera,
+    controls: () => controls,
+    render,
+    stopMotion,
+    invalidate,
+    cssSize: () => {
+      const { width, height } = renderer.domElement.getBoundingClientRect();
+      return { width: Math.max(1, Math.round(width)), height: Math.max(1, Math.round(height)) };
+    },
+    atomLabels: () => (labelsOn ? lastAtomLabels : []),
+    latticeLabels: () => latticeTools.placedLabels(),
+    compass: () => compassState,
+    // The measurement card, only while atoms are picked for it.
+    measurement: () => {
+      if (!selection.length || styleEditor?.picking) return null;
+      return {
+        value: $("distance").textContent.replace(/\s+/g, " ").trim(),
+        lines: $("selection")
+          .textContent.split("\n")
+          .filter((line) => line && !/^Tap /.test(line)),
+      };
+    },
+    name: () => structure?.name || structure?.block || currentFilename || "structure",
+    setBusy: (busy) => {
+      // Exports peel the full layer budget in every frame.
+      peeler.setExportMode(busy);
+      viewport.classList.toggle("exporting", busy);
+      controls.enabled = !busy;
+      for (const id of ["export-png", "export-video"]) $(id).disabled = busy || (id === "export-video" && !videoFormat.mime);
+    },
+  });
+  const videoFormat = exporter.videoSupport();
+  const exportScale = () => Number(document.querySelector('input[name="export-scale"]:checked')?.value || 2);
+  // DPI is stored in the PNG (pHYs); it does not change the pixel size.
+  const exportDpi = () => validDpi($("export-dpi").value);
+  function updateExportInfo() {
+    const { width, height } = renderer.domElement.getBoundingClientRect();
+    const scale = exportScale();
+    const limit = (max) => Math.min(scale, max / Math.max(width, height, 1));
+    const even = (v, f) => 2 * Math.round((v * f) / 2);
+    const png = limit(4096),
+      movie = limit(1920);
+    const dpi = exportDpi();
+    const cm = (pixels) => ((pixels / dpi) * 2.54).toFixed(1);
+    $("export-dims").textContent =
+      `PNG ${even(width, png)} × ${even(height, png)} px` +
+      (dpi ? ` = ${cm(even(width, png))} × ${cm(even(height, png))} cm at ${dpi} dpi` : " · DPI must be 30–2400") +
+      ` · movie ${even(width, movie)} × ${even(height, movie)} px`;
+    for (const preset of document.querySelectorAll(".dpi-preset"))
+      preset.setAttribute("aria-pressed", String(Number(preset.dataset.dpi) === dpi));
+    $("export-dpi").setCustomValidity(dpi ? "" : "Enter a DPI between 30 and 2400.");
+  }
+  for (const input of document.querySelectorAll('input[name="export-scale"]')) input.onchange = updateExportInfo;
+  $("export-dpi").oninput = updateExportInfo;
+  for (const preset of document.querySelectorAll(".dpi-preset"))
+    preset.onclick = () => {
+      $("export-dpi").value = preset.dataset.dpi;
+      updateExportInfo();
+    };
+  $("export-video").disabled = !videoFormat.mime;
+  $("export-video-note").textContent = videoFormat.mime
+    ? `Turntable: one full turn, ${videoFormat.extension.toUpperCase()} video.`
+    : videoFormat.reason;
+  $("export-png").onclick = async () => {
+    $("export-status").textContent = "Rendering PNG…";
+    try {
+      const dpi = exportDpi();
+      if (!dpi) {
+        $("export-dpi").reportValidity();
+        $("export-status").textContent = "Enter a DPI between 30 and 2400.";
+        return;
+      }
+      const result = await exporter.exportPNG({ scale: exportScale(), transparent: $("export-transparent").checked, dpi });
+      $("export-status").textContent = `Saved ${result.filename} (${result.width} × ${result.height} px, ${result.dpi} dpi).`;
+      lastExport = result;
+    } catch (error) {
+      $("export-status").textContent = `PNG export failed: ${error.message}`;
+    }
+  };
+  let recording = null,
+    lastExport = null;
+  $("export-video").onclick = async () => {
+    const progress = $("export-progress");
+    try {
+      recording = exporter.recordTurntable({
+        seconds: Number($("export-seconds").value),
+        fps: Number($("export-fps").value),
+        scale: exportScale(),
+        onProgress: (p) => {
+          progress.value = p;
+          $("export-status").textContent = `Recording turntable… ${Math.round(p * 100)}%`;
+        },
+      });
+      progress.hidden = false;
+      progress.value = 0;
+      $("export-cancel").hidden = false;
+      const result = await recording.done;
+      $("export-status").textContent = result.canceled
+        ? result.reason === "resized"
+          ? "Recording stopped because the view was resized; nothing was saved. Record again at the new size."
+          : "Recording canceled; nothing was saved."
+        : `Saved ${result.filename} (${result.width} × ${result.height}, ${result.frames} frames).`;
+      lastExport = result;
+    } catch (error) {
+      $("export-status").textContent = `Recording failed: ${error.message}`;
+    } finally {
+      recording = null;
+      progress.hidden = true;
+      $("export-cancel").hidden = true;
+    }
+  };
+  $("export-cancel").onclick = () => recording?.cancel();
+  applyMode(); // initial pane(s): one on tablets/phones, two on wide desktops
+
+  // Light/dark theme: CSS follows data-theme; scene overlays that carry
+  // their own colors are rebuilt with the new palette.
+  const themeSwitch = createThemeSwitch({
+    button: $("theme-toggle"),
+    onChange: () => {
+      if (cellLines) cellLines.material.color.set(scenePalette().cell);
+      updateSelection();
+      updatePickMarker();
+      highlightSite(highlightedSite);
+      latticeTools.rebuild();
+      invalidate();
+    },
+  });
   const wollastoniteExample =
     new URLSearchParams(location.search).get("example") === "wollastonite";
   const forsteriteExample =

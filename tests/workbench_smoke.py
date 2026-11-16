@@ -10,7 +10,7 @@ async def on_screen(control):
       const r = el.getBoundingClientRect();
       const x = r.left + r.width / 2, y = r.top + r.height / 2;
       const top = document.elementFromPoint(x, y);
-      return !!top && (el.contains(top) || top.closest('label')?.control === el);
+      return r.top >= 0 && r.bottom <= innerHeight && !!top && (el.contains(top) || top.closest('label')?.control === el);
     }""")
 
 
@@ -44,8 +44,7 @@ async def check(browser, width, height):
 
     # Check hit targets before Playwright gets a chance to auto-scroll to them.
     for selector in [
-        "#range-b-max",
-        '#range-form button[type="submit"]',
+        "#mode-extent",
         "#show-atoms",
         "#view-b",
         '[data-element="Mg"]',
@@ -63,6 +62,9 @@ async def check(browser, width, height):
         await expect(fields.nth(index)).to_have_attribute("aria-expanded", "true", timeout=1500)
         assert [float(await fields.nth(i).input_value()) for i in (0, 1)] == [1.8, 2.3]
     await page.locator(".cutoff-tuner:visible .done-button").tap()
+    await page.locator("#mode-extent").tap()
+    for selector in ["#range-b-max", "#range-c-max", '#range-form button[type="submit"]']:
+        assert await on_screen(page.locator(selector)), (width, height, selector)
     await page.locator("#range-b-max").fill("2")
     await page.locator('#range-form button[type="submit"]').tap()
     await settle(page)
@@ -87,6 +89,7 @@ async def check_phone(browser):
     assert await page.evaluate("document.scrollingElement.scrollWidth === innerWidth")
     assert await page.evaluate("document.scrollingElement.scrollHeight === innerHeight")
     # The forsterite example starts with boundary copies hidden.
+    await page.locator("#mode-extent").tap()
     if not await page.locator("#boundary").is_checked():
         await page.locator("#boundary").tap()
         await settle(page)

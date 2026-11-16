@@ -34,6 +34,7 @@ async def check(browser, width, height):
         assert current["camera"] == before["camera"]
 
     await target.select_option(mg)
+    assert not await page.locator("#style-opacity-row").is_visible()
     await paint.tap()
     await set_size(150)
     changed = await diagnostics(page)
@@ -46,6 +47,22 @@ async def check(browser, width, height):
             assert atom["color"] == old["color"] and atom["radius"] == old["radius"]
 
     await target.select_option(si_o)
+    opacity = page.locator("#style-opacity")
+    await opacity.fill("60")
+    await settle(page)
+    material = (await diagnostics(page))["faceMaterials"][0]
+    assert math.isclose(material["opacity"], 0.6)
+    assert await page.locator('[data-field="opacity"]').first.input_value() == "60"
+    geometry = material["geometry"]
+    await opacity.fill("100")
+    await settle(page)
+    material = (await diagnostics(page))["faceMaterials"][0]
+    assert not material["transparent"] and material["depthWrite"]
+    assert material["geometry"] == geometry
+    await page.locator("#mode-pairs").tap()
+    await page.locator('[data-field="opacity"]').first.fill("20")
+    await page.locator("#style-open").tap()
+    assert await opacity.input_value() == "20"
     await paint.tap()
     await set_size(75)
     changed = await diagnostics(page)
@@ -58,6 +75,7 @@ async def check(browser, width, height):
     check_crystal(enlarged)
     assert all(s["scale"] == 1.4 for s in enlarged["faceMaterials"][0]["styles"])
     await reset.tap()
+    assert math.isclose((await diagnostics(page))["faceMaterials"][0]["opacity"], 0.34)
     assert (await diagnostics(page))["faceMaterials"][0]["styles"] == before["faceMaterials"][0]["styles"]
     await target.select_option(mg)
     await reset.tap()
@@ -78,6 +96,31 @@ async def check(browser, width, height):
     styled = await diagnostics(page)
     assert styled["appearance"]["pickMarkerCount"] == 1
     assert sum(a["color"] != b["color"] for a, b in zip(styled["atoms"], restored["atoms"])) == 1
+    first_target = await target.input_value()
+    first_key = first_target.removeprefix("atom:")
+    first_atom = next(a for a in restored["atoms"] if a["key"] == first_key)
+    for atom in sorted(restored["atoms"], key=lambda a: a["z"]):
+        if await page.evaluate("([x,y]) => document.elementFromPoint(x,y)?.tagName === 'CANVAS'", [atom["x"], atom["y"]]):
+            await page.touchscreen.tap(atom["x"], atom["y"])
+            second_target = await target.input_value()
+            if second_target.startswith("atom:") and second_target != first_target:
+                break
+    assert second_target != first_target and second_target.startswith("atom:")
+    await page.locator('[data-color="#efa04c"]').tap()
+    assert (await diagnostics(page))["appearance"]["atomOverrides"] == 2
+    await target.select_option(first_target)
+    await reset.tap()
+    assert (await diagnostics(page))["appearance"]["atomOverrides"] == 1
+    await page.locator("#style-reset-individual").tap()
+    assert (await diagnostics(page))["appearance"]["atomOverrides"] == 0
+    # A broad color edit must include atoms styled individually earlier.
+    await page.touchscreen.tap(first_atom["x"], first_atom["y"])
+    await paint.tap()
+    assert (await diagnostics(page))["appearance"]["atomOverrides"] == 1
+    await target.select_option("element:" + first_atom["element"])
+    await page.locator('[data-color="#8cdf9b"]').tap()
+    current = await diagnostics(page)
+    assert all(a["color"] == "#8cdf9b" for a in current["atoms"] if a["element"] == first_atom["element"])
     await reset.tap()
     await page.locator("#show-atoms").tap()
     for atom in (await diagnostics(page))["atoms"]:

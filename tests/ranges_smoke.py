@@ -59,6 +59,7 @@ async def run(browser_type, touch):
     if not await page.locator("#polyhedra-only").is_checked():
         await click_control(page, page.locator("#polyhedra-only"), touch)
     await settle(page)
+    await click_control(page, page.locator("#mode-extent"), touch)
     await click_control(page, page.locator("#range-reset"), touch)
     initial = await diagnostics(page)
     base = len(initial["coordination"]["rules"][0]["environments"])
