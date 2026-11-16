@@ -235,7 +235,7 @@ async def run(profile):
                 break
         assert (
             ca is not None
-            and float(await ca.locator("[data-field=cutoff]").input_value()) == 2.6
+            and 2.6 < float(await ca.locator("[data-field=cutoff]").input_value()) < 2.9
         )
         await page.locator("#mode-export").click()
         async with page.expect_navigation():
@@ -245,7 +245,7 @@ async def run(profile):
         assert (await diagnostics(page))["session"]["restoredAt"] == 0
         assert not errors, errors
         print(
-            "Explicit example navigation, Ca–O2.6 default and Start fresh passed",
+            "Explicit example navigation, estimated Ca–O default and Start fresh passed",
             flush=True,
         )
         await context.close()

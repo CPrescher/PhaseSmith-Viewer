@@ -13,6 +13,8 @@ import { latticeViewDirection } from "./view-direction.js";
 import * as viewDirection from "./view-direction.js";
 import { createSessionStore } from "./session-store.js";
 import { buildCoordinationEnvironments, convexHull } from "./coordination.js";
+import { elementColor as defaultColor } from "./elements.js";
+import { estimatePairCutoff } from "./pair-defaults.js";
 import { angleAt, hullVolume } from "./crystal-math.js";
 import { createLatticeTools } from "./lattice-tools.js";
 import { createAxisCompass } from "./axis-compass.js";
@@ -158,8 +160,7 @@ function initialize() {
     coordinationStats = [],
     coordinationTotals = {},
     nextRule = 0;
-  const pairColors = ["#62d5df", "#efa04c", "#c6a0ef", "#8cdf9b", "#ef95b3"];
-  const CA_O_CUTOFF = 2.6; // default Ca–O polyhedron cutoff (Å)
+  const pairEstimates = new Map();
   const faceMeshes = new Map();
   const phoneLayout = matchMedia("(max-width: 640px)");
   // Local session autosave state, declared early: controls "change"
@@ -378,30 +379,6 @@ function initialize() {
   const legendResize = new ResizeObserver(updateElementOverflow);
   legendResize.observe($("elements"));
   $("elements").addEventListener("scroll", updateElementOverflow, { passive: true });
-  const colors = {
-    H: "#e7edf3",
-    C: "#65798c",
-    N: "#668df3",
-    O: "#ed7073",
-    F: "#91d5a0",
-    Na: "#bc96e6",
-    Mg: "#8dd2af",
-    Al: "#b8b7cf",
-    Si: "#d5b38a",
-    P: "#efb76a",
-    S: "#e4cf62",
-    Cl: "#78c98b",
-    K: "#ad87d8",
-    Ca: "#8fbd83",
-    Ti: "#aab7ca",
-    Cr: "#83b4c5",
-    Mn: "#c991bd",
-    Fe: "#db9564",
-    Co: "#8da2d5",
-    Ni: "#85b5a0",
-    Cu: "#ce9873",
-    Zn: "#99b1bb",
-  };
   const radii = {
     H: 0.22,
     C: 0.37,
@@ -415,7 +392,6 @@ function initialize() {
     Ca: 0.56,
     Fe: 0.45,
   };
-  const defaultColor = (e) => colors[e] || "#acb5cf";
   // Overlay colors (selection, measurement, pick marker, cell edges) per
   // theme; element and pair colors are scientific choices and never change.
   const SCENE_PALETTES = {
@@ -435,9 +411,7 @@ function initialize() {
   // same value drives the instance matrix, picking and the selection halo.
   const atomRadius = (a) =>
     (radii[a.element] || 0.42) * Number($("size").value) * styleOf(a).scale;
-  const ruleColor = (rule) =>
-    rule.color ??
-    pairColors[Math.max(rules.indexOf(rule), 0) % pairColors.length];
+  const ruleColor = (rule) => rule.color ?? defaultColor(rule.center);
   // A neutral procedural studio (no remote assets) lights the atoms only:
   // soft panel reflections give broad highlights, while polyhedra and bonds
   // keep their existing flat, colour-true shading.
@@ -680,18 +654,24 @@ function initialize() {
     }
     invalidate();
   }
+  function startingCutoff(center, neighbor) {
+    const key = `${center}|${neighbor}`;
+    if (!pairEstimates.has(key))
+      pairEstimates.set(key, estimatePairCutoff(structure, center, neighbor));
+    return pairEstimates.get(key);
+  }
   function resetRules() {
     nextRule = 0;
     const elements = [...new Set(structure.atoms.map((a) => a.element))];
-    const cutoffs = { Si: 2.1, Mg: 2.6, Al: 2.3, Fe: 2.7, Ca: CA_O_CUTOFF, Ti: 2.5 };
+    const oxideCenters = new Set(["Si", "Mg", "Al", "Fe", "Ca", "Ti"]);
     rules = elements.includes("O")
       ? elements
-          .filter((e) => cutoffs[e])
+          .filter((e) => oxideCenters.has(e))
           .map((e) => ({
             id: ++nextRule,
             center: e,
             neighbor: "O",
-            cutoff: cutoffs[e],
+            cutoff: startingCutoff(e, "O"),
             bonds: false,
             polyhedra: false,
             opacity: 0.34,
@@ -847,7 +827,7 @@ function initialize() {
               autocomplete: "off",
               spellcheck: false,
               enterKeyHint: "done",
-              title: "Distance cutoff (Å) · ↑/↓ ±0.1 Å",
+              title: "Distance cutoff (Å) · new element combinations get an estimated first-shell cutoff · ↑/↓ ±0.1 Å",
             });
           } else {
             input = make("select", {
@@ -873,8 +853,10 @@ function initialize() {
               return;
             }
             rule[field] = input.value;
+            card.style.setProperty("--pair-color", ruleColor(rule));
             label();
-            build();
+            setCutoff(startingCutoff(rule.center, rule.neighbor), false);
+            styleEditor?.refresh();
           };
         }
         const remove = make("button", {
@@ -1255,8 +1237,7 @@ function initialize() {
       id: ++nextRule,
       center,
       neighbor,
-      // Ca–O uses the same 2.6 Å default as the automatic pairs.
-      cutoff: center === "Ca" && neighbor === "O" ? CA_O_CUTOFF : 2.5,
+      cutoff: startingCutoff(center, neighbor),
       bonds: false,
       polyhedra: false,
       opacity: 0.34,
@@ -2614,6 +2595,7 @@ function initialize() {
     $("asym-toggle").checked = false;
     highlightedSite = null;
     structure = data;
+    pairEstimates.clear();
     latticeTools.reset();
     hiddenElements.clear();
     $("show-atoms").checked = true;

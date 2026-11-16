@@ -60,6 +60,7 @@ jobs:
           trap 'kill "$viewer_server_pid"; rm -rf "$viewer_site_root"' EXIT
           curl --retry 10 --retry-connrefused --retry-delay 1 -fsS "http://127.0.0.1:4181$VITE_BASE_PATH" > /dev/null
           VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/pages_smoke.py
+          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/pair_defaults_smoke.py
           VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/layout_smoke.py
       - name: Configure GitHub Pages
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'

@@ -31,6 +31,8 @@ Open `/?example=wollastonite` to follow the Si–O chains through three cells al
 
 Choose the central element, its neighboring element, and their maximum distance in ångströms. Bonds and polyhedra can be switched independently for each pair. A center inside the displayed cell can have neighbors in adjacent cells. The viewer includes these periodic images and measures distances to the actual image selected.
 
+New pairs start with an estimated cutoff from the structure's periodic first-neighbor distances, including the different independent central sites. Changing either element recalculates this starting value. A gap between distance groups helps separate the first shell; distorted shells get a small margin. These are editable starting estimates, not chemical bond assignments. Very large or extreme searches fall back to an element-specific covalent-radius estimate. Typed cutoffs and restored session values stay as entered.
+
 Tap or click a pair’s cutoff to open its speed slider. Hold the knob a little left or right for fine changes in 0.01 Å increments. Drag farther to change the cutoff faster and release to stop. The − and + buttons change it by 0.1 Å. On touch screens, tap the field again to type an exact cutoff.
 
 The **Opacity** slider controls each pair’s polyhedron faces. At 0% only the outlines remain visible. At 100% the faces are opaque. Turn off **Atoms** to remove the spheres from the view, or toggle an element in the legend to hide only its spheres. Bonds, polyhedra, and their coordination counts are independent of sphere visibility.
@@ -72,6 +74,8 @@ Choose **Sites** in the sidebar to see the original CIF site labels, fractional 
 **Asymmetric unit** displays each original independent site once before symmetry expansion. Pair geometry pauses in this view. Switching it off restores the full expanded structure and its pair settings.
 
 ## Changing colors and sizes
+
+Every element from H to Og has a defined default color. Common mineral elements use contrasting colors: O red, Si blue, Mg green, Al violet, Ca gold and Fe orange. Polyhedra inherit their central element's default color, so their colors stay consistent when pairs are added or deleted. Colors stay the same in both themes. Other element colors and the fallback covalent radii are adapted from the [Blue Obelisk Data Repository](https://github.com/BlueObelisk/bodr/blob/master/bodr/elements/elements.xml).
 
 Choose **Style** in the sidebar's mode bar (**Pairs · Style · Lattice · Sites · Extent**); the other tabs switch back. Choose an element to change its spheres' color and **Radius**, or a pair to change its polyhedra's color and **Opacity**. Polyhedron faces and edges always use the actual coordinating atom positions; saved display scales from earlier versions are ignored. Atom radius changes only the spheres drawn on screen.
 
@@ -127,7 +131,7 @@ To run the portable production browser check, install `tests/requirements-browse
 
 `python tests/layout_smoke.py` checks that the canvas, the control panel and its tab bar keep their bounds in every animation frame on a phone, a portrait tablet, a narrow desktop window and a desktop, in both themes. It picks atoms, measures a known distance and angle, switches modes and tabs, adds and edits pairs, planes and arrows, scrolls the panel with a real touch gesture (the wheel with a mouse), opens Style and Turn, checks Escape and outside dismissal with focus return, and rotates the window and back. CI runs it with the bundled Chromium. Use `BROWSER_CHANNEL=chrome` or `CHROMIUM_EXECUTABLE` to pick another Chromium, and set `WEBKIT_EXECUTABLE` to the path of Playwright's WebKit `pw_run.sh` to also run WebKit.
 
-Run the JavaScript geometry tests with `node --test tests/*.test.mjs`. The coordination browser test uses the packaged forsterite CIF (`python tests/coordination_smoke.py`). Run `python tests/steering_smoke.py` to check unrestricted rotation, axis views and custom directions in a triclinic cell. The plotting-range and display tests are `tests/ranges_smoke.py` and `tests/visibility_smoke.py`.
+Run the JavaScript geometry tests with `node --test tests/*.test.mjs`. The coordination browser test uses the packaged forsterite CIF (`python tests/coordination_smoke.py`). `python tests/pair_defaults_smoke.py` checks estimated cutoffs, element changes, stable pair colors and manual-cutoff restoration on desktop and phone. Run `python tests/steering_smoke.py` to check unrestricted rotation, axis views and custom directions in a triclinic cell. The plotting-range and display tests are `tests/ranges_smoke.py` and `tests/visibility_smoke.py`.
 
 ```sh
 cargo test --locked --manifest-path engine/Cargo.toml
