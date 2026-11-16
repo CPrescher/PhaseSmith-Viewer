@@ -73,9 +73,13 @@ async def check(browser, w, h, theme):
     await act(page.locator("#turn-open"))
     assert await page.locator("#turn-panel").is_visible()
     if w <= 640:
+        # Phones: the pad opens along the bottom edge and covers no atom.
         panel = await page.locator("#turn-panel").bounding_box()
         canvas = await page.locator("#viewport canvas").bounding_box()
-        assert panel["y"] >= canvas["y"] + canvas["height"] - 1, (panel, canvas)
+        assert panel["y"] + panel["height"] <= canvas["y"] + canvas["height"] + 1, (panel, canvas)
+        for a in (await diagnostics(page))["atoms"]:
+            if a["visible"]:
+                assert not (panel["x"] <= a["x"] <= panel["x"] + panel["width"] and panel["y"] <= a["y"] <= panel["y"] + panel["height"]), ("Turn covers an atom", a["label"], panel)
     for degrees in [90, 60, 45, 30, 10, 5]:
         await act(page.locator(f"#turn-preset-{degrees}"))
         before = await diagnostics(page)

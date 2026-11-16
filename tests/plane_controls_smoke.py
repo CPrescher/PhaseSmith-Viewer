@@ -4,7 +4,7 @@ import asyncio
 import math
 from pathlib import Path
 from playwright.async_api import async_playwright
-from smoke import URL, diagnostics, settle
+from smoke import URL, choose_tool, diagnostics, settle
 from science_smoke import change
 
 OUT = Path("/tmp/psv-gui-assessment/plane-controls")
@@ -34,7 +34,7 @@ async def check(browser, width, height, theme):
     async def state():
         return (await diagnostics(page))["lattice"]
 
-    await activate(page.locator("#mode-lattice"))
+    await choose_tool(page, "#mode-lattice", touch)
     await activate(page.locator("#plane-add"))
     row = page.locator("[data-plane-id]").first
     hkl, offset = row.locator("[data-field=hkl]"), row.locator("[data-field=m]")

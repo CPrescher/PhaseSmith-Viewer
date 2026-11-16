@@ -21,6 +21,19 @@ async def diagnostics(page):
 async def settle(page):
     await page.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
 
+async def choose_tool(page, button, touch=None):
+    """Choose a tool window from its launcher button (e.g. "#mode-lattice"):
+    the rail on desktops and tablets, the header Tools menu on phones."""
+    if touch is None:
+        touch = await page.evaluate("matchMedia('(pointer: coarse)').matches")
+    target = page.locator(button)
+    if not await target.is_visible():
+        menu = page.locator("#tools-menu")
+        await (menu.tap() if touch else menu.click())
+        await target.wait_for(state="visible")
+    await (target.tap() if touch else target.click())
+    await settle(page)
+
 async def pair(page):
     d = await diagnostics(page)
     atoms = d['atoms']

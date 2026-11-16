@@ -390,12 +390,15 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   // after a selection (which grows the measurement/Info card) may be the
   // last one; it must see the card's new size. A handful of DOM reads.
   // Includes the Turn button (floats under the toolbar on phones), the
-  // open Turn popover and the [uvw] form; hidden or in-pane ones have no
-  // box over the canvas and drop out by themselves.
+  // open Turn popover (or the phone Turn dock), the [uvw] form, the tool
+  // rail or phone Tools menu and the open tool windows; hidden ones have
+  // no box over the canvas and drop out by themselves.
   const OBSTACLES = [
     ".view-directions",
     "#turn-open",
-    "#turn-panel:not(.in-pane)",
+    "#turn-panel",
+    "#tool-rail",
+    ".tool-window:not([hidden])",
     ".view-directions details[open] #direction-form",
     ".measure-row",
     ".measure-details",
@@ -920,6 +923,8 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       ...planes.map((plane) => {
         const row = make("div", { className: "tool-row" });
         row.dataset.planeId = plane.id;
+        row.dataset.tuneItem = `plane:${plane.id}`;
+        row.dataset.tuneName = `plane (${plane.hkl.join(" ")})`;
         row.style.setProperty("--tool-color", plane.color);
         const name = () => `(${plane.hkl.join(" ")})`;
         const hkl = textField(plane.hkl.join(" "), "Miller indices (h k l), integers", "hkl", (input) =>
@@ -927,6 +932,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
             const v = parseTriple(text, { integer: true, label: "indices" });
             if (v.every((x) => x === 0)) throw Error("Miller indices must not all be zero.");
             plane.hkl = v;
+            row.dataset.tuneName = `plane (${v.join(" ")})`;
             // Until m is edited by hand, it follows the indices so the
             // plane cuts through the middle of the displayed range.
             if (plane.autoOffset) {
@@ -1043,12 +1049,15 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       ...arrows.map((arrow) => {
         const row = make("div", { className: "tool-row" });
         row.dataset.arrowId = arrow.id;
+        row.dataset.tuneItem = `arrow:${arrow.id}`;
+        row.dataset.tuneName = `arrow [${arrow.uvw.join(" ")}]`;
         row.style.setProperty("--tool-color", arrow.color);
         const uvw = textField(arrow.uvw.join(" "), "Direct lattice direction [u v w]", "uvw", (input) =>
           commit(input, arrow, (text) => {
             const v = parseTriple(text, { label: "components" });
             if (v.every((x) => x === 0)) throw Error("Direction [uvw] must not be zero.");
             arrow.uvw = v;
+            row.dataset.tuneName = `arrow [${v.join(" ")}]`;
           }),
         );
         uvw.dataset.field = "uvw";
@@ -1105,12 +1114,15 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         : missed
           ? `No plane with integer m crosses this extent. Enter m, widen the extent or raise Size. d = ${plane.d.toFixed(4)} Å`
           : `${plane.family ? "m + n · " : ""}d = ${plane.d.toFixed(4)} Å · ${plane.render.polygons.length} in range${plane.render.truncated ? ` (first ${plane.render.offsets.length})` : ""}`;
+      // The readout keeps a fixed two-line box; the full text is its title.
+      el.title = el.textContent;
     }
     for (const arrow of arrows) {
       const el = document.querySelector(`[data-arrow-id="${arrow.id}"] [data-readout]`);
       if (!el) continue;
       el.classList.toggle("error", Boolean(arrow.error));
       el.textContent = arrow.error ? arrow.error : `${arrow.render.length.toFixed(4)} Å`;
+      el.title = el.textContent;
     }
     // Symmetry readouts.
     const note = $("sym-note");

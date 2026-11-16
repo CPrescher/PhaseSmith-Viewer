@@ -86,6 +86,7 @@ export function createAppearanceEditor(host) {
     pick = $("style-pick"),
     open = $("style-open");
   let target = "",
+    isOpen = false,
     picking = false,
     picked = null; // { value, label, group } of the last explicitly picked item
 
@@ -145,20 +146,17 @@ export function createAppearanceEditor(host) {
     refresh();
   };
   pick.onclick = () => setPicking(!picking);
-  // The Style tab toggles the editor; the sidebar tabs navigate away.
-  open.onclick = () => setOpen(root.hidden);
+  // The Appearance tool window opens and closes the editor (host.setOpen);
+  // Escape first ends picking, then the window's own Escape closes it.
   root.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      if (picking) setPicking(false);
-      else {
-        setOpen(false);
-        open.focus({ preventScroll: true });
-      }
+    if (e.key === "Escape" && picking) {
+      e.preventDefault();
+      setPicking(false);
     }
   });
 
   function setPicking(active) {
-    picking = active && !root.hidden;
+    picking = active && isOpen;
     pick.setAttribute("aria-pressed", String(picking));
     // The pressed button carries the instruction, so no card covers the
     // crystal while picking.
@@ -166,12 +164,8 @@ export function createAppearanceEditor(host) {
     host.onPickMode(picking);
   }
   function setOpen(show) {
-    root.hidden = !show;
-    // In constrained inspectors the editor temporarily replaces Pairs
-    // (CSS decides where both fit); Extent always stays.
-    root.closest("aside")?.classList.toggle("editing-style", show);
+    isOpen = show;
     open.setAttribute("aria-expanded", String(show));
-    open.setAttribute("aria-pressed", String(show));
     if (!show) setPicking(false);
     host.onOpen(show);
     if (show) refresh();
@@ -182,7 +176,7 @@ export function createAppearanceEditor(host) {
     return list;
   }
   function refresh() {
-    if (root.hidden) return host.onTarget?.(null);
+    if (!isOpen) return host.onTarget?.(null);
     try {
       update();
     } finally {
@@ -281,7 +275,7 @@ export function createAppearanceEditor(host) {
   }
   return {
     get open() {
-      return !root.hidden;
+      return isOpen;
     },
     get picking() {
       return picking;
@@ -289,9 +283,9 @@ export function createAppearanceEditor(host) {
     get target() {
       return target;
     },
-    /** Sidebar modes open/close the editor explicitly. */
+    /** The Appearance window shows or hides the editor. */
     setOpen(show) {
-      if (show !== !root.hidden) setOpen(show);
+      if (show !== isOpen) setOpen(show);
     },
     /** Select an explicitly picked atom or polyhedron as the target. */
     choose(item) {

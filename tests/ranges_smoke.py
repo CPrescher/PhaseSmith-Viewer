@@ -54,7 +54,9 @@ async def run(browser_type, touch):
     await row.locator('[data-field="center"]').select_option("Si")
     await row.locator('[data-field="neighbor"]').select_option("O")
     await row.locator('[data-field="cutoff"]').fill("1.8")
-    await row.locator('[data-field="cutoff"]').dispatch_event("change")
+    # Enter commits the typed cutoff and closes its tuner (which covers the
+    # Bonds/Polyhedra row while open).
+    await row.locator('[data-field="cutoff"]').press("Enter")
     if not await row.locator('[data-field="polyhedra"]').is_checked():
         await click_control(page, row.locator('[data-field="polyhedra"]'), touch)
     if not await page.locator("#polyhedra-only").is_checked():

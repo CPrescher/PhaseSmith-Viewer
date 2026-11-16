@@ -19,7 +19,10 @@ async def check(browser, width, height):
         "window.viewerDiagnostics?.().coordination.polyhedronCount===12"
     )
     box = await page.locator("canvas").bounding_box()
-    x, y = box["x"] + box["width"] * 0.55, box["y"] + box["height"] * 0.55
+    # A point on the crystal's stage: the part of the view that open tool
+    # windows (and the atom bar riding on a bottom sheet) leave clear.
+    clear = (await diagnostics(page))["stage"]["clear"]
+    x, y = box["x"] + clear["x"] + clear["w"] * 0.55, box["y"] + clear["y"] + clear["h"] * 0.55
     original = (await diagnostics(page))["camera"]
     await page.mouse.move(x, y)
     await page.mouse.wheel(0, -300)
@@ -71,12 +74,11 @@ async def check(browser, width, height):
         assert len(state["selectedIds"]) == 1
         assert state["distance"] is None and state["angle"] is None
         picked.append(state["selectedIds"][0])
-        details = (
-            page.locator("#atom-info")
-            if await page.locator("#atom-info").is_visible()
-            else page.locator("#selection")
-        )
-        text = await details.inner_text()
+        # Phones open the full lines with Details under the value.
+        more = page.locator("#measure-more")
+        if await more.is_visible() and await more.get_attribute("aria-expanded") != "true":
+            await more.tap()
+        text = await page.locator("#selection").inner_text()
         assert "occupancy" in text and "frac" in text and "xyz" in text, text
     assert picked[0] != picked[1]
     name = {1440: "desktop", 1024: "landscape", 768: "portrait", 390: "phone"}[width]
