@@ -1,3 +1,5 @@
+> Historical review of the first floating-window version. The stationary, single-window revision below supersedes its automatic framing, Pin and Minimize behavior. See [the revised workflow review](gui-stationary-tools-2026-11-16.md).
+
 # Floating tools: validation and review
 
 The GUI uses small labeled launchers at the right edge on desktop/tablet and a round Tools launcher with labeled choices on phones. Choosing a tool reuses a stable palette; Keep open is explicit and limited to one extra window. Narrow viewports park the extra window without discarding its state or saved desktop position. Phone Tune keeps the chosen pair, plane or arrow visible beside the structure. Existing direction, Turn, measurement, rotation, pan and zoom controls remain in the canvas.

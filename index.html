@@ -50,17 +50,7 @@
           <span aria-hidden="true">☀</span>
         </button>
         <button id="library-open" class="view-button" aria-label="Structure library" title="Structure library" aria-haspopup="dialog" aria-controls="structure-library"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M12 7c-3-3-6-3-9-2v14c3-1 6-1 9 2 3-3 6-3 9-2V5c-3-1-6-1-9 2Z"/><path d="M12 7v14"/></svg><span>Library</span></button>
-        <button
-          id="tools-menu"
-          type="button"
-          class="tools-menu"
-          aria-label="Tools"
-          aria-expanded="false"
-          aria-controls="tool-rail"
-          title="Tools: Pairs, Appearance, Lattice, Sites, Extent, Export"
-        >
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
-        </button>
+
         <button id="open" class="primary" aria-label="Open CIF file" title="Open CIF file">
           ＋ Open<span class="open-kind"> CIF</span><span class="desktop"> file</span></button
         ><input id="file" type="file" accept=".cif,.mcif,text/plain" hidden />
@@ -281,14 +271,8 @@
               hidden
             ></p>
             <div class="atoms-bar toolbar" role="group" aria-label="Atoms">
-              <label class="chip master" title="Show or hide all spheres"
-                ><input
-                  id="show-atoms"
-                  type="checkbox"
-                  checked
-                  aria-label="Show atoms; preserves individual element visibility choices"
-                /><span>Atoms</span></label
-              >
+              <label class="chip icon-toggle" title="Show or hide atoms"><input id="show-atoms" type="checkbox" checked aria-label="Show atoms"/><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/></svg></label>
+              <label class="chip icon-toggle" title="Show or hide all polyhedra; preserve pair settings"><input id="show-polyhedra" type="checkbox" checked aria-label="Show polyhedra"/><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 10-9 10L3 12 12 2Z M3 12l9 3 9-3 M12 2v13l0 7"/></svg></label>
               <div id="elements" class="elements" role="group" aria-label="Element visibility; scroll horizontally for more elements" title="Scroll or swipe to reach more elements"></div>
               <label class="size-control" title="Atom size (50–150%)"
                 ><span>Size</span
@@ -305,7 +289,18 @@
             <span id="atom-summary"></span>
           </div>
           <!-- Tool launcher: a rail at the right edge (desktop, tablet) or,
-               on phones, the list opened by the header Tools button. -->
+               on phones, the list opened by the lower-right Tools button. -->
+        <button
+          id="tools-menu"
+          type="button"
+          class="tools-menu"
+          aria-label="Tools"
+          aria-expanded="false"
+          aria-controls="tool-rail"
+          title="Tools: Pairs, Appearance, Lattice, Sites, Extent, Export"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+        </button>
           <nav id="tool-rail" class="tool-rail" aria-label="Tools">
             <button id="mode-pairs" type="button" class="rail-button" data-tool="pairs" aria-pressed="false" title="Pairs: bonds, polyhedra, cutoffs and face opacity">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="7" r="3"/><path d="M8.4 15.2 15.6 8.8"/></svg><span class="rail-label">Pairs</span><span class="rail-hint" aria-hidden="true">bonds, polyhedra, cutoffs and face opacity</span>
@@ -325,12 +320,10 @@
             <button id="mode-export" type="button" class="rail-button" data-tool="export" aria-pressed="false" title="Export: PNG, turntable movie and the saved session">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 19h14"/></svg><span class="rail-label">Export</span><span class="rail-hint" aria-hidden="true">PNG, turntable movie and the saved session</span>
             </button>
-            <button id="tools-tidy" type="button" class="rail-button rail-tidy" title="Return moved tool windows to their default places" aria-label="Return tool windows to their default places">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="8" height="16" rx="1.5"/><rect x="13" y="4" width="8" height="7" rx="1.5"/><rect x="13" y="13" width="8" height="7" rx="1.5"/></svg><span class="rail-label">Tidy</span>
-            </button>
+
           </nav>
           <!-- One bounded palette per tool; tool-windows.js adds the title
-               bar (Tune · Keep open · Minimize · Close) and places them. -->
+               bar (Tune · Close) and places them. -->
           <div id="tool-layer" class="tool-layer">
             <section id="tool-window-pairs" class="tool-window" data-tool="pairs" hidden>
               <div class="tool-window-body">
@@ -341,9 +334,9 @@
                     </h2>
                     <label
                       class="chip"
-                      title="Keep only completed polyhedra and their atoms"
-                      ><input id="polyhedra-only" type="checkbox" /><span
-                        >Polyhedra only</span
+                      title="Hide atoms that are not centers or vertices of an enabled polyhedron"
+                      ><input id="polyhedra-only" type="checkbox" aria-describedby="polyhedra-filter-help" /><span
+                        >Hide atoms outside polyhedra</span
                       ></label
                     ><button
                       id="add-rule"
@@ -354,6 +347,7 @@
                       ＋ Add
                     </button>
                   </div>
+                  <p id="polyhedra-filter-help" class="muted-note">Keeps only the centers and vertices of enabled polyhedra. Other atoms are hidden.</p>
                   <div id="pair-rules"></div>
                   <p id="isolation-note" class="note" role="status" hidden></p>
                 </section>

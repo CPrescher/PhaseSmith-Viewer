@@ -27,6 +27,8 @@ async def choose_tool(page, button, touch=None):
     if touch is None:
         touch = await page.evaluate("matchMedia('(pointer: coarse)').matches")
     target = page.locator(button)
+    if await target.get_attribute("aria-pressed") == "true":
+        return
     if not await target.is_visible():
         menu = page.locator("#tools-menu")
         await (menu.tap() if touch else menu.click())

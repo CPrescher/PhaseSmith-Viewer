@@ -115,6 +115,10 @@ C Cl .5 .85 .5
         and reset["arrows"] == []
         and not reset["symmetry"]["shown"]
     )
+    # Close the settings overlay explicitly before picking the new fixture;
+    # menus deliberately no longer move the structure out of their way.
+    active = page.locator('.tool-window:not([hidden]) [data-action=close]')
+    if await active.count(): await active.click()
     await page.locator("#measure-angle").tap()
     await page.locator("#view-c").tap()
     await settle(page)

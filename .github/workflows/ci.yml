@@ -64,6 +64,7 @@ jobs:
           VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/pair_defaults_smoke.py
           VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/layout_smoke.py
           VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/tool_windows_smoke.py
+          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/turn_smoke.py
       - name: Configure GitHub Pages
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/configure-pages@v6.0.0

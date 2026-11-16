@@ -90,6 +90,8 @@ async def check(browser, engine, width, height, touch, theme):
     async def press(selector):
         locator = page.locator(selector).first
         launcher_button = selector.startswith("#mode-") or selector == "#style-open"
+        if launcher_button and await locator.get_attribute("aria-pressed") == "true":
+            return
         if launcher_button and not await locator.is_visible():  # phone: Tools menu
             menu = page.locator("#tools-menu")
             await (menu.tap() if touch else menu.click())
@@ -131,8 +133,19 @@ async def check(browser, engine, width, height, touch, theme):
     async def shown_tool():
         return await page.locator(WINDOW).get_attribute("data-tool")
 
+    await press("#mode-pairs")
     await press("#view-c")
     assert await shown_tool() == "pairs", (where, "Pairs opens first")
+    if (await page.evaluate("viewerDiagnostics().windows.profile")) == "sheet":
+        window = await page.locator(WINDOW).bounding_box()
+        atom = next(a for a in (await page.evaluate("viewerDiagnostics()"))["atoms"] if a["label"] == "B")
+        await page.locator(WINDOW + ' [data-action=close]').click()
+        dy = window["y"] - 80 - atom["y"]
+        await page.mouse.move(120, atom["y"])
+        await page.mouse.down(button="right")
+        await page.mouse.move(120, atom["y"] + dy, steps=8)
+        await page.mouse.up(button="right")
+        await press("#mode-pairs")
     baseline = await page.evaluate(RECTS, tracked)
     await page.evaluate(RECORD, tracked)
 
@@ -271,6 +284,8 @@ async def check_landscape_legend(browser, engine, theme):
         timeout=45000,
     )
     await page.evaluate("new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))")
+    from smoke import choose_tool
+    await choose_tool(page, "#mode-pairs", True)
     toolbar = await page.locator(".view-directions").bounding_box()
     reset = await page.locator("#reset").bounding_box()
     assert reset["x"] >= toolbar["x"] and reset["x"] + reset["width"] <= toolbar["x"] + toolbar["width"] + 1
@@ -279,7 +294,7 @@ async def check_landscape_legend(browser, engine, theme):
     tracked = ["#viewport", "canvas", "#tools-menu", WINDOW, "#measure-info", "#clear"]
     before = await page.evaluate(RECTS, tracked)
     size_box = await page.locator(".size-control").bounding_box()
-    assert size_box["x"] + size_box["width"] <= sheet["x"], (engine, theme, "Size under the side sheet")
+    assert size_box["y"] >= sheet["y"] + sheet["height"], (engine, theme, "Size under the side sheet")
     for element in ["Mg", "Si", "O"]:
         chip = page.locator(f'[data-element="{element}"]')
         await chip.scroll_into_view_if_needed()

@@ -38,6 +38,7 @@ async def check(browser, width, height):
     assert dimensions["width"] <= width + 1 and dimensions["height"] <= height + 1, (
         dimensions
     )
+    await choose_tool(page, "#mode-pairs")
     await check_panel_widths(page)
     canvas = dimensions["canvas"]
     assert canvas["height"] >= height * 0.42 and canvas["width"] >= width * 0.49, canvas
@@ -53,6 +54,7 @@ async def check(browser, width, height):
     sliders = page.locator('[data-field="opacity"]')
     assert await sliders.count() == 2
     for i in range(2):
+        await sliders.nth(i).scroll_into_view_if_needed()
         assert await on_screen(sliders.nth(i)), (width, height, "opacity", i)
     # Opening a tuner by touch must not let the compatibility click land on
     # one of its buttons (it opens in place of the row under the field).

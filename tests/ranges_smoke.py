@@ -7,7 +7,7 @@ import math
 import os
 from pathlib import Path
 from playwright.async_api import async_playwright
-from smoke import URL, HERE, diagnostics, settle
+from smoke import URL, HERE, diagnostics, settle, choose_tool
 from coordination_smoke import click_control
 
 
@@ -46,6 +46,7 @@ async def run(browser_type, touch):
     # The public example is a real teaching CIF, not a synthetic chain.
     assert "wollaston" in (await diagnostics(page))["block"].lower()
     await click_control(page, page.locator("#measure-distance"), touch)
+    await choose_tool(page, "#mode-pairs")
     rows = page.locator("#pair-rules .pair-rule")
     while await rows.count():
         await click_control(page, rows.first.locator('button[aria-label^="Delete "]'), touch)

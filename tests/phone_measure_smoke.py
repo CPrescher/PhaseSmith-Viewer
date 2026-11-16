@@ -49,6 +49,16 @@ async def check(browser, theme, mode):
         {"name": "angle.cif", "mimeType": "text/plain", "buffer": CIF.encode()}
     )
     await page.wait_for_function("window.viewerDiagnostics().block==='angle'")
+    await page.locator("#view-c").tap()
+    await choose_tool(page, "#mode-pairs", True)
+    box = await page.locator("#tool-window-pairs").bounding_box()
+    await page.locator('#tool-window-pairs [data-action=close]').tap()
+    atom = next(a for a in (await diagnostics(page))["atoms"] if a["label"] == "B")
+    await page.mouse.move(120, atom["y"])
+    await page.mouse.down(button="right")
+    await page.mouse.move(120, box["y"] - 80, steps=8)
+    await page.mouse.up(button="right")
+    await settle(page)
     if mode == "lattice":
         await choose_tool(page, "#mode-lattice", True)
         await page.locator("#plane-add").tap()

@@ -65,29 +65,17 @@ function initialize() {
   // A perspective control camera supplies intuitive distance-based zoom;
   // the synchronized parallel camera renders and picks the crystal.
   const viewCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10000);
-  // Stage: the crystal is centred in the part of the view that open tool
-  // windows leave clear. Only the rendered camera's projection window is
-  // shifted by `stage` CSS px (an off-axis orthographic frustum); the pose
-  // (camera, target, up) is untouched. Rendering, picking, labels,
-  // measurement overlays and diagnostics all project through viewCamera,
-  // the compass and [uvw] readout depend on rotation only, and right-drag
-  // pan moves world units per CSS px, so all stay consistent. Wheel and
-  // click zoom subtract the offset to keep the cursor point fixed. Exports
-  // suspend the offset, so images are framed on the full canvas.
+  // Tool windows overlay the view. Opening, switching, moving or closing
+  // a tool never changes the camera or the projected atom positions.
   const stage = { x: 0, y: 0, clear: null };
-  let stageSuspended = false;
-  const viewSize = { width: 1, height: 1 };
   function syncViewCamera() {
     const halfHeight =
       camera.position.distanceTo(controls.target) *
       Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-    const perPixel = (2 * halfHeight) / viewSize.height;
-    const sx = stageSuspended ? 0 : stage.x * perPixel,
-      sy = stageSuspended ? 0 : stage.y * perPixel;
-    viewCamera.left = -halfHeight * camera.aspect - sx;
-    viewCamera.right = halfHeight * camera.aspect - sx;
-    viewCamera.top = halfHeight + sy;
-    viewCamera.bottom = -halfHeight + sy;
+    viewCamera.left = -halfHeight * camera.aspect;
+    viewCamera.right = halfHeight * camera.aspect;
+    viewCamera.top = halfHeight;
+    viewCamera.bottom = -halfHeight;
     // Depth is decoupled from the logical (zoom) distance: when zoomed into
     // a long structure the logical camera can sit inside it, which would
     // clip near atoms and let rays start behind them. Move only the
@@ -378,8 +366,6 @@ function initialize() {
   renderer.domElement.addEventListener("wheel", invalidate, { passive: true });
   const resize = new ResizeObserver(() => {
     const { width, height } = viewport.getBoundingClientRect();
-    viewSize.width = Math.max(width, 1);
-    viewSize.height = Math.max(height, 1);
     renderer.setSize(width, height);
     controls.handleResize();
     camera.aspect = width / height;
@@ -1306,7 +1292,7 @@ function initialize() {
     invalidate();
   }
   function setFaceOpacity(mesh, opacity) {
-    mesh.visible = opacity > 0;
+    mesh.visible = $("show-polyhedra").checked && opacity > 0;
     mesh.material.opacity = opacity;
     const transparencyChanged = mesh.material.transparent !== opacity < 1;
     mesh.material.transparent = opacity < 1;
@@ -1338,6 +1324,14 @@ function initialize() {
     invalidate();
   }
   $("show-atoms").onchange = updateAtomVisibility;
+  $("show-polyhedra").onchange = () => {
+    for (const mesh of faceMeshes.values()) {
+      mesh.visible = $("show-polyhedra").checked && mesh.material.opacity > 0;
+      if (mesh.userData.outline) mesh.userData.outline.visible = $("show-polyhedra").checked;
+    }
+    updatePickMarker();
+    invalidate();
+  };
   // Central atom key → [{ pair, coordination, volume }] for inspection.
   const polyInfo = new Map();
   function buildCoordination() {
@@ -1575,6 +1569,7 @@ function initialize() {
             opacity: 0.9,
           }),
         );
+        outline.visible = $("show-polyhedra").checked;
         faces.userData.outline = outline;
         model.add(outline);
       }
@@ -1771,23 +1766,16 @@ function initialize() {
     }
     orient(fields.map(Number));
   };
-  // Fit room: only the view toolbar (top) and the atom bar (bottom) span the
-  // crystal's column; the measurement card and compass sit beside it. The
-  // margins are measured within the clear stage area (the atom bar rides
-  // on top of a bottom tool sheet).
-  function overlayReserve(clear) {
+  // Fit uses the full canvas and fixed-size view controls, independently
+  // of which overlay is open. Only explicit view actions refit the model.
+  function overlayReserve() {
     const view = viewport.getBoundingClientRect();
     const top = document.querySelector(".view-directions").getBoundingClientRect();
     const bottom = document.querySelector(".atoms-bar").getBoundingClientRect();
-    // The [uvw] readout sits above the legend; keep the fit clear of it.
     const readout = $("view-readout").getBoundingClientRect();
-    const bottomTop = readout.height ? Math.min(bottom.top, readout.top) : bottom.top;
-    const clearTop = view.top + clear.y,
-      clearBottom = clearTop + clear.h;
-    return Math.max(top.bottom - clearTop, clearBottom - bottomTop, 0) + 4;
+    const bottomTop = Math.min(bottom.top, readout.height ? readout.top : bottom.top);
+    return Math.max(top.bottom - view.top, view.bottom - bottomTop) + 4;
   }
-  // The last fit; a layout change (tool window opened, moved, closed)
-  // refits only while the user has not zoomed or panned since.
   let fitPose = null;
   function isAtFit() {
     if (!fitPose) return false;
@@ -1847,11 +1835,10 @@ function initialize() {
     halfRight = Math.max(halfRight, 0.5);
     halfUp = Math.max(halfUp, 0.5);
     // Canvas toolbars sit along the top and bottom edges; fit the crystal
-    // between them, inside the area open tool windows leave clear, so no
-    // control or palette covers it after a reset.
+    // between them. Settings overlays never influence this fit.
     const height = viewport.clientHeight || 1;
-    const clear = stage.clear ?? { x: 0, y: 0, w: viewport.clientWidth || 1, h: height };
-    const usable = Math.max(clear.h - 2 * overlayReserve(clear), clear.h * 0.7);
+    const clear = { x: 0, y: 0, w: viewport.clientWidth || 1, h: height };
+    const usable = Math.max(clear.h - 2 * overlayReserve(), clear.h * 0.7);
     const halfHeight =
       Math.max(halfUp * (height / usable), halfRight * (height / Math.max(clear.w, 1))) * 1.06;
     fitDistance = halfHeight / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
@@ -2214,8 +2201,8 @@ function initialize() {
       factor = distanceNext / distanceNow;
       if (Math.abs(factor - 1) < 1e-9) return;
       // Relative to the projected pivot, which sits at the stage centre.
-      const nx = ((clientX - rect.left) / rect.width) * 2 - 1 - (2 * stage.x) / rect.width,
-        ny = 1 - ((clientY - rect.top) / rect.height) * 2 + (2 * stage.y) / rect.height;
+      const nx = ((clientX - rect.left) / rect.width) * 2 - 1,
+        ny = 1 - ((clientY - rect.top) / rect.height) * 2;
       const halfHeight = distanceNow * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
       const halfWidth = halfHeight * camera.aspect;
       camera.updateMatrixWorld();
@@ -2603,6 +2590,7 @@ function initialize() {
     latticeTools.reset();
     hiddenElements.clear();
     $("show-atoms").checked = true;
+    $("show-polyhedra").checked = true;
     $("name").textContent = data.name || data.block || "Crystal structure";
     const reference = entryForFilename(currentFilename);
     $("source").replaceChildren();
@@ -2948,6 +2936,7 @@ function initialize() {
         };
       }),
       atomsVisible: $("show-atoms").checked,
+      polyhedraVisible: $("show-polyhedra").checked,
       visibleAtomCount: atoms.filter(atomVisible).length,
       renderedAtomCount: meshes
         .filter((mesh) => mesh.visible)
@@ -2969,7 +2958,7 @@ function initialize() {
         // Per-polyhedron display styles: centre atom key, colour, scale.
         styles: mesh.userData.styles.map((s) => ({ ...s })),
         // Translucent pairs render from the shared sorted batch instead.
-        drawnBy: mesh.visible ? (mesh.material.opacity < 1 ? "sorted-batch" : "own-mesh") : "outline-only",
+        drawnBy: mesh.visible ? (mesh.material.opacity < 1 ? "sorted-batch" : "own-mesh") : mesh.userData.outline?.visible ? "outline-only" : "hidden",
       })),
       translucentFaces: faceSorter.diagnostics(),
       transparency: peeler.diagnostics(),
@@ -3078,9 +3067,7 @@ function initialize() {
     },
     name: () => structure?.name || structure?.block || currentFilename || "structure",
     setBusy: (busy) => {
-      // Exports frame the full canvas: the stage offset pauses meanwhile.
-      exportBusy = busy;
-      stageSuspended = busy;
+      // Export framing is identical to the stationary canvas view.
       // Exports peel the full layer budget in every frame.
       peeler.setExportMode(busy);
       latticeTools.setExportMode(busy);
@@ -3181,21 +3168,10 @@ function initialize() {
     }
   };
   $("export-cancel").onclick = () => recording?.cancel();
-  // ---- Tool windows ---------------------------------------------------------
-  // One bounded palette per tool (tool-windows.js). Window layout changes
-  // only by explicit window actions and window resizes; each one moves the
-  // crystal into the clear area (projection offset) and refits it only if
-  // the view is still at its last fit (no manual zoom or pan since).
-  let exportBusy = false;
+  // ---- Tool windows: overlays never reposition or refit the structure. ----
   function applyStageLayout(info) {
-    viewport.style.setProperty("--sheet-lift", `${info.sheetLift}px`);
-    viewport.style.setProperty("--right-shift", `${info.rightShift}px`);
-    const refit = Boolean(structure) && isAtFit() && !exportBusy;
-    stage.x = info.offset.x;
-    stage.y = info.offset.y;
     stage.clear = { ...info.clear };
-    if (refit) reset(true);
-    else invalidate();
+    invalidate();
     boundDetails();
   }
   const toolWindows = createToolWindows({
@@ -3203,20 +3179,26 @@ function initialize() {
     app: $("app"),
     rail: $("tool-rail"),
     menuButton: $("tools-menu"),
-    tidyButton: $("tools-tidy"),
     metrics() {
       // Palette below the measurement card's reserved height; the rail and
       // compass keep the right edge; sheets stay below the rail.
       const view = viewport.getBoundingClientRect();
       const row = document.querySelector(".measure-row").getBoundingClientRect();
       const rail = $("tool-rail").getBoundingClientRect();
+      const bottomControls = [".view-bottom", "#view-readout", ".axis-compass", "#tools-menu"]
+        .map(selector => document.querySelector(selector).getBoundingClientRect()).filter(rect => rect.width && rect.height);
+      const bottomGap = Math.ceil(Math.max(0, ...bottomControls.map(rect => view.bottom - rect.top)) + 8);
+      viewport.style.setProperty("--bottom-controls-gap", `${bottomGap}px`);
       const cardMax = parseFloat(getComputedStyle(viewport).getPropertyValue("--card-max")) || 168;
       return {
         paletteTop: row.bottom - view.top + 6 + cardMax + 10,
         railColumn: 92,
         railBottom: $("app").dataset.launcher === "rail" && rail.height ? rail.bottom - view.top : 0,
+        sheetTop: row.bottom - view.top + 6 + 88 + 8,
         sideTop: row.bottom - view.top + 6,
         bottomGap: 40,
+        sheetBottomGap: bottomGap,
+        sideBottomGap: bottomGap,
       };
     },
     onLayout: applyStageLayout,
@@ -3267,6 +3249,7 @@ function initialize() {
       boundary: $("boundary").checked,
       cell: $("cell").checked,
       polyhedraOnly: $("polyhedra-only").checked,
+      polyhedraVisible: $("show-polyhedra").checked,
       rules: rules.map((r) => ({
         id: r.id,
         center: r.center,
@@ -3336,6 +3319,7 @@ function initialize() {
       ["boundary", "boundary"],
       ["cell", "cell"],
       ["polyhedra-only", "polyhedraOnly"],
+      ["show-polyhedra", "polyhedraVisible"],
     ])
       if (typeof s[key] === "boolean") $(id).checked = s[key];
     // Pair rules.

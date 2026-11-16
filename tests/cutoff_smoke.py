@@ -4,19 +4,21 @@ import asyncio
 import math
 from playwright.async_api import async_playwright
 
-from smoke import URL, diagnostics, settle
+from smoke import URL, diagnostics, settle, choose_tool
 
 
 async def run(browser, touch):
     page = await browser.new_page(viewport={"width": 1024, "height": 768}, has_touch=touch)
     await page.goto(URL + "/?example=forsterite")
     await page.wait_for_function("window.viewerDiagnostics?.().coordination.polyhedronCount === 12")
+    await choose_tool(page, "#mode-pairs")
     rows = page.locator(".pair-rule")
     si = rows.nth(0).locator('[data-field="cutoff"]')
     mg = rows.nth(1).locator('[data-field="cutoff"]')
     slider = rows.nth(1).locator('[data-field="cutoff-speed"]')
     await (mg.tap() if touch else mg.click())
     await slider.wait_for(state="visible")
+    await slider.scroll_into_view_if_needed()
     box = await slider.bounding_box()
     assert box
     center = box["x"] + box["width"] / 2

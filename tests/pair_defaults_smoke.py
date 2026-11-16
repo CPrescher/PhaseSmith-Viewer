@@ -22,6 +22,7 @@ async def main():
             page.on("pageerror", lambda error: errors.append(str(error)))
             await page.goto(URL + "/?example=forsterite")
             await page.wait_for_function("window.viewerDiagnostics?.().coordination.polyhedronCount === 12")
+            await choose_tool(page, "#mode-pairs")
             await page.locator("#add-rule").click()
             row = page.locator(".pair-rule").last
             center = row.locator("[data-field=center]")

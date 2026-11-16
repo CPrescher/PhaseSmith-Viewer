@@ -1,500 +1,246 @@
-"""Tool-window workflow: edit while the affected structure stays in view.
-
-Real mouse/touch input only (diagnostics are read only). Checks, on a desktop,
-a landscape and a portrait tablet and phones (both themes):
-- the default palette covers neither the original canvas controls nor the
-  crystal, and the crystal is framed in the area the windows leave clear;
-- dragging the cutoff speed track and the opacity slider moves no control
-  (0 px) while the counts, polyhedra and face opacity change live;
-- choosing another tool keeps the palette outline; values, selection and
-  scroll stay with each tool; invalid (hkl) shows an error without reflow;
-  a new plane appears without moving the camera;
-- picking atoms and measuring never replaces or scrolls the open tool;
-- Keep open gives a second window beside the first, never a duplicate;
-  windows move, clamp on resize and return; Tidy restores default places;
-- right-drag pan stays 1:1 and wheel zoom keeps the cursor point fixed with
-  the crystal centred off-axis; Fit frames it inside the clear area;
-- phone: Tools menu, bottom sheet, explicit Tune / All settings (scroll
-  restored), bounded Details, 44 px targets, state across orientation.
-Known forsterite volumes (Mg1 11.787, Mg2 12.392, Si 2.208 Å³) are read from
-the Sites table at the end.
-
-Portable: bundled Chromium by default; BROWSER_CHANNEL=chrome or
-CHROMIUM_EXECUTABLE to choose another; VIEWER_URL selects the app.
-"""
-
-import asyncio
-import math
-import os
+"""Native inputs: stationary scene, single toggleable tools, aligned info,
+independent global visibility, precise editing and saved settings."""
+import asyncio, math, os
 from playwright.async_api import async_playwright
+from smoke import URL, diagnostics, settle, choose_tool
 
-URL = os.environ.get("VIEWER_URL", "http://127.0.0.1:4179").rstrip("/")
-WINDOW = "#tool-layer .tool-window:not([hidden])"
-ORIGINAL = ["#view-a", "#view-b", "#view-c", ".view-directions summary", "#turn-open", "#reset",
-            "#measure-info", "#measure-distance", "#measure-angle", "#clear", "#show-atoms", "#size"]
-HITS = """(sel) => {
-  const el = document.querySelector(sel), r = el.getBoundingClientRect();
-  const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-  return Boolean(hit && (hit === el || el.contains(hit) || hit.closest('label')?.contains(el)));
-}"""
-RECTS = """(sels) => sels.map((s) => { const r = document.querySelector(s).getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; })"""
-RECORD = """(sels) => { window.__frames = []; window.__rec = true;
-  const f = () => { if (!window.__rec) return;
-    window.__frames.push(sels.map((s) => { const r = document.querySelector(s).getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; }));
-    requestAnimationFrame(f); };
-  f(); }"""
-STOP = "() => { window.__rec = false; return window.__frames; }"
-
-
-async def diag(page):
-    return await page.evaluate("viewerDiagnostics()")
-
-
-async def settle(page, frames=2):
-    for _ in range(frames):
-        await page.evaluate("new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))")
-
-
-def same(a, b, tol=0.51):
-    return all(abs(x - y) <= tol for x, y in zip(a, b))
-
-
-async def tap(page, selector, touch):
-    loc = page.locator(selector).first
-    await (loc.tap() if touch else loc.click())
-    await settle(page)
-
-
-async def choose(page, button, touch):
-    loc = page.locator(button)
-    if not await loc.is_visible():
-        await tap(page, "#tools-menu", touch)
-        await loc.wait_for(state="visible")
-    await tap(page, button, touch)
-
-
-async def stage_frames_crystal(page, where, margin=2):
-    """Every visible atom centre lies inside the clear stage area, and no
-    window covers it."""
-    d = await diag(page)
-    canvas = await page.locator("canvas").bounding_box()
-    clear = d["stage"]["clear"]
-    left, top = canvas["x"] + clear["x"], canvas["y"] + clear["y"]
-    for a in d["atoms"]:
-        if not a["visible"]:
-            continue
-        assert left - margin <= a["x"] <= left + clear["w"] + margin and top - margin <= a["y"] <= top + clear["h"] + margin, (where, "atom outside the clear area", a["label"], a["x"], a["y"], clear)
-        assert await page.evaluate("([x,y])=>document.elementFromPoint(x,y)?.tagName", [a["x"], a["y"]]) in ("CANVAS", "SPAN"), (where, "atom covered", a["label"])
-
-
-async def open_page(browser, width, height, touch, theme):
-    context = await browser.new_context(viewport={"width": width, "height": height}, has_touch=touch, is_mobile=touch and width < 900)
-    await context.add_init_script(f"localStorage.setItem('psv-theme','{theme}')")
-    page = await context.new_page()
-    errors = []
-    page.on("pageerror", lambda e: errors.append(str(e)))
-    await page.goto(URL + "/?example=forsterite")
-    await page.wait_for_function(
-        "window.viewerDiagnostics?.().coordination.polyhedronCount===12 && !viewerDiagnostics().session.suspended", timeout=45000
-    )
-    await settle(page)
-    return context, page, errors
-
-
-async def check_defaults(page, where, guide):
-    d = await diag(page)
-    assert d["windows"]["visible"] == ["pairs"], (where, d["windows"]["visible"])
-    if d["windows"]["profile"] == "sheet":
-        assert await page.locator("#tool-window-pairs .tune-button").is_visible(), (where, "initial Tune unavailable")
-    for sel in ORIGINAL:
-        assert await page.evaluate(HITS, sel), (where, "original control covered", sel)
-    await stage_frames_crystal(page, where)
-    assert d["windows"]["clearFraction"] >= guide, (where, "clear area", d["windows"]["clearFraction"], guide)
-    return d
-
-
-async def desktop(browser, width, height, touch, theme):
-    where = f"{width}×{height} {'touch' if touch else 'mouse'} {theme}"
-    context, page, errors = await open_page(browser, width, height, touch, theme)
-    d = await check_defaults(page, where, 0.6 if width >= 1200 else 0.5)
-    assert d["windows"]["profile"] == "float", where
-
-    # ---- Cutoff speed track: nothing moves, the structure changes live.
-    mg = page.locator('.pair-rule[data-tune-item="rule:1"]')
-    field = mg.locator("[data-field=cutoff]")
-    await (field.tap() if touch else field.click())
-    track = mg.locator("[data-field=cutoff-speed]")
-    await track.wait_for(state="visible")
-    watched = [WINDOW, '.pair-rule[data-tune-item="rule:1"] [data-field=cutoff]', '.pair-rule[data-tune-item="rule:1"] [data-field=cutoff-speed]',
-               '.pair-rule[data-tune-item="rule:2"] [data-field=polyhedra]', '.pair-rule[data-tune-item="rule:2"] [data-field=opacity]',
-               "#pair-count-1", "#measure-info", "#view-c", "canvas"]
-    before = await page.evaluate(RECTS, watched)
-    pose = (await diag(page))["camera"]
-    counts0 = await page.locator("#pair-count-1").inner_text()
-    box = await track.bounding_box()
-    cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
-    await page.evaluate(RECORD, watched)
-    if touch:
-        cdp = await context.new_cdp_session(page)
-        await cdp.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": cx, "y": cy, "id": 1}]})
-        await cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [{"x": cx + box["width"] * 0.45, "y": cy, "id": 1}]})
-        # A software renderer may advance the intentionally frame-capped
-        # fine tuner more slowly. Hold until a shell actually changes;
-        # this still requires live feedback before releasing the pointer.
-        await page.wait_for_function("before => document.getElementById('pair-count-1').textContent !== before", arg=counts0, timeout=15000)
-        await cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
-    else:
-        await page.mouse.move(cx, cy)
-        await page.mouse.down()
-        await page.mouse.move(cx + box["width"] * 0.45, cy, steps=4)
-        # A software renderer may advance the intentionally frame-capped
-        # fine tuner more slowly. Hold until a shell actually changes;
-        # this still requires live feedback before releasing the pointer.
-        await page.wait_for_function("before => document.getElementById('pair-count-1').textContent !== before", arg=counts0, timeout=15000)
-        await page.mouse.up()
-    await page.wait_for_timeout(250)
-    frames = await page.evaluate(STOP)
-    assert len(frames) > 10, (where, len(frames))
-    for frame in frames:
-        for i, rect in enumerate(frame):
-            assert same(rect, before[i]), (where, "moved during cutoff drag", watched[i], rect, before[i])
-    value = float(await field.input_value())
-    assert value > 2.3, (where, "cutoff did not grow", value)
-    assert await page.locator("#pair-count-1").inner_text() != counts0, (where, "counts did not follow the cutoff")
-    assert (await diag(page))["camera"] == pose, (where, "cutoff edit moved the camera")
-    await field.fill("2.3")
-    await field.press("Enter")
-    await settle(page)
-    assert float(await field.input_value()) == 2.3, where
-    assert await field.get_attribute("aria-expanded") == "false", (where, "Enter kept the tuner open")
-    await page.keyboard.press("Escape")  # leaves the field; the window stays
-    assert (await diag(page))["windows"]["visible"] == ["pairs"], (where, "Escape in a field closed the tool")
-
-    # ---- Opacity slider: live faces, no movement.
-    slider = page.locator('.pair-rule[data-tune-item="rule:2"] [data-field=opacity]')
-    sbox = await slider.bounding_box()
-    before = await page.evaluate(RECTS, watched)
-    await page.evaluate(RECORD, watched)
-    sx, sy = sbox["x"] + sbox["width"] * 0.34, sbox["y"] + sbox["height"] / 2
-    if touch:
-        cdp = await context.new_cdp_session(page)
-        for kind, x in (("touchStart", sx), ("touchMove", sx + sbox["width"] * 0.3), ("touchMove", sbox["x"] + sbox["width"] * 0.8)):
-            await cdp.send("Input.dispatchTouchEvent", {"type": kind, "touchPoints": [{"x": x, "y": sy, "id": 2}]})
-            await page.wait_for_timeout(60)
-        await cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
-    else:
-        await page.mouse.move(sx, sy)
-        await page.mouse.down()
-        await page.mouse.move(sbox["x"] + sbox["width"] * 0.8, sy, steps=6)
-        await page.mouse.up()
-    await settle(page)
-    frames = await page.evaluate(STOP)
-    for frame in frames:
-        for i, rect in enumerate(frame):
-            assert same(rect, before[i]), (where, "moved during opacity drag", watched[i], rect, before[i])
-    faces = {f["id"]: f["opacity"] for f in (await diag(page))["faceMaterials"]}
-    assert faces[2] > 0.6, (where, "face opacity not live", faces)
-
-    # ---- Tool switch: same outline; Lattice edits; error without reflow.
-    pairs_rect = (await page.evaluate(RECTS, [WINDOW]))[0]
-    await choose(page, "#mode-lattice", touch)
-    assert same((await page.evaluate(RECTS, [WINDOW]))[0], pairs_rect), (where, "Lattice changed the palette outline")
-    pose = (await diag(page))["camera"]
-    await tap(page, "#plane-add", touch)
-    row = page.locator("[data-plane-id]").first
-    hkl = row.locator("[data-field=hkl]")
-    await hkl.fill("1 1 1")
-    await hkl.press("Tab")
-    await settle(page)
-    lattice = (await diag(page))["lattice"]
-    assert lattice["planes"][0]["hkl"] == [1, 1, 1] and not lattice["planes"][0]["error"], (where, lattice["planes"][0])
-    assert (await diag(page))["camera"] == pose, (where, "adding a plane moved the camera")
-    row_rect = (await page.evaluate(RECTS, ["[data-plane-id]"]))[0]
-    await hkl.fill("0 0 0")
-    await hkl.press("Tab")
-    await settle(page)
-    assert "zero" in (await row.locator("[data-readout]").inner_text()), where
-    assert same((await page.evaluate(RECTS, ["[data-plane-id]"]))[0], row_rect), (where, "invalid hkl reflowed the row")
-    await hkl.fill("1 1 1")
-    await hkl.press("Tab")
-
-    # ---- Measuring with a tool open: the tool stays, nothing scrolls.
-    await tap(page, "#measure-distance", touch)
-    d = await diag(page)
-    picks = [a for a in d["atoms"] if a["visible"] and await page.evaluate("([x,y])=>document.elementFromPoint(x,y)?.tagName==='CANVAS'", [a["x"], a["y"]])][:2]
-    for a in picks:
-        await (page.touchscreen.tap(a["x"], a["y"]) if touch else page.mouse.click(a["x"], a["y"]))
-        await settle(page)
-    d = await diag(page)
-    assert len(d["selectedIds"]) == 2 and d["distance"] > 0, (where, d["selectedIds"])
-    assert d["windows"]["visible"] == ["lattice"], (where, "measuring replaced the tool")
-    assert same((await page.evaluate(RECTS, [WINDOW]))[0], pairs_rect), (where, "measuring moved the palette")
-    await tap(page, "#measure-info", touch)
-
-    # ---- Keep open: a second window beside it, never a duplicate.
-    def crystal_size(state):
-        visible = [a for a in state["atoms"] if a["visible"]]
-        return [max(a[k] for a in visible) - min(a[k] for a in visible) for k in ("x", "y")]
-    before_keep = crystal_size(await diag(page))
-    await tap(page, "#tool-window-lattice [data-action=pin]", touch)
-    await choose(page, "#mode-pairs", touch)
-    d = await diag(page)
-    rects = d["windows"]["rects"]
-    retained = [after / before for after, before in zip(crystal_size(d), before_keep)]
-    assert min(retained) >= 0.8, (where, "Keep open shrank the crystal", retained, d["stage"])
-    assert sorted(d["windows"]["visible"]) == ["lattice", "pairs"], (where, d["windows"]["visible"])
-    a, b = rects["lattice"], rects["pairs"]
-    assert a["x"] >= b["x"] + b["w"] or b["x"] >= a["x"] + a["w"] or a["y"] >= b["y"] + b["h"] or b["y"] >= a["y"] + a["h"], (where, "windows overlap", rects)
-    await choose(page, "#mode-lattice", touch)
-    assert await page.locator(WINDOW).count() == 2, (where, "duplicate window")
-    for sel in ORIGINAL:
-        assert await page.evaluate(HITS, sel), (where, "original control covered with two windows", sel)
-    await stage_frames_crystal(page, where + " two windows")
-
-    if not touch:
-        # ---- Move, clamp on resize, return; Tidy.
-        head = await page.locator("#tool-window-pairs .tool-window-head").bounding_box()
-        await page.mouse.move(head["x"] + 60, head["y"] + head["height"] / 2)
-        await page.mouse.down()
-        await page.mouse.move(head["x"] - 200, head["y"] + 80, steps=6)
-        await page.mouse.up()
-        await settle(page)
-        moved = (await diag(page))["windows"]["rects"]["pairs"]
-        view = await page.locator("canvas").bounding_box()
-        expected_y = min(b["y"] + 80, view["height"] - b["h"] - 8)  # stays fully on screen
-        assert abs(moved["x"] - (b["x"] - 260)) < 2 and abs(moved["y"] - expected_y) < 2, (where, moved, b)
-        await page.set_viewport_size({"width": 900, "height": 640})
-        await page.wait_for_timeout(250)
-        small = await diag(page)
-        ws = small["windows"]
-        canvas = await page.locator("canvas").bounding_box()
-        for tool, r in ws["rects"].items():
-            assert r["x"] >= 0 and r["y"] >= 0 and r["x"] + r["w"] <= canvas["width"] + 0.5 and r["y"] + r["h"] <= canvas["height"] + 0.5, (where, "window off screen", tool, r)
-        await page.set_viewport_size({"width": width, "height": height})
-        await page.wait_for_timeout(250)
-        assert same(list((await diag(page))["windows"]["rects"]["pairs"].values()), list(moved.values()), 1), (where, "window did not return")
-        await tap(page, "#tools-tidy", touch)
-        d = await diag(page)
-        assert same(list(d["windows"]["rects"]["lattice"].values()), list(a.values()), 1), (where, "Tidy", d["windows"]["rects"])
-
-        # ---- 1:1 pan and cursor-anchored zoom with the off-axis stage.
-        assert d["stage"]["x"] != 0, (where, "stage offset expected with palettes open")
-        atom = min((x for x in d["atoms"] if x["visible"]), key=lambda x: x["x"])
-        x0, y0 = atom["x"], atom["y"]
-        await page.mouse.move(x0, y0)
-        await page.mouse.down(button="right")
-        await page.mouse.move(x0 + 60, y0 + 35, steps=5)
-        await page.mouse.up(button="right")
-        await settle(page)
-        moved_atom = next(x for x in (await diag(page))["atoms"] if x["id"] == atom["id"])
-        assert math.dist([moved_atom["x"], moved_atom["y"]], [x0 + 60, y0 + 35]) < 0.5, (where, "pan slipped", moved_atom, x0, y0)
-        await page.mouse.move(moved_atom["x"], moved_atom["y"])
-        await page.mouse.wheel(0, -240)
-        await page.wait_for_timeout(300)
-        zoomed = next(x for x in (await diag(page))["atoms"] if x["id"] == atom["id"])
-        assert math.dist([zoomed["x"], zoomed["y"]], [moved_atom["x"], moved_atom["y"]]) < 0.5, (where, "zoom not anchored", zoomed, moved_atom)
-        # Double right-click fits inside the clear area again.
-        c = await page.locator("canvas").bounding_box()
-        await page.mouse.click(c["x"] + 40, c["y"] + c["height"] - 140, button="right")
-        await page.mouse.click(c["x"] + 40, c["y"] + c["height"] - 140, button="right")
-        await settle(page)
-        assert (await diag(page))["stage"]["atFit"], where
-        await stage_frames_crystal(page, where + " after fit")
-
-    assert not errors, (where, errors)
-    await context.close()
-    print(f"{where}: stationary cutoff/opacity drags, same outline per tool, kept window, clear-area framing")
-
-
-async def phone(browser, width, height, theme):
-    where = f"phone {width}×{height} {theme}"
-    context, page, errors = await open_page(browser, width, height, True, theme)
-    d = await check_defaults(page, where, 0.35)
-    assert d["windows"]["profile"] == "sheet" and d["windows"]["launcher"] == "menu", where
-    sheet = (await page.evaluate(RECTS, [WINDOW]))[0]
-    # 44 px targets for the launcher, window chrome and pair controls.
-    for sel in ["#tools-menu", "#tool-window-pairs [data-action=close]", "#tool-window-pairs [data-action=minimize]",
-                "#tool-window-pairs .tune-button", ".pair-rule [data-field=cutoff]", ".pair-rule label:has([data-field=polyhedra])", ".pair-rule .icon-button"]:
-        r = (await page.evaluate(RECTS, [sel]))[0]
-        assert r[2] >= 43.5 and r[3] >= 43.5, (where, "small target", sel, r)
-    # Tools menu: labelled, then the sheet keeps its place per tool.
-    await tap(page, "#tools-menu", True)
-    for sel in ["#mode-pairs", "#mode-lattice", "#mode-export"]:
-        r = (await page.evaluate(RECTS, [sel]))[0]
-        assert r[3] >= 43.5, (where, sel, r)
-    await tap(page, "#mode-sites", True)
-    assert same((await page.evaluate(RECTS, [WINDOW]))[0], sheet), (where, "Sites sheet outline")
-    await choose(page, "#mode-pairs", True)
-    # Scroll Pairs a little, choose the Mg–O cutoff and Tune.
-    body = page.locator("#tool-window-pairs .tool-window-body")
-    await body.evaluate("el => el.scrollTo(0, 40)")
-    scroll = await body.evaluate("el => el.scrollTop")
-    mg = page.locator('.pair-rule[data-tune-item="rule:1"]')
-    await mg.locator("[data-field=polyhedra]").tap()  # marks Mg–O as the entry to tune
-    await mg.locator("[data-field=polyhedra]").tap()
-    await settle(page)
-    scroll = await body.evaluate("el => el.scrollTop")  # where All settings must return
-    await tap(page, "#tool-window-pairs .tune-button", True)
-    d = await diag(page)
-    title = await page.locator("#tool-title-pairs").inner_text()
-    assert "Mg–O" in title, (where, title)
-    assert d["windows"]["clearFraction"] >= 0.55, (where, "Tune clear area", d["windows"]["clearFraction"])
-    assert await mg.locator("[data-field=cutoff]").is_visible() and await mg.locator("[data-field=opacity]").is_visible(), where
-    assert not await page.locator('.pair-rule[data-tune-item="rule:2"]').is_visible(), (where, "Tune shows other entries")
-    await stage_frames_crystal(page, where + " tune")
-    # Exact entry in Tune.
-    field = mg.locator("[data-field=cutoff]")
-    await field.fill("2.4")
-    await field.press("Enter")
-    await settle(page)
-    assert float(await field.input_value()) == 2.4
-    await tap(page, "#tool-window-pairs .tune-button", True)
-    assert abs(await body.evaluate("el => el.scrollTop") - scroll) < 1, (where, "All settings lost the scroll position")
-    assert await page.locator('.pair-rule[data-tune-item="rule:2"]').is_visible(), where
-    # Pick: the sheet stays, Details is bounded and inside the clear area.
-    d = await diag(page)
-    atom = [a for a in d["atoms"] if a["visible"] and await page.evaluate("([x,y])=>document.elementFromPoint(x,y)?.tagName==='CANVAS'", [a["x"], a["y"]])][0]
-    await page.touchscreen.tap(atom["x"], atom["y"])
-    await settle(page)
-    assert (await diag(page))["windows"]["visible"] == ["pairs"], where
-    await tap(page, "#measure-more", True)
-    pop = await page.locator("#selection").bounding_box()
-    assert pop and pop["x"] >= 0 and pop["x"] + pop["width"] <= width + 0.5, (where, pop)
-    canvas = await page.locator("canvas").bounding_box()
-    clear = (await diag(page))["stage"]["clear"]
-    assert pop["y"] + pop["height"] <= canvas["y"] + clear["y"] + clear["h"] + 1, (where, "Details over the sheet", pop, clear)
-    assert "occupancy" in await page.locator("#selection").inner_text(), where
-    footer = await page.locator(".view-bottom").bounding_box()
-    assert pop["y"] + pop["height"] <= footer["y"] - 4, (where, "Details over the atom controls", pop, footer)
-    assert await page.evaluate(HITS, "#measure-more"), (where, "Details covered its own close button")
-    prior = (await diag(page))["selectedIds"]
-    alternatives = [a for a in (await diag(page))["atoms"] if a["visible"] and a["id"] not in prior and await page.evaluate("([x,y])=>document.elementFromPoint(x,y)?.tagName==='CANVAS'", [a["x"], a["y"]])]
-    assert alternatives, where
-    previous_atom = next(a for a in (await diag(page))["atoms"] if a["id"] == prior[0])
-    target = max(alternatives, key=lambda a: math.dist([a["x"], a["y"]], [previous_atom["x"], previous_atom["y"]]))
-    await page.touchscreen.tap(target["x"], target["y"])
-    await settle(page)
-    assert (await diag(page))["selectedIds"] != prior, where
-    assert await page.locator("#measure-more").get_attribute("aria-expanded") == "true", (where, "new atom closed Details")
-    await page.locator("#measure-more").press("Escape")
-    assert await page.locator("#measure-more").get_attribute("aria-expanded") == "false", where
-    await tap(page, "#measure-more", True)
-    await tap(page, "#view-c", True)
-    assert await page.locator("#measure-more").get_attribute("aria-expanded") == "false", where
-    # Orientation round trip keeps tool, sheet and scroll.
-    kept = await body.evaluate("el => (el.scrollTo(0, 30), el.scrollTop)")
-    assert kept > 0, where
-    await page.set_viewport_size({"width": height, "height": width})
-    await page.wait_for_timeout(300)
-    d = await diag(page)
-    assert d["windows"]["profile"] == "side" and d["windows"]["visible"] == ["pairs"], (where, d["windows"])
-    assert await page.evaluate(HITS, "#turn-open"), (where, "Turn covered in landscape")
-    await page.set_viewport_size({"width": width, "height": height})
-    await page.wait_for_timeout(300)
-    assert same((await page.evaluate(RECTS, [WINDOW]))[0], sheet), (where, "sheet after rotation")
-    assert abs(await body.evaluate("el => el.scrollTop") - kept) < 1, (where, "scroll after rotation")
-    # Known physical volumes in Sites (scientific values untouched).
-    await choose(page, "#mode-sites", True)
-    rows = [r.strip() for r in await page.locator("#poly-table tbody tr").all_inner_texts()]
-    for label, volume in (("Mg1", "11.787"), ("Mg2", "12.392"), ("Si", "2.208")):
-        assert any(label in r and volume in r for r in rows), (where, label, rows)
-    assert not errors, (where, errors)
-    await context.close()
-    print(f"{where}: menu, sheet, Tune/All settings, bounded Details, rotation state, known volumes")
-
-
-async def parked_tool(browser):
-    context, page, errors = await open_page(browser, 1440, 900, True, "dark")
-    await tap(page, '#tool-window-pairs [data-action="pin"]', True)
-    await choose(page, "#mode-lattice", True)
-    await tap(page, "#plane-add", True)
-    assert await page.locator('#tool-window-lattice [data-action="pin"]').is_disabled()
-    original_rects = (await diag(page))["windows"]["rects"]
-    await page.set_viewport_size({"width": 960, "height": 1050})
-    await settle(page)
-    assert (await diag(page))["windows"]["parked"]
-    assert (await diag(page))["windows"]["visible"] == ["lattice"]
-    narrow_rect = (await page.evaluate(RECTS, [WINDOW]))[0]
-    saved_rects = (await diag(page))["windows"]["state"]["rects"]
-    head = await page.locator("#tool-title-lattice").bounding_box()
-    await page.mouse.move(head["x"] + 20, head["y"] + 10)
-    await page.mouse.down()
-    await page.mouse.move(head["x"] - 80, head["y"] + 70, steps=5)
-    await page.mouse.up()
-    await page.locator("#tool-title-lattice").dblclick()
-    await settle(page)
-    assert same((await page.evaluate(RECTS, [WINDOW]))[0], narrow_rect)
-    assert (await diag(page))["windows"]["state"]["rects"] == saved_rects
-    assert not await page.locator("#tool-window-lattice .window-grip").is_visible()
-    await stage_frames_crystal(page, "narrow desktop parked windows")
-    await choose(page, "#mode-pairs", True)
-    assert same((await page.evaluate(RECTS, [WINDOW]))[0], narrow_rect)
-    await page.set_viewport_size({"width": 1440, "height": 900})
-    await settle(page)
-    assert (await diag(page))["windows"]["rects"] == original_rects
-    assert not (await diag(page))["windows"]["parked"]
-    await page.set_viewport_size({"width": 390, "height": 844})
-    await settle(page)
-    await choose(page, "#mode-pairs", True)
-    assert await page.locator("#tool-window-pairs .tune-button").is_visible()
-    assert await page.evaluate("document.activeElement.id") == "tool-title-pairs"
-    await tap(page, "#tool-window-pairs .tune-button", True)
-    d = await diag(page)
-    assert d["windows"]["state"]["tune"] and d["windows"]["state"]["pinned"] == ["pairs"]
-    fonts = await page.locator('#tool-window-pairs input[type="text"], #tool-window-pairs select').evaluate_all("els => els.map(el => parseFloat(getComputedStyle(el).fontSize))")
-    assert min(fonts) >= 16, fonts
-    await choose(page, "#mode-lattice", True)
-    assert not (await diag(page))["windows"]["state"]["tune"]
-    await tap(page, "#tool-window-lattice .tune-button", True)
-    field = page.locator('[aria-label="Miller indices (h k l), integers"]')
-    await field.fill("1 1 0")
-    await field.press("Tab")
-    await page.locator("#tool-title-lattice").filter(has_text="1 1 0").wait_for()
-    await page.set_viewport_size({"width": 1440, "height": 900})
-    await settle(page)
-    assert sorted((await diag(page))["windows"]["visible"]) == ["lattice", "pairs"]
-    assert not errors, errors
-    await context.close()
-    print("Kept tool: phone Tune, named parameter refresh, readable fields, focus, desktop restoration")
-
-
-async def narrow_desktop(browser):
-    for width, height, touch in [(960, 1050, False), (980, 720, False), (940, 700, True), (1000, 1000, False)]:
-        context, page, errors = await open_page(browser, width, height, touch, "dark")
-        assert await page.locator('#tool-window-pairs [data-action="pin"]').is_disabled(), (width, height)
-        await stage_frames_crystal(page, f"{width}x{height} single palette")
-        assert not errors, errors
-        await context.close()
-    print("Narrow desktop: Keep open unavailable when it would obscure or shrink the crystal")
-
+TOOLS=['#mode-pairs','#mode-lattice','#style-open','#mode-sites','#mode-extent','#mode-export']
+SIZES=[(1440,900),(1920,1080),(1024,768),(768,1024),(390,844),(375,667),(844,390),(960,1050)]
+async def ready(page):
+ await page.goto(URL+'/?example=forsterite')
+ await page.wait_for_function('window.viewerDiagnostics?.().coordination.polyhedronCount===12 && !viewerDiagnostics().session.suspended')
+ await settle(page)
+async def launcher(page,button):
+ if not await page.locator(button).is_visible():
+  prior=await diagnostics(page)
+  await page.locator('#tools-menu').click()
+  await settle(page)
+  unchanged(prior,await diagnostics(page))
+  menu=await page.locator('#tool-rail').bounding_box();trigger=await page.locator('#tools-menu').bounding_box()
+  assert menu['y']+menu['height']<=trigger['y']-4,(menu,trigger)
+ await page.locator(button).click()
+ await settle(page)
+def unchanged(before,after):
+ assert before['camera']==after['camera'],'Overlay changed the camera'
+ assert len(before['atoms'])==len(after['atoms'])
+ shift=max(math.dist([a['x'],a['y']],[b['x'],b['y']]) for a,b in zip(before['atoms'],after['atoms']))
+ assert shift<.01,('Overlay moved the projected structure',shift)
+async def pick(page,avoid=None):
+ d=await diagnostics(page)
+ candidates=[a for a in d['atoms'] if a['visible'] and a['id']!=avoid and await page.evaluate("([x,y])=>document.elementFromPoint(x,y)?.tagName==='CANVAS'",[a['x'],a['y']])]
+ assert candidates,'No exposed atom to inspect'
+ prior=next((a for a in d['atoms'] if a['id']==avoid),None)
+ target=max(candidates,key=lambda a:math.dist([a['x'],a['y']],[prior['x'],prior['y']])) if prior else candidates[0]
+ await page.mouse.click(target['x'],target['y']);await settle(page)
+ assert (await diagnostics(page))['selectedIds']
+async def matrix(browser):
+ for theme in ['dark','light']:
+  for w,h in SIZES:
+   ctx=await browser.new_context(viewport={'width':w,'height':h},has_touch=w<1100,is_mobile=w<900)
+   await ctx.add_init_script(f"localStorage.setItem('psv-theme','{theme}')")
+   page=await ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+   await ready(page);base=await diagnostics(page)
+   assert await page.locator('#view-readout').evaluate("el=>{const r=el.getBoundingClientRect();const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return el===hit||el.contains(hit)}"),'View direction readout obscured'
+   assert base['windows']['visible']==[]
+   icons={key:await page.locator(key).bounding_box() for key in ['#show-atoms','#show-polyhedra']}
+   for rect in icons.values():
+    assert rect['x']<w*.5 and rect['y']>h-80 and min(rect['width'],rect['height'])>=44,rect
+   assert icons['#show-atoms']['x']<=24,('Visibility icons must start at the lower left',icons)
+   phone_launcher=await page.locator('#tools-menu').is_visible()
+   if phone_launcher:
+    trigger=await page.locator('#tools-menu').bounding_box()
+    assert trigger['x']>w*.75 and trigger['y']>h-80,trigger
+   assert await page.locator('[data-action=pin],[data-action=minimize],#tools-tidy').count()==0
+   bounds=None
+   for tool in TOOLS:
+    await launcher(page,tool)
+    d=await diagnostics(page);unchanged(base,d)
+    for key,rect in icons.items():assert await page.locator(key).bounding_box()==rect,('Visibility shortcut moved',key)
+    if phone_launcher:assert await page.locator('#tools-menu').bounding_box()==trigger
+    assert len(d['windows']['visible'])==1
+    rect=await page.locator('.tool-window:not([hidden])').bounding_box()
+    body=await page.locator('.tool-window:not([hidden]) .tool-window-body').bounding_box()
+    assert body['height']>=120,('Editor too small for usable controls',w,h,body)
+    if bounds: assert rect==bounds,('Tool switch moved palette',w,h,rect,bounds)
+    bounds=rect
+    assert rect['x']>=0 and rect['y']>=0 and rect['x']+rect['width']<=w+.5 and rect['y']+rect['height']<=h+.5
+    if d['windows']['profile'] in ['sheet','side']:
+     for selector in ['.view-bottom','#view-readout','.axis-compass','#tools-menu']:
+      control=await page.locator(selector).bounding_box()
+      if control:assert rect['y']+rect['height']<=control['y']-7,(w,h,selector,rect,control)
+   if w<=640:
+    # All three default element chips must be visible without sideways scrolling.
+    assert await page.locator('#elements button').count()==3
+    for chip in await page.locator('#elements button').all():
+     assert await chip.evaluate("el=>{const r=el.getBoundingClientRect();const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return el===hit||el.contains(hit)}"),'Element chip obscured'
+   await launcher(page,TOOLS[-1]);assert (await diagnostics(page))['windows']['visible']==[]
+   unchanged(base,await diagnostics(page))
+   # Info is right-aligned to its own mode toolbar at every responsive size.
+   await pick(page)
+   row=await page.locator('.measure-row').bounding_box();info=await page.locator('.measure-details').bounding_box()
+   assert abs(row['x']+row['width']-info['x']-info['width'])<1,(w,h,row,info)
+   assert info['y']>=row['y']+row['height'],(w,h,row,info)
+   # The global polyhedra toggle leaves scientific data and atoms unchanged.
+   d=await diagnostics(page);geometry=[m['geometry'] for m in d['faceMaterials']]
+   await page.locator('#show-polyhedra').uncheck();await settle(page);hidden=await diagnostics(page)
+   assert hidden['polyhedra']==d['polyhedra'] and hidden['coordination']==d['coordination']
+   assert all(not m['visible'] and not m['outlineVisible'] for m in hidden['faceMaterials'])
+   assert hidden['atomsVisible'] and hidden['visibleAtomCount']==d['visibleAtomCount']
+   assert [m['geometry'] for m in hidden['faceMaterials']]==geometry
+   unchanged(d,hidden)
+   await page.locator('#show-atoms').uncheck();await settle(page)
+   assert (await diagnostics(page))['visibleAtomCount']==0
+   await page.locator('#show-polyhedra').check();await settle(page)
+   assert any(m['visible'] for m in (await diagnostics(page))['faceMaterials'])
+   assert (await diagnostics(page))['visibleAtomCount']==0
+   assert not await page.evaluate('document.documentElement.scrollWidth>innerWidth')
+   assert not errors,errors
+   await ctx.close()
+   print(f'{w}x{h} {theme}: scene fixed, tools toggle/swap, info aligned, Atoms/Polyhedra independent',flush=True)
+async def editing(browser):
+ page=await browser.new_page(viewport={'width':1440,'height':900},has_touch=True)
+ await ready(page);await choose_tool(page,'#mode-pairs')
+ assert 'Hide atoms outside polyhedra' in await page.locator('label:has(#polyhedra-only)').inner_text()
+ await page.locator('#polyhedra-filter-help').wait_for(state='visible')
+ pose=await diagnostics(page);window=await page.locator('#tool-window-pairs').bounding_box()
+ mg=page.locator('.pair-rule').filter(has=page.locator('[data-field=center] option:checked[value=Mg]'))
+ field=mg.locator('[data-field=cutoff]');await field.fill('2.15');await field.press('Enter')
+ await page.wait_for_function('viewerDiagnostics().coordination.rules.some(r=>r.center==="Mg"&&r.counts.join(",")==="3,6")')
+ updated=await diagnostics(page);assert updated['camera']==pose['camera']
+ prior={a['key']:a for a in pose['atoms']}
+ assert max(math.dist([a['x'],a['y']],[prior[a['key']]['x'],prior[a['key']]['y']]) for a in updated['atoms'] if a['key'] in prior)<.01
+ assert await page.locator('#tool-window-pairs').bounding_box()==window
+ # Hiding globally survives rebuilds, opacity edits and plane changes.
+ await page.locator('#show-polyhedra').uncheck()
+ await field.fill('2.30');await field.press('Enter');await settle(page)
+ opacity=mg.locator('[data-field=opacity]');await opacity.focus();await opacity.press('ArrowRight')
+ await settle(page);d=await diagnostics(page)
+ assert all(not m['visible'] and not m['outlineVisible'] for m in d['faceMaterials'])
+ await choose_tool(page,'#mode-lattice');await page.locator('#plane-add').click();await settle(page)
+ assert any(p['faces']['visible'] for p in (await diagnostics(page))['lattice']['planes'])
+ await choose_tool(page,'#mode-export');await page.locator('#session-save').click()
+ await page.wait_for_function('!viewerDiagnostics().session.pending && viewerDiagnostics().session.status.startsWith("Saved")')
+ await page.wait_for_timeout(1200) # let the IndexedDB save transaction commit
+ await page.reload();await page.wait_for_function('window.viewerDiagnostics?.().session.restoredAt>0 && !viewerDiagnostics().session.suspended')
+ assert not (await diagnostics(page))['polyhedraVisible']
+ await page.locator('#show-polyhedra').check();await settle(page)
+ assert all(m['visible'] and m['outlineVisible'] for m in (await diagnostics(page))['faceMaterials'])
+ await page.close()
+ print('Editing: cutoff/science/camera stable; global visibility survives rebuild/opacity/session; planes unaffected',flush=True)
+FRAMES = """sels=>{window.__stationaryFrames=[];window.__stationaryRecording=true;function sample(){if(!window.__stationaryRecording)return;window.__stationaryFrames.push(sels.map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.x,r.y,r.width,r.height]}));requestAnimationFrame(sample)}sample()}"""
+async def frame_check(page, selectors, action):
+ before=await page.evaluate("sels=>sels.map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.x,r.y,r.width,r.height]})",selectors)
+ await page.evaluate(FRAMES,selectors)
+ await action()
+ await settle(page)
+ frames=await page.evaluate("()=>{window.__stationaryRecording=false;return window.__stationaryFrames}")
+ assert len(frames)>3
+ for frame in frames:
+  assert all(abs(x-y)<.6 for old,new in zip(before,frame) for x,y in zip(old,new)),('Control moved during native edit',before,frame)
+async def interaction_details(browser, phone=False):
+ # WebKit's desktop test build has no native mobile wheel implementation;
+ # use its touch-capable narrow viewport, with native mouse slider drags.
+ page=await browser.new_page(viewport={'width':390 if phone else 1440,'height':844 if phone else 900},has_touch=phone,is_mobile=phone and browser.browser_type.name=='chromium')
+ await ready(page);await choose_tool(page,'#mode-pairs',phone)
+ win=page.locator('#tool-window-pairs');body=win.locator('.tool-window-body')
+ mg=page.locator('.pair-rule').filter(has=page.locator('[data-field=center] option:checked[value=Mg]'))
+ field=mg.locator('[data-field=cutoff]')
+ await field.click();track=mg.locator('[data-field=cutoff-speed]');await track.scroll_into_view_if_needed()
+ pose=await diagnostics(page);counts=await mg.locator('.pair-counts').inner_text()
+ async def cutoff_drag():
+  box=await track.bounding_box();cx=box['x']+box['width']/2;cy=box['y']+box['height']/2
+  if phone and browser.browser_type.name=='chromium':
+   cdp=await page.context.new_cdp_session(page)
+   await cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':cx,'y':cy,'id':1}]})
+   await cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':cx-box['width']*.3,'y':cy,'id':1}]})
+  else:
+   await page.mouse.move(cx,cy);await page.mouse.down();await page.mouse.move(cx-box['width']*.3,cy,steps=4)
+  await page.wait_for_function("([id,old])=>document.getElementById(id).textContent!==old",arg=[await mg.locator('.pair-counts').get_attribute('id'),counts],timeout=15000)
+  if phone and browser.browser_type.name=='chromium':await cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
+  else:await page.mouse.up()
+  await page.wait_for_timeout(120)
+ selectors=['#tool-window-pairs', '[aria-label="Mg–O distance cutoff (Å)"]','[aria-label="Mg–O cutoff speed control (Å)"]','#measure-info','#show-atoms','#show-polyhedra']
+ await frame_check(page,selectors,cutoff_drag)
+ assert (await diagnostics(page))['camera']==pose['camera']
+ await field.fill('2.15');await field.press('Enter');await settle(page)
+ assert any(r['center']=='Mg' and r['counts']==[3,6] for r in (await diagnostics(page))['coordination']['rules'])
+ slider=mg.locator('[data-field=opacity]');await slider.scroll_into_view_if_needed()
+ async def opacity_drag():
+  box=await slider.bounding_box();x=box['x']+box['width']*.34;y=box['y']+box['height']/2
+  if phone and browser.browser_type.name=='chromium':
+   cdp=await page.context.new_cdp_session(page)
+   await cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':x,'y':y,'id':1}]})
+   await cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':box['x']+box['width']*.75,'y':y,'id':1}]})
+   await page.wait_for_timeout(150)
+   await cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
+  else:
+   await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(box['x']+box['width']*.75,y,steps=6);await page.wait_for_timeout(150);await page.mouse.up()
+ await frame_check(page,['#tool-window-pairs', '[aria-label="Mg–O distance cutoff (Å)"]', '#pair-opacity-1','#measure-info'],opacity_drag)
+ # Native thumb sizes differ by engine, so the same pointer endpoint can
+ # yield different percentages. Require a substantial, non-clamped change
+ # and verify the renderer uses the exact resulting value.
+ value=float(await slider.input_value());assert 55<value<100,value
+ assert abs(next(m['opacity'] for m in (await diagnostics(page))['faceMaterials'] if m['id']==1)-value/100)<1e-8
+ if phone:
+  # Remember the actual scroll position after focusing the chosen entry.
+  await field.click();saved=await body.evaluate('el=>el.scrollTop');base=await diagnostics(page)
+  await win.locator('[data-action=tune]').tap();assert (await diagnostics(page))['windows']['state']['tune'];unchanged(base,await diagnostics(page))
+  await win.locator('[data-action=tune]').tap();assert abs(await body.evaluate('el=>el.scrollTop')-saved)<1
+ else:
+  base=await diagnostics(page);head=await win.locator('.tool-window-title').bounding_box()
+  await page.mouse.move(head['x']+20,head['y']+10);await page.mouse.down();await page.mouse.move(head['x']-100,head['y']+50,steps=6);await page.mouse.up();await settle(page)
+  unchanged(base,await diagnostics(page))
+  grip=await win.locator('.window-grip').bounding_box();await page.mouse.move(grip['x']+grip['width']-4,grip['y']+grip['height']-4);await page.mouse.down();await page.mouse.move(grip['x']+grip['width']+20,grip['y']+grip['height']+20,steps=5);await page.mouse.up();await settle(page)
+  unchanged(base,await diagnostics(page))
+ # Lattice changes must retain row bounds and per-tool scroll on return.
+ await choose_tool(page,'#mode-lattice',phone)
+ for _ in range(4):await page.locator('#plane-add').click()
+ row=page.locator('[data-plane-id]').first;hkl=row.locator('input[type=text]').first
+ await hkl.fill('1 1 1');await hkl.press('Tab');await hkl.scroll_into_view_if_needed();await settle(page)
+ rect=await row.bounding_box();await hkl.fill('0 0 0');await hkl.press('Tab');await settle(page)
+ after=await row.bounding_box();assert all(abs(rect[k]-after[k])<.6 for k in rect),(rect,after)
+ assert (await diagnostics(page))['lattice']['planes'][0]['error']
+ lattice_body=page.locator('#tool-window-lattice .tool-window-body');await lattice_body.hover();await page.mouse.wheel(0,400);await page.wait_for_timeout(150)
+ saved=await lattice_body.evaluate('el=>el.scrollTop');assert saved>0
+ await choose_tool(page,'#mode-pairs',phone);assert float(await field.input_value())==2.15
+ await choose_tool(page,'#mode-lattice',phone);assert abs(await lattice_body.evaluate('el=>el.scrollTop')-saved)<1
+ # Pick an exposed atom without replacing or scrolling the active editor.
+ before=await diagnostics(page);rect=await page.locator('.tool-window:not([hidden])').bounding_box();await pick(page);after=await diagnostics(page)
+ assert after['windows']['visible']==['lattice'];unchanged(before,after)
+ assert await page.locator('.tool-window:not([hidden])').bounding_box()==rect
+ assert abs(await lattice_body.evaluate('el=>el.scrollTop')-saved)<1
+ if phone:
+  await page.locator('#measure-more').tap();box=await page.locator('#selection').bounding_box();panel=await page.locator('#tool-window-lattice').bounding_box()
+  assert box['x']>=0 and box['x']+box['width']<=390 and box['y']+box['height']<=panel['y']-4,(box,panel)
+  await page.locator('#measure-more').tap()
+  await page.set_viewport_size({'width':844,'height':390});await settle(page);assert (await diagnostics(page))['windows']['visible']==['lattice']
+  await page.set_viewport_size({'width':390,'height':844});await settle(page);assert (await diagnostics(page))['windows']['visible']==['lattice']
+  # Closing in landscape then rotating must also refresh the Turn dock's
+  # footer reserve; no active editor may be needed to compute that gap.
+  await page.set_viewport_size({'width':844,'height':390});await settle(page)
+  await page.locator('#tool-window-lattice [data-action=close]').tap()
+  await page.set_viewport_size({'width':390,'height':844});await settle(page)
+  base=await diagnostics(page);await page.locator('#turn-open').tap();await settle(page)
+  unchanged(base,await diagnostics(page))
+  panel=await page.locator('#turn-panel').bounding_box();footer=await page.locator('.view-bottom').bounding_box()
+  assert panel['y']+panel['height']<=footer['y']-7,(panel,footer)
+  await page.locator('#turn-close').tap();await choose_tool(page,'#mode-lattice',True)
+ buttons=page.locator('.tool-window:not([hidden]) .window-button')
+ for box in await buttons.evaluate_all('els=>els.filter(e=>e.getClientRects().length).map(e=>({w:e.offsetWidth,h:e.offsetHeight}))'):
+  if phone:assert min(box['w'],box['h'])>=44,box
+ await page.close()
+ print(('Phone' if phone else 'Desktop')+': native edit frames, fixed scene on move/resize, values/scroll, invalid hkl, picking, Tune/rotation',flush=True)
 
 async def main():
-    async with async_playwright() as p:
-        options = {"args": ["--enable-unsafe-swiftshader"]}
-        if os.environ.get("CI"):
-            options["args"] += ["--use-gl=angle", "--use-angle=swiftshader-webgl"]
-        if os.environ.get("BROWSER_CHANNEL"):
-            options["channel"] = os.environ["BROWSER_CHANNEL"]
-        elif os.environ.get("CHROMIUM_EXECUTABLE"):
-            options["executable_path"] = os.environ["CHROMIUM_EXECUTABLE"]
-        browser = await p.chromium.launch(**options)
-        for theme in ("dark", "light"):
-            await desktop(browser, 1440, 900, False, theme)
-            await phone(browser, 390, 844, theme)
-        await desktop(browser, 1920, 1080, False, "dark")
-        await desktop(browser, 1024, 768, True, "light")
-        await phone(browser, 375, 667, "dark")
-        # Portrait tablet: one sheet below the rail, original controls free.
-        context, page, errors = await open_page(browser, 768, 1024, True, "dark")
-        d = await check_defaults(page, "768×1024", 0.45)
-        assert d["windows"]["profile"] == "sheet" and d["windows"]["launcher"] == "rail"
-        assert not errors, errors
-        await context.close()
-        print("768×1024: sheet below the rail, controls and crystal clear")
-        await narrow_desktop(browser)
-        await parked_tool(browser)
-        await browser.close()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+ async with async_playwright() as p:
+  opts={'args':['--enable-unsafe-swiftshader']}
+  if os.environ.get('CI'):opts['args']+=['--use-gl=angle','--use-angle=swiftshader-webgl']
+  if os.environ.get('BROWSER_CHANNEL'):opts['channel']=os.environ['BROWSER_CHANNEL']
+  elif os.environ.get('CHROMIUM_EXECUTABLE'):opts['executable_path']=os.environ['CHROMIUM_EXECUTABLE']
+  browsers=[await p.chromium.launch(**opts)]
+  if os.environ.get('WEBKIT_EXECUTABLE'):
+   browsers.append(await p.webkit.launch(executable_path=os.environ['WEBKIT_EXECUTABLE']))
+  for b in browsers:
+   print('Browser: '+b.browser_type.name,flush=True)
+   await matrix(b);await editing(b);await interaction_details(b);await interaction_details(b,True);await b.close()
+if __name__=='__main__':asyncio.run(main())
