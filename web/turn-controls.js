@@ -3,9 +3,10 @@
 // UI only — the viewer supplies onTurn(action, degrees) and isBusy().
 //
 // Placement: a popover under the view toolbar on larger screens; on phones
-// (phoneLayout matches) the panel moves into the lower pane right below the
-// mode bar, so an open pad never covers the crystal. It stays open for
-// repeated turns and closes with ✕, Escape, the Turn button again, or a
+// (phoneLayout matches) the panel moves into the lower pane right after the
+// pinned pick-details strip, so an open pad never covers the crystal. It
+// stays open for repeated turns and closes with ✕, Escape (wherever focus
+// is: Safari does not focus tapped buttons), the Turn button again, or a
 // press outside both the panel and the Turn button.
 
 const LABELS = {
@@ -88,8 +89,7 @@ export function createTurnControls({ onTurn, isBusy, phoneLayout, paneAnchor, on
     const inPane = phoneLayout.matches;
     panel.classList.toggle("in-pane", inPane);
     if (inPane) {
-      if (panel.parentElement !== paneAnchor.parentElement || panel.nextElementSibling !== paneAnchor)
-        paneAnchor.before(panel);
+      if (panel.previousElementSibling !== paneAnchor) paneAnchor.after(panel);
     } else if (panel.parentElement !== home.parent) home.parent.insertBefore(panel, home.next);
   }
   function setOpen(show, { focus = false } = {}) {
@@ -104,16 +104,23 @@ export function createTurnControls({ onTurn, isBusy, phoneLayout, paneAnchor, on
     open.setAttribute("aria-expanded", String(show));
     // Plane labels avoid the open popover: re-place them now.
     onOpenChange(show);
-    if (show && phoneLayout.matches) panel.scrollIntoView({ block: "nearest" });
+    // In the lower pane: scroll the pane (never the page) so the panel
+    // starts right below the pinned tab bar and pick-details strip.
+    if (show && phoneLayout.matches) {
+      const pane = panel.parentElement;
+      pane.scrollTop = panel.offsetTop - parseFloat(getComputedStyle(panel).scrollMarginTop || 0);
+    }
     if (focus) (show ? panel.querySelector(".turn-preset[aria-pressed='true']") ?? close : open).focus({ preventScroll: true });
   }
   open.onclick = () => setOpen(panel.hidden);
   close.onclick = () => setOpen(false, { focus: true });
-  panel.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      setOpen(false, { focus: true });
-    }
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || panel.hidden || e.defaultPrevented) return;
+    // Escape inside another editor (cutoff tuner, Style) is theirs.
+    const t = e.target;
+    if (t !== document.body && !panel.contains(t) && t !== open) return;
+    e.preventDefault();
+    setOpen(false, { focus: true });
   });
   document.addEventListener(
     "pointerdown",

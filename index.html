@@ -254,7 +254,7 @@
                   aria-label="Show atoms; preserves individual element visibility choices"
                 /><span>Atoms</span></label
               >
-              <div id="elements" class="elements"></div>
+              <div id="elements" class="elements" role="group" aria-label="Element visibility; scroll horizontally for more elements" title="Scroll or swipe to reach more elements"></div>
               <label class="size-control" title="Atom size (50–150%)"
                 ><span>Size</span
                 ><input
@@ -271,63 +271,65 @@
           </div>
         </div>
         <aside aria-label="Structure controls" data-mode="pairs">
-          <nav class="mode-bar" aria-label="Sidebar view">
-            <button id="mode-pairs" class="mode-tab" aria-pressed="true">
-              Pairs
-            </button>
-            <button
-              id="style-open"
-              type="button"
-              class="mode-tab"
-              aria-controls="style-editor"
-              aria-expanded="false"
-              aria-pressed="false"
-              title="Colors and sizes of atoms and polyhedra"
-            >
-              Style
-            </button>
-            <button
-              id="mode-lattice"
-              class="mode-tab"
-              aria-pressed="false"
-              title="Lattice planes, directions and symmetry elements"
-            >
-              Lattice
-            </button>
-            <button
-              id="mode-sites"
-              class="mode-tab"
-              aria-pressed="false"
-              title="CIF sites, asymmetric unit, labels and polyhedron volumes"
-            >
-              Sites
-            </button>
-            <button
-              id="mode-extent"
-              class="mode-tab"
-              aria-pressed="false"
-              title="Fractional plotting range, cell edges and boundary atoms"
-            >
-              Extent
-            </button>
-            <button
-              id="mode-export"
-              class="mode-tab mode-icon"
-              aria-pressed="false"
-              aria-label="Export image or movie"
-              title="Export a PNG image or a turntable movie"
-            >
-              <span aria-hidden="true">⤓</span>
-            </button>
-          </nav>
-          <div
-            id="atom-info"
-            class="atom-info"
-            role="status"
-            aria-live="polite"
-            aria-label="Selected atom"
-            hidden
-          ></div>
+          <div id="inspector-header" class="inspector-header">
+            <nav class="mode-bar" aria-label="Sidebar view">
+              <button id="mode-pairs" class="mode-tab" aria-pressed="true">
+                Pairs
+              </button>
+              <button
+                id="style-open"
+                type="button"
+                class="mode-tab"
+                aria-controls="style-editor"
+                aria-expanded="false"
+                aria-pressed="false"
+                title="Colors and sizes of atoms and polyhedra"
+              >
+                Style
+              </button>
+              <button
+                id="mode-lattice"
+                class="mode-tab"
+                aria-pressed="false"
+                title="Lattice planes, directions and symmetry elements"
+              >
+                Lattice
+              </button>
+              <button
+                id="mode-sites"
+                class="mode-tab"
+                aria-pressed="false"
+                title="CIF sites, asymmetric unit, labels and polyhedron volumes"
+              >
+                Sites
+              </button>
+              <button
+                id="mode-extent"
+                class="mode-tab"
+                aria-pressed="false"
+                title="Fractional plotting range, cell edges and boundary atoms"
+              >
+                Extent
+              </button>
+              <button
+                id="mode-export"
+                class="mode-tab mode-icon"
+                aria-pressed="false"
+                aria-label="Export image or movie"
+                title="Export a PNG image or a turntable movie"
+              >
+                <span aria-hidden="true">⤓</span>
+              </button>
+            </nav>
+            <div
+              id="atom-info"
+              class="atom-info"
+              role="status"
+              aria-live="polite"
+              aria-label="Selection"
+              data-kind="hint"
+            ><span class="atom-info-hint">Tap an atom for its details.</span></div>
+          </div>
           <p id="peel-note" class="peel-note" role="status" hidden></p>
           <section
             id="style-editor"
@@ -433,7 +435,7 @@
           </section>
           <section class="lattice-panel" aria-labelledby="plane-title">
             <div class="section-title">
-              <h2 id="plane-title">Planes (hkl)</h2>
+              <h2 id="plane-title">Planes <span class="scientific-notation">(hkl)</span></h2>
               <label
                 class="chip small"
                 title="Labels on drawn planes and direction arrows"
@@ -475,7 +477,7 @@
             </div>
             <div id="plane-list" class="tool-list"></div>
             <div class="section-title">
-              <h2 id="arrow-title">Directions [uvw]</h2>
+              <h2 id="arrow-title">Directions <span class="scientific-notation">[uvw]</span></h2>
               <button
                 id="arrow-add"
                 class="text-button"

@@ -19,7 +19,7 @@ Open the local address printed by Vite. Pick **Open CIF** to load a file from th
 
 Left-drag continuously in any direction to turn the model over its poles around the current view center. The wheel zooms about the cursor. Right-drag pans with the point you grab held under the cursor. A right-click zooms out one step, and a double right-click fits the displayed structure while preserving its orientation. Use the **a**, **b**, or **c** views to align the camera with a direct lattice axis. For a custom direction, enter the three indices of [uvw]. The camera looks toward the structure from the positive side of the vector u**a** + v**b** + w**c**. The parallel projection aligns rows of atoms along that direction. These are direct lattice directions. In a nonorthogonal cell a direct direction and the normal to the plane with the same indices generally differ.
 
-**Turn** opens step controls for exact rotations. Choose 90°, 60°, 45°, 30°, 10° or 5°, or type a custom angle greater than 0° and at most 360° (decimals allowed). The arrow pad turns the crystal left, right, up, down or along one of the four diagonals by exactly that angle. **⟲** and **⟳** roll it counterclockwise or clockwise in the screen plane. Directions describe how the crystal appears to move. Every turn is about the current view center and keeps the zoom, atom coordinates, selections and measurements. The crystal stops exactly at the new orientation. The controls stay open for repeated turns and close with ✕, Escape or a tap elsewhere. On a phone they open in the lower panel so the crystal stays uncovered. Turns are unavailable while an image or movie is exported.
+**Turn** opens step controls for exact rotations. Choose 90°, 60°, 45°, 30°, 10° or 5°, or type a custom angle greater than 0° and at most 360° (decimals allowed). The arrow pad turns the crystal left, right, up, down or along one of the four diagonals by exactly that angle. **⟲** and **⟳** roll it counterclockwise or clockwise in the screen plane. Directions describe how the crystal appears to move. Every turn is about the current view center and keeps the zoom, atom coordinates, selections and measurements. The crystal stops exactly at the new orientation. The controls stay open for repeated turns and close with ✕, Escape or a tap elsewhere; Escape or ✕ returns keyboard focus to **Turn**. On a phone they open in the lower panel, directly below the selection details, so the crystal stays uncovered. Turns are unavailable while an image or movie is exported.
 
 ## Displaying more than one unit cell
 
@@ -63,7 +63,7 @@ The Lattice **Labels** toggle annotates added planes and directions. **Show m in
 
 Choose **Info** to inspect one atom at a time, including its CIF label, element, occupancy, displayed coordinates and configured coordination information.
 
-Use **∠** in the measurement control and pick three atoms in A–B–C order. The second atom is the angle vertex. Select **Å** to return to two-atom distance measurements.
+Use **∠** in the measurement control and pick three atoms in A–B–C order. The second atom is the angle vertex. Select **↔** (Distance) to return to two-atom distance measurements.
 
 Choose **Sites** in the sidebar to see the original CIF site labels, fractional coordinates and occupancies. **Labels** annotates visible spheres. Tap a table row to highlight visible copies of that site. The polyhedron table reports coordination numbers and convex-hull volumes in Å³ by central site. These volumes use the physical atomic coordinates.
 
@@ -91,7 +91,9 @@ The header theme button switches between light and dark. An explicit choice is r
 
 ## Try on a tablet or phone
 
-The crystal stays in view while you edit the structure. The controls sit beside it on a landscape tablet and below it in portrait. On a phone, scroll the lower panel to reach the extent controls.
+The crystal stays in view while you edit the structure. The controls sit beside it on a landscape tablet and below it in portrait. In portrait the crystal and the lower panel split the screen at a fixed ratio: picking atoms, switching measurement modes or tabs, adding pairs, planes or arrows, and opening editors change what the panel shows, never the size of the crystal view. Longer content scrolls inside the panel, under a tab bar that stays in place; each tab opens at its top. Picking an atom never scrolls the panel.
+
+On a phone, the details of the picked atom, distance or angle appear in a fixed strip under the tab bar, which stays visible while the panel scrolls. Before anything is picked it shows a short hint. A polyhedron center's CN and volume line follows its coordinates; with several pairs, scroll the strip itself. The full site and polyhedron tables are under **Sites**. The tabs and strip share an opaque sticky header, so scrolled controls cannot receive taps through the gaps. If the element legend is too long, its fading edge indicates that it can be scrolled horizontally; the Size slider stays beside it.
 
 Build the application, then serve the compiled directory over your local network.
 
@@ -120,6 +122,8 @@ The initial NaCl example is an idealized rock-salt structure with a rounded 5.64
 GitHub Actions runs the Rust importer tests, rebuilds its WebAssembly module from the pinned PhaseSmith revision, runs the JavaScript tests, and builds the application for its GitHub Pages path. A Chromium smoke test then checks all three examples, WebAssembly loading, plane placement, saved-session restoration, and the phone layout. Passing changes on `main` deploy automatically to GitHub Pages; pull requests run the same checks without deploying.
 
 To run the portable production browser check, install `tests/requirements-browser.txt` and Chromium (`python -m playwright install chromium`), serve the built app, then run `VIEWER_URL=http://localhost:4179 python tests/pages_smoke.py`. `BROWSER_CHANNEL=chrome` uses an installed Chrome instead of Playwright's bundled Chromium.
+
+`python tests/layout_smoke.py` checks that the canvas, the control panel and its tab bar keep their bounds in every animation frame on a phone, a portrait tablet, a narrow desktop window and a desktop, in both themes. It picks atoms, measures a known distance and angle, switches modes and tabs, adds and edits pairs, planes and arrows, scrolls the panel with a real touch gesture (the wheel with a mouse), opens Style and Turn, checks Escape and outside dismissal with focus return, and rotates the window and back. CI runs it with the bundled Chromium. Use `BROWSER_CHANNEL=chrome` or `CHROMIUM_EXECUTABLE` to pick another Chromium, and set `WEBKIT_EXECUTABLE` to the path of Playwright's WebKit `pw_run.sh` to also run WebKit.
 
 Run the JavaScript geometry tests with `node --test tests/*.test.mjs`. The coordination browser test uses the packaged forsterite CIF (`python tests/coordination_smoke.py`). Run `python tests/steering_smoke.py` to check unrestricted rotation, axis views and custom directions in a triclinic cell. The plotting-range and display tests are `tests/ranges_smoke.py` and `tests/visibility_smoke.py`.
 

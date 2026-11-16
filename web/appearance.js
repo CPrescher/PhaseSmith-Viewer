@@ -174,10 +174,7 @@ export function createAppearanceEditor(host) {
     open.setAttribute("aria-pressed", String(show));
     if (!show) setPicking(false);
     host.onOpen(show);
-    if (show) {
-      refresh();
-      root.scrollIntoView({ block: "nearest" });
-    }
+    if (show) refresh();
   }
   function options() {
     const list = host.targets();

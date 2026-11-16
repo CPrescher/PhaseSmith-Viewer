@@ -337,7 +337,7 @@ function initialize() {
   // changes only when the description does.
   const readoutEye = new THREE.Vector3();
   let readoutText = "";
-  function updateViewReadout() {
+  function updateViewReadout(eye = null) {
     const el = $("view-readout");
     const describe = viewDirection.describeViewDirection;
     if (typeof describe !== "function" || !structure?.basis) {
@@ -346,7 +346,7 @@ function initialize() {
     }
     let text = "";
     try {
-      text = describe(structure.basis, readoutEye.copy(camera.position).sub(controls.target).toArray())?.text ?? "";
+      text = describe(structure.basis, (eye ?? readoutEye.copy(camera.position).sub(controls.target)).toArray())?.text ?? "";
     } catch {
       text = "";
     }
@@ -366,6 +366,18 @@ function initialize() {
     invalidate();
   });
   resize.observe(viewport);
+  // Expose horizontal overflow at either edge of the element legend.
+  // Its fade follows scrolling and resizing without moving the atom-size control.
+  function updateElementOverflow() {
+    const legend = $("elements");
+    legend.dataset.overflow = [
+      legend.scrollLeft > 1 ? "start" : "",
+      legend.scrollLeft + legend.clientWidth < legend.scrollWidth - 1 ? "end" : "",
+    ].filter(Boolean).join(" ");
+  }
+  const legendResize = new ResizeObserver(updateElementOverflow);
+  legendResize.observe($("elements"));
+  $("elements").addEventListener("scroll", updateElementOverflow, { passive: true });
   const colors = {
     H: "#e7edf3",
     C: "#65798c",
@@ -1762,8 +1774,8 @@ function initialize() {
   function reset(keepOrientation = false) {
     if (!keepOrientation) selection = [];
     updateSelection();
-    // Fit what is drawn — cell edges, atom spheres, polyhedra (at display
-    // scale) and planes/arrows/symmetry elements — by its projected extent
+    // Fit what is drawn — cell edges, atom spheres, physical polyhedra
+    // and planes/arrows/symmetry elements — by its projected extent
     // in the orientation being shown (orthographic view), not by a
     // bounding sphere, which framed elongated cells far too small.
     const bounds = fitBounds.clone().union(latticeTools.bounds());
@@ -1771,6 +1783,9 @@ function initialize() {
     const direction = keepOrientation
       ? camera.position.clone().sub(controls.target).normalize()
       : new THREE.Vector3(0.68, 0.48, 0.8).normalize();
+    // The first fit precedes the first frame and camera placement. Show its
+    // direction readout now to reserve the same space as every later fit.
+    updateViewReadout(direction);
     const viewUp = keepOrientation ? camera.up.clone() : new THREE.Vector3(0, 1, 0);
     const basis = new THREE.Matrix4().lookAt(direction, new THREE.Vector3(), viewUp);
     const right = new THREE.Vector3().setFromMatrixColumn(basis, 0);
@@ -1938,21 +1953,25 @@ function initialize() {
       .join("\n");
     if (measureMode === "info" && !picking) showAtomInfo();
     else if (selection.length && !picking) showMeasureDetails(value, angleMode, lines, selection.length < needed);
-    else $("atom-info").hidden = true;
+    else showPaneHint($("selection").textContent);
     invalidate();
   }
-  // Phones show distance/angle details in the bottom panel (CSS hides it
-  // elsewhere), keeping the card over the crystal a narrow column.
+  // Phones show the pick details in a fixed-height strip pinned under the
+  // lower pane's tabs (CSS hides it elsewhere; the card over the crystal
+  // stays a narrow column). The strip is always there, with a hint when
+  // nothing is picked, so picking never resizes or scrolls the pane.
+  function showPaneHint(text) {
+    const panel = $("atom-info");
+    panel.dataset.kind = "hint";
+    panel.setAttribute("aria-label", "Selection");
+    panel.replaceChildren(Object.assign(document.createElement("span"), { className: "atom-info-hint", textContent: text }));
+  }
   function showMeasureDetails(value, angleMode, lines, incomplete) {
     const unit = angleMode ? "°" : " Å";
     const name = angleMode ? "Angle" : "Distance";
     const panel = $("atom-info");
-    const wasHidden = panel.hidden;
-    panel.hidden = false;
+    panel.dataset.kind = "measure";
     panel.setAttribute("aria-label", `${name} measurement`);
-    // A long sidebar (Lattice, Sites, Export…) may be scrolled down: bring
-    // the details into view once, without moving the page.
-    if (wasHidden && phoneLayout.matches) panel.scrollIntoView({ block: "nearest" });
     panel.replaceChildren(
       Object.assign(document.createElement("strong"), {
         textContent: value === null ? name : `${name} ${value.toFixed(angleMode ? 2 : 4)}${unit}`,
@@ -1970,8 +1989,8 @@ function initialize() {
   }
   // Info: one atom at a time — label, element, occupancy, fractional and
   // Cartesian position, and the CN/volume of configured polyhedra around
-  // it. No distance is implied. On phones the details also appear at the
-  // top of the bottom panel so the card stays small over the crystal.
+  // it. No distance is implied. On phones the details also appear in the
+  // strip at the top of the lower pane so the card stays small.
   function atomInfoLines(a) {
     const lines = [
       `${a.element} · occupancy ${a.occupancy != null ? Number(a.occupancy).toFixed(3) : "—"}`,
@@ -1987,19 +2006,14 @@ function initialize() {
     $("distance").replaceChildren(document.createTextNode(a ? a.label : "—"));
     const lines = a ? atomInfoLines(a) : [];
     $("selection").textContent = a ? lines.join("\n") : $("show-atoms").checked ? "Tap an atom for its details." : "Show atoms to inspect.";
+    if (!a) return showPaneHint($("selection").textContent);
     const panel = $("atom-info");
+    panel.dataset.kind = "info";
     panel.setAttribute("aria-label", "Selected atom");
-    if (a && panel.hidden && phoneLayout.matches) {
-      panel.hidden = false;
-      panel.scrollIntoView({ block: "nearest" });
-    }
-    panel.hidden = !a;
-    if (a) {
-      panel.replaceChildren(
-        Object.assign(document.createElement("strong"), { textContent: a.label }),
-        ...lines.map((line) => Object.assign(document.createElement("span"), { textContent: line })),
-      );
-    }
+    panel.replaceChildren(
+      Object.assign(document.createElement("strong"), { textContent: a.label }),
+      ...lines.map((line) => Object.assign(document.createElement("span"), { textContent: line, title: line })),
+    );
   }
   // Distance (2 atoms) · Angle (3) · Info (1). Switching keeps the picked
   // atoms that still fit the new mode.
@@ -2446,6 +2460,7 @@ function initialize() {
       if (open && !openModes.includes("style")) pinMode("style");
       else if (!open && openModes.includes("style")) unpinMode("style");
       applyMode();
+      if (open) document.querySelector("aside").scrollTop = 0; // tabs open at their top
     },
     onTarget(value) {
       updatePickMarker(value);
@@ -2478,6 +2493,8 @@ function initialize() {
     const styleWanted = openModes.includes("style");
     if (styleWanted !== styleEditor.open) styleEditor.setOpen(styleWanted);
     applyMode();
+    // Every tab opens at its top (the tab bar itself never moves).
+    document.querySelector("aside").scrollTop = 0;
   }
   function applyMode() {
     const aside = document.querySelector("aside");
@@ -2636,6 +2653,7 @@ function initialize() {
         return d;
       }),
     );
+    updateElementOverflow();
     $("block-wrap").hidden = data.blocks.length < 2;
     $("block").replaceChildren(
       ...data.blocks.map((b) => {
@@ -2786,7 +2804,7 @@ function initialize() {
     onTurn: turnView,
     isBusy: () => exporter.busy,
     phoneLayout,
-    paneAnchor: $("atom-info"),
+    paneAnchor: $("inspector-header"),
     onOpenChange: invalidate, // plane labels re-place around the popover
   });
   // The [uvw] form is a label obstacle too while open.
