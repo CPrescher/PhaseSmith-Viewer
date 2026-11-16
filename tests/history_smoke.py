@@ -221,6 +221,9 @@ async def check(browser, phone):
     assert (await diagnostics(page))["history"]["redoCount"] == 0
     await press("#show-atoms")
     await press("#mode-pairs")
+    # This section tests camera gestures, so close the overlay explicitly.
+    # Opening/closing tools never refits the structure around a phone sheet.
+    await press("#tool-window-pairs [data-action=close]")
     # Camera history needs a real nonorthogonal crystal, without the
     # expensive intersecting overlays exercised above. A compact fixture
     # keeps the settling animation independent of software-GPU throughput.
