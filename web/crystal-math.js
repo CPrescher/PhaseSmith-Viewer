@@ -55,14 +55,25 @@ export function parseTriple(text, { integer = false, label = "indices" } = {}) {
 }
 
 // ---- Lattice planes (hkl) ---------------------------------------------------
-/** Offset h·f = m through the center of the displayed fractional bounds.
- *  For nonzero indices and positive-width bounds this cuts the interior,
- *  including negative/mixed indices and translated or repeated cells. */
+/** Integer offset nearest the displayed center, preferring an interior
+ *  intersection. Without an interior integer, use a boundary/nearest
+ *  integer; narrow fractional extents may contain no integer-offset plane. */
 export function initialPlaneOffset(hkl, ranges) {
-  return dot(
-    hkl,
-    ranges.map(([lo, hi]) => lo + (hi - lo) / 2),
-  );
+  const center = dot(hkl, ranges.map(([lo, hi]) => lo + (hi - lo) / 2));
+  const limits = ranges.map(([lo, hi], i) => [hkl[i] * lo, hkl[i] * hi]);
+  const min = limits.reduce((sum, v) => sum + Math.min(...v), 0);
+  const max = limits.reduce((sum, v) => sum + Math.max(...v), 0);
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const lo = Math.floor(min) + 1, hi = Math.ceil(max) - 1;
+  if (lo <= hi) {
+    // Half-integer ties toward zero give conventional m=±1 for (±111).
+    const nearest = Math.sign(center) * Math.ceil(Math.abs(center) - 0.5);
+    return clamp(nearest, lo, hi) || 0;
+  }
+  // Boundary ties away from zero give m=±1 for (±100) in one cell.
+  const nearest = Math.sign(center) * Math.round(Math.abs(center));
+  const lower = Math.ceil(min), upper = Math.floor(max);
+  return (lower <= upper ? clamp(nearest, lower, upper) : nearest) || 0;
 }
 
 /** Enlarge only a plane's clipping box about the displayed box center.

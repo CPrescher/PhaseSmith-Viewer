@@ -39,8 +39,8 @@ async def check(browser, width, height, theme):
     row = page.locator("[data-plane-id]").first
     hkl, offset = row.locator("[data-field=hkl]"), row.locator("[data-field=m]")
     for indices, expected in [
-        ("1 0 0", 0.5),
-        ("-1 -1 -1", -1.5),
+        ("1 0 0", 1),
+        ("-1 -1 -1", -1),
         ("1 -1 0", 0),
         ("1 1 0", 1),
     ]:

@@ -33,7 +33,7 @@ const inversion = {
   ],
   translation: [0, 0, 0],
 };
-test("initial plane offsets cut the interior for signed indices and shifted bounds", () => {
+test("automatic offsets are integers and intersect whenever an integer plane can", () => {
   for (const ranges of [
     box,
     [
@@ -59,19 +59,36 @@ test("initial plane offsets cut the interior for signed indices and shifted boun
           ]);
           const lo = extrema.reduce((s, v) => s + Math.min(...v), 0);
           const hi = extrema.reduce((s, v) => s + Math.max(...v), 0);
-          assert.ok(lo < m && m < hi);
+          assert.ok(Number.isInteger(m));
           const polygon = clipPlaneToBox(hkl, m, ranges);
-          assert.ok(polygon?.length >= 3);
-          assert.ok(
-            polygon.every(
-              (p) =>
-                Math.abs(p.reduce((s, v, i) => s + v * hkl[i], 0) - m) < 1e-9,
-            ),
-          );
+          const available = [];
+          for (let c = Math.ceil(lo); c <= Math.floor(hi); c++)
+            if (clipPlaneToBox(hkl, c, ranges)) available.push(c);
+          if (available.length) assert.ok(polygon?.length >= 3);
+          if (available.some((c) => lo < c && c < hi))
+            assert.ok(lo < m && m < hi);
+          if (polygon)
+            assert.ok(
+              polygon.every(
+                (p) =>
+                  Math.abs(p.reduce((s, v, i) => s + v * hkl[i], 0) - m) < 1e-9,
+              ),
+            );
         }
   }
-  assert.equal(initialPlaneOffset([-1, -1, -1], box), -1.5);
+  assert.equal(initialPlaneOffset([-1, -1, -1], box), -1);
+  assert.equal(initialPlaneOffset([1, 1, 1], box), 1);
+  assert.equal(initialPlaneOffset([1, 0, 0], box), 1);
+  assert.equal(initialPlaneOffset([-1, 0, 0], box), -1);
   assert.equal(initialPlaneOffset([1, -1, 0], box), 0);
+  const narrow = [
+    [0.2, 0.8],
+    [0, 1],
+    [0, 1],
+  ];
+  const m = initialPlaneOffset([1, 0, 0], narrow);
+  assert.ok(Number.isInteger(m));
+  assert.equal(clipPlaneToBox([1, 0, 0], m, narrow), null);
 });
 test("plane size enlarges the polygon without changing its offset or cell bounds", () => {
   const enlarged = planeDisplayRanges(box, 1.5);

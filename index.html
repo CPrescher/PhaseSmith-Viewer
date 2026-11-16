@@ -87,6 +87,16 @@
                 </form>
               </details>
               <button
+                id="turn-open"
+                class="view-button turn-open"
+                title="Turn the crystal in steps (left/right, up/down, diagonal, roll)"
+                aria-label="Turn view in steps"
+                aria-expanded="false"
+                aria-controls="turn-panel"
+              >
+                Turn
+              </button>
+              <button
                 id="reset"
                 class="view-button"
                 title="Reset view"
@@ -95,6 +105,69 @@
                 ↺
               </button>
             </div>
+            <!-- Step turns. A popover under the view toolbar on larger
+                 screens; on phones main.js moves it into the lower pane so
+                 it never covers the crystal. Directions describe how the
+                 crystal appears to move. -->
+            <section
+              id="turn-panel"
+              class="turn-panel"
+              role="dialog"
+              aria-label="Turn the crystal in steps"
+              hidden
+            >
+              <div class="turn-head">
+                <span class="turn-title">Turn crystal</span>
+                <button
+                  id="turn-close"
+                  type="button"
+                  class="view-button turn-close"
+                  aria-label="Close turn controls"
+                  title="Close (Esc)"
+                >
+                  ✕
+                </button>
+              </div>
+              <div class="turn-angles" role="group" aria-label="Turn angle">
+                <button type="button" id="turn-preset-90" class="turn-preset" data-angle="90" aria-pressed="true">90°</button>
+                <button type="button" id="turn-preset-60" class="turn-preset" data-angle="60" aria-pressed="false">60°</button>
+                <button type="button" id="turn-preset-45" class="turn-preset" data-angle="45" aria-pressed="false">45°</button>
+                <button type="button" id="turn-preset-30" class="turn-preset" data-angle="30" aria-pressed="false">30°</button>
+                <button type="button" id="turn-preset-10" class="turn-preset" data-angle="10" aria-pressed="false">10°</button>
+                <button type="button" id="turn-preset-5" class="turn-preset" data-angle="5" aria-pressed="false">5°</button>
+                <label class="turn-custom" title="Custom angle in degrees: greater than 0 and at most 360; decimals allowed"
+                  ><span class="micro">custom °</span
+                  ><input
+                    id="turn-angle"
+                    class="tool-field"
+                    type="text"
+                    inputmode="decimal"
+                    value="90"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-label="Custom turn angle in degrees (greater than 0, at most 360)"
+                    aria-describedby="turn-angle-error"
+                /></label>
+              </div>
+              <p id="turn-angle-error" class="turn-error" role="status"></p>
+              <div class="turn-body">
+                <div class="turn-pad" role="group" aria-label="Turn direction">
+                  <button type="button" id="turn-up-left" class="view-button" data-turn="up-left">↖</button>
+                  <button type="button" id="turn-up" class="view-button" data-turn="up">↑</button>
+                  <button type="button" id="turn-up-right" class="view-button" data-turn="up-right">↗</button>
+                  <button type="button" id="turn-left" class="view-button" data-turn="left">←</button>
+                  <span id="turn-angle-readout" class="turn-readout" aria-hidden="true">90°</span>
+                  <button type="button" id="turn-right" class="view-button" data-turn="right">→</button>
+                  <button type="button" id="turn-down-left" class="view-button" data-turn="down-left">↙</button>
+                  <button type="button" id="turn-down" class="view-button" data-turn="down">↓</button>
+                  <button type="button" id="turn-down-right" class="view-button" data-turn="down-right">↘</button>
+                </div>
+                <div class="turn-roll" role="group" aria-label="Roll in the screen plane">
+                  <button type="button" id="turn-counterclockwise" class="view-button" data-turn="counterclockwise">⟲</button>
+                  <button type="button" id="turn-clockwise" class="view-button" data-turn="clockwise">⟳</button>
+                </div>
+              </div>
+            </section>
             <section
               id="measure-overlay"
               class="measurement info-mode"
@@ -162,6 +235,16 @@
           <div id="error" role="alert" hidden></div>
           <div id="loading">Reading crystal structure…</div>
           <div class="view-bottom">
+            <!-- Current viewing direction in direct-lattice [uvw], just above
+                 the atom legend (positioned by CSS; outside the crystal). -->
+            <p
+              id="view-readout"
+              class="view-readout"
+              role="status"
+              aria-live="off"
+              title="Viewing direction as a direct-lattice vector u·a + v·b + w·c from the crystal toward you (same convention as the a, b, c view buttons). ≈ marks a direction that is not an exact small-integer one."
+              hidden
+            ></p>
             <div class="atoms-bar toolbar" role="group" aria-label="Atoms">
               <label class="chip master" title="Show or hide all spheres"
                 ><input
@@ -253,15 +336,6 @@
             hidden
           >
             <div class="section-title">
-              <button
-                id="style-close"
-                type="button"
-                class="back-button"
-                aria-label="Close appearance and return to pairs"
-                title="Back to pairs"
-              >
-                ‹ Pairs
-              </button>
               <h2 id="style-title">Appearance</h2>
               <button
                 id="style-pick"
@@ -305,9 +379,7 @@
                   id="style-size-value"
                   for="style-size"
                 ></output></label
-              ><button id="style-reset" type="button" class="secondary">
-                Reset
-              </button>
+              >
             </div>
             <p id="style-size-hint" class="style-size-hint"></p>
             <label id="style-opacity-row" class="style-size style-opacity" hidden
@@ -322,12 +394,19 @@
                 for="style-opacity"
               ></output
             ></label>
-            <button
-              id="style-reset-individual"
-              type="button"
-              class="text-button reset-individual"
-              hidden
-            ></button>
+            <!-- Resets on their own row so longer labels never squeeze the
+                 sliders: the selected target, then all individual copies. -->
+            <div class="style-reset-row">
+              <button id="style-reset" type="button" class="secondary">
+                Reset
+              </button>
+              <button
+                id="style-reset-individual"
+                type="button"
+                class="text-button reset-individual"
+                hidden
+              ></button>
+            </div>
           </section>
           <section class="coordination" aria-labelledby="coord-title">
             <div class="section-title">
@@ -661,6 +740,24 @@
             <progress id="export-progress" max="1" value="0" hidden></progress>
             <p id="export-video-note" class="note"></p>
             <p id="export-status" class="note" role="status" aria-live="polite"></p>
+            <!-- Local session (IndexedDB on this device only). -->
+            <div class="section-title session-title">
+              <h2 id="session-title">Session</h2>
+            </div>
+            <p id="session-status" class="note" role="status" aria-live="polite">
+              Settings are saved on this device.
+            </p>
+            <div class="export-row session-actions">
+              <button id="session-save" type="button" class="secondary">Save now</button>
+              <button
+                id="session-fresh"
+                type="button"
+                class="secondary"
+                title="Discard the saved session on this device and start again with this page's structure"
+              >
+                Start fresh
+              </button>
+            </div>
           </section>
           <div
             id="warnings"

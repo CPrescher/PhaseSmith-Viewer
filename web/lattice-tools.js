@@ -338,6 +338,8 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         const text = labelOffsets ? `${name} · m=${fmt(m)}` : name;
         // The ACTUAL drawn polygon (after Size clipping) anchors the label.
         anchors.push({
+          // Stable identity across frames and rebuilds: entry + family offset.
+          key: `p${plane.id}:${fmt(m)}`,
           text,
           color: plane.color,
           world: vec(centroid),
@@ -350,7 +352,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     for (const arrow of arrows) {
       if (!arrow.visible || arrow.error || !arrow.render) continue;
       const text = `${indexText(arrow.uvw, "[", "]")}${arrow.length !== 1 ? ` ×${fmt(arrow.length)}` : ""}`;
-      anchors.push({ text, color: arrow.color, world: vec(arrow.render.end), kind: "arrow" });
+      anchors.push({ key: `a${arrow.id}`, text, color: arrow.color, world: vec(arrow.render.end), kind: "arrow" });
     }
   }
   // ---- Placement ----------------------------------------------------------
@@ -387,7 +389,19 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   // plane labels. No time cache: rendering is on demand, so the frame
   // after a selection (which grows the measurement/Info card) may be the
   // last one; it must see the card's new size. A handful of DOM reads.
-  const OBSTACLES = [".view-directions", "#measure-overlay", ".view-bottom > *", ".axis-compass", "#atom-summary"];
+  // Includes the Turn button (floats under the toolbar on phones), the
+  // open Turn popover and the [uvw] form; hidden or in-pane ones have no
+  // box over the canvas and drop out by themselves.
+  const OBSTACLES = [
+    ".view-directions",
+    "#turn-open",
+    "#turn-panel:not(.in-pane)",
+    ".view-directions details[open] #direction-form",
+    "#measure-overlay",
+    ".view-bottom > *",
+    ".axis-compass",
+    "#atom-summary",
+  ];
   let obstacles = [];
   function refreshObstacles(canvasRect) {
     obstacles = [];
@@ -429,15 +443,34 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     });
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   }
+  // Soft score (lower is better) plus a hard flag: off the canvas, under a
+  // view overlay, or overlapping an already placed label.
+  // Blocked = off the canvas, under a view overlay or over a placed label.
+  // `pad` > 0 demands clearance; a negative pad tolerates touching.
+  function blocked(rect, ctx, pad) {
+    const { W, H, placed } = ctx;
+    const edge = Math.max(pad, 0);
+    return (
+      rect.x < edge ||
+      rect.y < edge ||
+      rect.x + rect.w > W - edge ||
+      rect.y + rect.h > H - edge ||
+      obstacles.some((o) => hits(rect, o, pad)) ||
+      placed.some((p) => hits(rect, p.rect, pad))
+    );
+  }
+  // Two hard tests (spatial hysteresis): a NEW spot needs NEW_PAD px of
+  // clearance (`hard`), but the spot a label already holds stays usable
+  // until it truly overlaps (`hardKeep`, KEEP_PAD). A few pixels of drift
+  // therefore never force a label off a spot it would want right back.
   function score(rect, leader, base, ctx) {
-    const { W, H, placed, model } = ctx;
+    const { placed, model } = ctx;
     let s = base;
-    if (rect.x < 2 || rect.y < 2 || rect.x + rect.w > W - 2 || rect.y + rect.h > H - 2) s += 1000;
-    if (obstacles.some((o) => hits(rect, o, 2))) s += 700;
-    if (placed.some((p) => hits(rect, p.rect, 2))) s += 800;
+    const hard = blocked(rect, ctx, NEW_PAD);
+    const hardKeep = hard ? blocked(rect, ctx, KEEP_PAD) : false;
     if (leader && placed.some((p) => segmentHitsRect(leader, p.rect))) s += 40;
     if (model) s += 220 * overlapFraction(rect, model);
-    return s;
+    return { s, hard, hardKeep };
   }
   function segmentHitsRect(l, r) {
     // Coarse: sample the short leader.
@@ -448,8 +481,52 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     }
     return false;
   }
-  // Best placement for one plane label, or null (skipped).
-  function placePlane(a, sv, w, ctx) {
+  // ---- Stability ----------------------------------------------------------
+  // Each label has a stable key (plane id + family offset m; arrow id) and
+  // remembers its chosen candidate, a candidate id that names a polygon
+  // edge, a point along it, a side and a variant. Every frame the remembered
+  // candidate is re-evaluated at its edge's CURRENT projection, so the label
+  // follows the plane smoothly. It switches only when that candidate
+  // becomes unusable (off canvas, under a view overlay, colliding) or when
+  // another candidate is better by more than SWITCH_MARGIN. Labels shown in
+  // the previous frame are placed first, in the order they first appeared,
+  // so tiny depth changes never reshuffle collision priority. A visible
+  // label hides only at a looser threshold than a new label needs to
+  // appear. The cache holds one small entry per current anchor and is
+  // pruned every frame; a new structure, Labels off or a position change
+  // clears it.
+  //
+  // Dense-scene additions (repeated A→B→A hops):
+  //  - spatial hysteresis: a held spot is abandoned only when it truly
+  //    overlaps (KEEP_PAD), while a new spot needs NEW_PAD px clearance;
+  //  - dwell: for DWELL_FRAMES rendered frames after any switch, a usable
+  //    held spot is never swapped for a merely better one;
+  //  - reverse penalty: for REVERSE_FRAMES frames the spot just left costs
+  //    REVERSE_PENALTY extra, so a label does not hop straight back;
+  //  - permanent priority: a label's rank is fixed when first seen and
+  //    kept while it is hidden, so hide/show never reorders collisions.
+  // Frames count rendered frames only (on-demand rendering: no timers or
+  // extra frames); a hard block still relocates immediately.
+  const SWITCH_MARGIN = 30,
+    FAMILY_NEW = 150, // a further family member needs a clear spot to appear…
+    FAMILY_KEEP = 260, // …and keeps showing until it gets clearly worse.
+    NEW_PAD = 4,
+    KEEP_PAD = -1,
+    DWELL_FRAMES = 20,
+    REVERSE_FRAMES = 60,
+    REVERSE_PENALTY = 80,
+    // Moving labels (cascade control):
+    HELD_PENALTY = 260, // landing on another label's previous-frame spot
+    DISPLACE_FREE = 24, // px of free movement for a relocating label…
+    DISPLACE_COST = 0.45, // …then this cost per px (a 180 px jump ≈ +70)
+    LONG_JUMP = 110; // a second long forced jump within REVERSE_FRAMES culls
+  // key → { rank, cand, nv, visible, lastCand, switchFrame, switches }
+  const placementCache = new Map();
+  let nextRank = 0,
+    frameNo = 0,
+    cachedPosition = labelPosition;
+  // All candidates for one plane label, each with a stable id.
+  function planeCandidates(sv, w, ctx) {
     const h = LABEL_H;
     const n = sv.length;
     let cx = 0,
@@ -461,20 +538,23 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       const q = sv[(i + 1) % n];
       area += sv[i].x * q.y - q.x * sv[i].y;
     }
+    const out = [];
     if (labelPosition === "center") {
       const rect = { x: cx - w / 2, y: cy - h / 2, w, h };
-      if (cx < 0 || cy < 0 || cx > ctx.W || cy > ctx.H) return null;
-      if (ctx.placed.some((p) => hits(rect, p.rect, 2))) return null;
-      return { rect, leader: null, x: cx, y: cy };
+      const off = cx < 0 || cy < 0 || cx > ctx.W || cy > ctx.H;
+      const hard = off || ctx.placed.some((p) => hits(rect, p.rect, NEW_PAD));
+      const hardKeep = off || ctx.placed.some((p) => hits(rect, p.rect, KEEP_PAD));
+      out.push({ id: "center", s: 0, hard, hardKeep, rect, leader: null, x: cx, y: cy });
+      return out;
     }
-    // Edge-on (degenerate projection): outward is ambiguous, try both sides.
+    // Edge-on (degenerate projection): outward is ambiguous, both sides
+    // are equal. Otherwise the inward side is merely penalised, so a kept
+    // candidate stays identifiable while a plane turns through edge-on.
     const degenerate = Math.abs(area) / 2 < 40;
     const mc = ctx.model ? { x: ctx.model.x + ctx.model.w / 2, y: ctx.model.y + ctx.model.h / 2 } : { x: ctx.W / 2, y: ctx.H / 2 };
-    let best = null;
-    const consider = (rect, leader, base, M) => {
-      const s = score(rect, leader, base, ctx);
-      if (!best || s < best.s) best = { s, rect, leader, x: M.x, y: M.y };
-    };
+    // Several points per edge so a crowded label can shift locally along
+    // its own edge before relocating across the polygon.
+    const ts = [0.5, 0.3, 0.7, 0.15, 0.85];
     for (let i = 0; i < n; i++) {
       const P = sv[i],
         Q = sv[(i + 1) % n];
@@ -482,40 +562,106 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         dy = Q.y - P.y,
         len = Math.hypot(dx, dy);
       if (len < 6) continue;
-      let nx = -dy / len,
-        ny = dx / len;
+      // Sides are relative to the raw edge perpendicular, which turns
+      // continuously with the view (unlike "outward", which can flip).
+      const rx = -dy / len,
+        ry = dx / len;
       const mid = { x: (P.x + Q.x) / 2, y: (P.y + Q.y) / 2 };
-      if ((mid.x - cx) * nx + (mid.y - cy) * ny < 0) {
-        nx = -nx;
-        ny = -ny;
-      }
-      const normals = degenerate ? [[nx, ny], [-nx, -ny]] : [[nx, ny]];
-      for (const t of [0.5, 0.3, 0.7]) {
+      const outwardSign = (mid.x - cx) * rx + (mid.y - cy) * ry >= 0 ? 1 : -1;
+      for (let ti = 0; ti < ts.length; ti++) {
+        const t = ts[ti];
         const M = { x: P.x + dx * t, y: P.y + dy * t };
-        for (const [ux, uy] of normals) {
+        for (const sign of [1, -1]) {
+          const ux = rx * sign,
+            uy = ry * sign;
+          const inward = !degenerate && sign !== outwardSign ? 60 : 0;
           // Prefer edges facing away from the model's middle.
           const away = Math.hypot(M.x - mc.x, M.y - mc.y) || 1;
-          const facing = 12 * (1 - ((M.x - mc.x) * ux + (M.y - mc.y) * uy) / away) + (t === 0.5 ? 0 : 3);
+          const facing = 12 * (1 - ((M.x - mc.x) * ux + (M.y - mc.y) * uy) / away) + (t === 0.5 ? 0 : 3) + inward;
           const ext = (Math.abs(ux) * w) / 2 + (Math.abs(uy) * h) / 2;
           const at = (dist) => ({ x: M.x + ux * dist - w / 2, y: M.y + uy * dist - h / 2, w, h });
+          const add = (variant, rect, leader, base) => {
+            const { s, hard, hardKeep } = score(rect, leader, base, ctx);
+            out.push({ id: `${i}:${ti}:${sign > 0 ? "+" : "-"}:${variant}`, s, hard, hardKeep, rect, leader, x: M.x, y: M.y });
+          };
           if (labelPosition === "outside") {
             const rect = at(LEADER + ext);
             const end = nearest(rect, M);
-            consider(rect, { x1: M.x, y1: M.y, x2: end.x, y2: end.y }, facing, M);
+            add("leader", rect, { x1: M.x, y1: M.y, x2: end.x, y2: end.y }, facing);
           }
           // Against the edge, outside (Edge mode; Outside fallback).
-          consider(at(ext + 1), null, facing + (labelPosition === "outside" ? 90 : 0), M);
+          add("touch", at(ext + 1), null, facing + (labelPosition === "outside" ? 90 : 0));
           // Tight views: straddling or just inside the edge.
-          consider(at(0), null, facing + 140, M);
-          consider(at(-(ext + 1)), null, facing + 170, M);
+          add("straddle", at(0), null, facing + 140);
+          add("inside", at(-(ext + 1)), null, facing + 170);
         }
       }
     }
-    if (!best || best.s >= REJECT) return null;
+    return out;
+  }
+  // Placement for one plane label with hysteresis, or null (hidden).
+  function placePlane(a, sv, w, ctx, prev) {
+    const cands = planeCandidates(sv, w, ctx);
+    const sinceSwitch = prev?.switchFrame == null ? Infinity : frameNo - prev.switchFrame;
+    const edgeOf = (id) => {
+      const [i, , sign] = String(id).split(":");
+      return `${i}:${sign}`;
+    };
+    const heldEdge = prev?.cand ? edgeOf(prev.cand) : null,
+      leftEdge = prev?.lastCand ? edgeOf(prev.lastCand) : null;
+    const center = (r) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
+    const from = (prev?.visible || prev?.culled) && prev.rect ? center(prev.rect) : null;
+    // Spots other visible labels held last frame and not yet placed now
+    // (lower priority): a moving label must not knock them off.
+    const held = [];
+    for (const [key, r] of ctx.heldRects) if (key !== a.key && !ctx.placedKeys.has(key)) held.push(r);
+    const displacement = (c) => (from ? Math.hypot(center(c.rect).x - from.x, center(c.rect).y - from.y) : 0);
+    // Cost of a candidate for a label that relocates.
+    const adjusted = (c) => {
+      let v = c.s;
+      // Back to the edge/side just left (any point on it): no quick return.
+      if (leftEdge && sinceSwitch < REVERSE_FRAMES && edgeOf(c.id) === leftEdge && edgeOf(c.id) !== heldEdge) v += REVERSE_PENALTY;
+      if (held.some((r) => hits(c.rect, r, 2))) v += HELD_PENALTY;
+      v += Math.max(0, displacement(c) - DISPLACE_FREE) * DISPLACE_COST;
+      return v;
+    };
+    let best = null,
+      bestScore = Infinity;
+    for (const c of cands)
+      if (!c.hard) {
+        const v = adjusted(c);
+        if (v < bestScore) {
+          best = c;
+          bestScore = v;
+        }
+      }
+    // The held spot stays usable until it truly overlaps (KEEP_PAD).
+    const kept = prev?.cand && prev.nv === sv.length ? cands.find((c) => c.id === prev.cand && !c.hardKeep) : null;
+    let chosen,
+      reason;
+    if (kept) {
+      // Within the dwell window a usable held spot is never traded for a
+      // merely better one; afterwards only for a clearly better one.
+      const switchOK = sinceSwitch >= DWELL_FRAMES && best && bestScore < kept.s - SWITCH_MARGIN;
+      chosen = switchOK ? best : kept;
+      reason = switchOK ? "better" : "kept";
+    } else {
+      chosen = best;
+      reason = prev?.cand ? "forced" : "new";
+      // Anti-oscillation: a label already relocated recently that would
+      // now have to jump far again waits hidden (its held spot is
+      // remembered) instead of teleporting back and forth.
+      if (chosen && (prev?.visible || prev?.culled) && prev.cand && sinceSwitch < REVERSE_FRAMES && displacement(chosen) > LONG_JUMP) {
+        ctx.culled.push(a.key);
+        return null;
+      }
+    }
+    if (!chosen || chosen.s >= REJECT) return null;
     // Do not cover the middle of the model just to label every member of
-    // a family: later members need a clear spot.
-    if (best.s >= 150 && ctx.placed.some((p) => p.planeId === a.planeId)) return null;
-    return best;
+    // a family; a visible member hides only when clearly worse.
+    const limit = prev?.visible ? FAMILY_KEEP : FAMILY_NEW;
+    if (chosen.s >= limit && ctx.placed.some((p) => p.planeId === a.planeId)) return null;
+    return { ...chosen, kept: chosen === kept, reason, displacement: Math.round(displacement(chosen)) };
   }
   function updateLabels(camera, canvas) {
     if (!anchors.length && !shownLabels.length) return;
@@ -540,26 +686,78 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         candidates.push({ ...a, x: c.x, y: c.y, z: c.z });
       }
     }
-    candidates.sort((p, q) => p.z - q.z);
-    if (labelPosition !== "center" && candidates.some((c) => c.kind === "plane")) refreshObstacles(canvasRect);
-    const ctx = { W, H, placed: [], model: labelPosition === "center" ? null : modelRect(camera, W, H) };
+    // Stable priority: labels shown last frame first, in the order they
+    // first appeared; new ones after them, front-most first.
+    if (cachedPosition !== labelPosition) {
+      placementCache.clear();
+      cachedPosition = labelPosition;
+    }
+    const live = new Set(anchors.map((a) => a.key));
+    for (const key of placementCache.keys()) if (!live.has(key)) placementCache.delete(key);
+    const rankOf = (c) => placementCache.get(c.key)?.rank ?? Infinity;
+    candidates.sort((p, q) => rankOf(p) - rankOf(q) || p.z - q.z || (p.key < q.key ? -1 : 1));
+    if (candidates.length) refreshObstacles(canvasRect);
+    // Previous-frame spots of visible labels (cascade control), keyed.
+    const heldRects = new Map();
+    for (const [key, entry] of placementCache) if (entry.visible && entry.rect) heldRects.set(key, entry.rect);
+    const ctx = {
+      W,
+      H,
+      placed: [],
+      placedKeys: new Set(),
+      heldRects,
+      culled: [],
+      model: labelPosition === "center" ? null : modelRect(camera, W, H),
+    };
     const placed = ctx.placed;
+    const shownKeys = new Set();
+    frameNo++;
     for (const c of candidates) {
       if (placed.length >= LABEL_LIMIT) break;
-      if (placed.some((p) => p.text === c.text && Math.hypot(p.anchorX - c.x, p.anchorY - c.y) < 4)) continue;
+      // Permanent rank, fixed the first time a label is seen.
+      let entry = placementCache.get(c.key);
+      const prev = entry?.cand ? entry : null;
+      if (!entry) {
+        entry = { rank: nextRank++, cand: null, nv: 0, visible: false, lastCand: null, switchFrame: null, switches: 0 };
+        placementCache.set(c.key, entry);
+      }
       const w = labelWidth(c.text, layer);
+      let spot = null;
       if (c.kind === "arrow") {
         const rect = { x: c.x + 6, y: c.y - 6 - LABEL_H, w, h: LABEL_H };
-        if (placed.some((p) => hits(rect, p.rect, 2))) continue;
-        placed.push({ text: c.text, color: c.color, kind: "arrow", x: c.x, y: c.y, rect, leader: null, anchorX: c.x, anchorY: c.y });
+        const pad = entry.visible ? KEEP_PAD : NEW_PAD;
+        if (!placed.some((p) => hits(rect, p.rect, pad))) spot = { id: "tip", rect, leader: null, x: c.x, y: c.y, kept: entry.visible };
+      } else spot = placePlane(c, c.sv, w, ctx, prev);
+      if (!spot) {
+        // Culled by the anti-oscillation rule: hidden, spot remembered.
+        entry.culled = ctx.culled.includes(c.key);
         continue;
       }
-      const spot = placePlane(c, c.sv, w, ctx);
-      if (!spot) continue;
+      entry.culled = false;
+      entry.rect = { ...spot.rect };
+      ctx.placedKeys.add(c.key);
+      if (entry.cand && spot.id !== entry.cand) {
+        entry.lastCand = entry.cand;
+        entry.switchFrame = frameNo;
+        entry.switches++;
+      }
+      entry.cand = spot.id;
+      entry.nv = c.sv?.length ?? 0;
+      entry.visible = true;
+      shownKeys.add(c.key);
       placed.push({
+        key: c.key,
+        candidate: spot.id,
+        kept: spot.kept,
+        rank: entry.rank,
+        lastCandidate: entry.lastCand,
+        switchFrame: entry.switchFrame,
+        switches: entry.switches,
+        reason: spot.reason ?? (spot.kept ? "kept" : "new"),
+        displacement: spot.displacement ?? 0,
         text: c.text,
         color: c.color,
-        kind: "plane",
+        kind: c.kind,
         planeId: c.planeId,
         x: spot.x,
         y: spot.y,
@@ -569,6 +767,13 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         anchorY: c.y,
       });
     }
+    // Hidden this frame: keep the candidate (continuity) AND the rank.
+    for (const [key, entry] of placementCache)
+      if (!shownKeys.has(key)) {
+        entry.visible = false;
+        if (!ctx.culled.includes(key)) entry.culled = false;
+      }
+    lastCulled = [...ctx.culled];
     while (labelPool.length < placed.length) {
       const span = make("span", { className: "lattice-label" });
       layer.append(span);
@@ -606,7 +811,16 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     }
     shownLabels = placed.map((c) => c.text);
     const round = (v) => Math.round(v * 10) / 10;
-    lastPlaced = placed.map(({ text, x, y, color, kind, rect, leader, planeId }) => ({
+    lastPlaced = placed.map(({ key, candidate, kept, rank, lastCandidate, switchFrame, switches, reason, displacement, text, x, y, color, kind, rect, leader, planeId }) => ({
+      key,
+      candidate,
+      kept,
+      rank,
+      lastCandidate: lastCandidate ?? null,
+      switchFrame: switchFrame ?? null,
+      switches: switches ?? 0,
+      reason: reason ?? null, // kept | better | forced | new
+      displacement: displacement ?? 0, // px moved this frame when relocating
       text,
       x,
       y,
@@ -617,7 +831,8 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       leader: leader ? { x1: round(leader.x1), y1: round(leader.y1), x2: round(leader.x2), y2: round(leader.y2) } : null,
     }));
   }
-  let lastPlaced = [];
+  let lastPlaced = [],
+    lastCulled = [];
   // The m option is subordinate to Labels: disabled (preference kept)
   // while labels are off.
   function syncLabelOptions() {
@@ -880,9 +1095,15 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       const el = document.querySelector(`[data-plane-id="${plane.id}"] [data-readout]`);
       if (!el) continue;
       el.classList.toggle("error", Boolean(plane.error));
+      // Automatic integer m can miss a narrow fractional extent entirely;
+      // say so instead of silently using a fractional m.
+      const missed = !plane.error && plane.autoOffset && !plane.render.polygons.length;
+      el.classList.toggle("warn", missed);
       el.textContent = plane.error
         ? plane.error
-        : `${plane.family ? "m + n · " : ""}d = ${plane.d.toFixed(4)} Å · ${plane.render.polygons.length} in range${plane.render.truncated ? ` (first ${plane.render.offsets.length})` : ""}`;
+        : missed
+          ? `No plane with integer m crosses this extent. Enter m, widen the extent or raise Size. d = ${plane.d.toFixed(4)} Å`
+          : `${plane.family ? "m + n · " : ""}d = ${plane.d.toFixed(4)} Å · ${plane.render.polygons.length} in range${plane.render.truncated ? ` (first ${plane.render.offsets.length})` : ""}`;
     }
     for (const arrow of arrows) {
       const el = document.querySelector(`[data-arrow-id="${arrow.id}"] [data-readout]`);
@@ -1017,9 +1238,101 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     /** Labels currently on screen, in CSS px of the canvas (for export). */
     placedLabels: () => (anchors.length ? lastPlaced : []),
     /** New file or block: drop all per-structure tool state. */
+    /** Plain settings for the local session (no geometry or caches). */
+    exportState() {
+      return {
+        planes: planes.map((p) => ({
+          id: p.id,
+          hkl: [...p.hkl],
+          m: p.m,
+          autoOffset: Boolean(p.autoOffset),
+          size: p.size,
+          opacity: p.opacity,
+          family: p.family,
+          visible: p.visible,
+          color: p.color,
+        })),
+        arrows: arrows.map((a) => ({
+          id: a.id,
+          uvw: [...a.uvw],
+          origin: [...a.origin],
+          length: a.length,
+          visible: a.visible,
+          color: a.color,
+        })),
+        symmetry: { shown: symmetry.shown, filters: [...symmetry.filters], opacity: symmetry.opacity },
+        labels: { enabled: labelsOn, includeOffsets: labelOffsets, position: labelPosition },
+      };
+    },
+    /** Apply validated session settings; invalid entries are skipped. */
+    restoreState(state) {
+      if (!state || typeof state !== "object") return;
+      const finite = (v) => typeof v === "number" && Number.isFinite(v);
+      const triple = (v) => Array.isArray(v) && v.length === 3 && v.every(finite);
+      const color = (v, fallback) => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v : fallback);
+      const bool = (v, fallback) => (typeof v === "boolean" ? v : fallback);
+      const ids = new Set();
+      const freshId = (id) => {
+        const ok = Number.isInteger(id) && id > 0 && !ids.has(id);
+        const value = ok ? id : ++nextId;
+        ids.add(value);
+        nextId = Math.max(nextId, value);
+        return value;
+      };
+      planes = (Array.isArray(state.planes) ? state.planes : [])
+        .filter((p) => p && triple(p.hkl) && p.hkl.every(Number.isInteger) && p.hkl.some((x) => x !== 0) && finite(p.m))
+        .slice(0, 50)
+        .map((p, i) => ({
+          id: freshId(p.id),
+          hkl: [...p.hkl],
+          m: p.m,
+          autoOffset: bool(p.autoOffset, false),
+          size: finite(p.size) && p.size >= 100 && p.size <= 200 ? p.size : 100,
+          opacity: finite(p.opacity) && p.opacity >= 0 && p.opacity <= 1 ? p.opacity : 0.28,
+          family: bool(p.family, false),
+          visible: bool(p.visible, true),
+          color: color(p.color, PLANE_COLORS[i % PLANE_COLORS.length]),
+          error: "",
+        }));
+      arrows = (Array.isArray(state.arrows) ? state.arrows : [])
+        .filter((a) => a && triple(a.uvw) && a.uvw.some((x) => x !== 0) && triple(a.origin) && finite(a.length) && a.length !== 0)
+        .slice(0, 50)
+        .map((a, i) => ({
+          id: freshId(a.id),
+          uvw: [...a.uvw],
+          origin: [...a.origin],
+          length: a.length,
+          visible: bool(a.visible, true),
+          color: color(a.color, ARROW_COLORS[i % ARROW_COLORS.length]),
+          error: "",
+        }));
+      const sym = state.symmetry ?? {};
+      symmetry.shown = bool(sym.shown, false);
+      if (Array.isArray(sym.filters)) {
+        const known = new Set(SYMMETRY_CATEGORIES.map((c) => c.id));
+        symmetry.filters = new Set(sym.filters.filter((f) => known.has(f)));
+      }
+      if (finite(sym.opacity) && sym.opacity >= 0 && sym.opacity <= 1) symmetry.opacity = sym.opacity;
+      $("sym-toggle").checked = symmetry.shown;
+      $("sym-controls").hidden = !symmetry.shown;
+      for (const box of document.querySelectorAll("#sym-filters input")) box.checked = symmetry.filters.has(box.value);
+      $("sym-opacity").value = String(Math.round(symmetry.opacity * 100));
+      $("sym-opacity-value").value = `${$("sym-opacity").value}%`;
+      const labels = state.labels ?? {};
+      labelsOn = bool(labels.enabled, true);
+      labelOffsets = bool(labels.includeOffsets, true);
+      if (["outside", "edge", "center"].includes(labels.position)) labelPosition = labels.position;
+      $("lattice-labels-toggle").checked = labelsOn;
+      placementCache.clear();
+      renderPlaneList();
+      renderArrowList();
+      rebuild();
+      collectLabelAnchors();
+    },
     reset() {
       planes = [];
       arrows = [];
+      placementCache.clear(); // new structure: no remembered label spots
       symmetry.cacheKey = "";
       symmetry.result = null;
       symmetry.shown = false;
@@ -1040,6 +1353,23 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           enabled: labelsOn,
           includeOffsets: labelOffsets,
           position: labelPosition,
+          stability: {
+            switchMargin: SWITCH_MARGIN,
+            familyNew: FAMILY_NEW,
+            familyKeep: FAMILY_KEEP,
+            newPad: NEW_PAD,
+            keepPad: KEEP_PAD,
+            dwellFrames: DWELL_FRAMES,
+            reverseFrames: REVERSE_FRAMES,
+            reversePenalty: REVERSE_PENALTY,
+            heldPenalty: HELD_PENALTY,
+            displaceFree: DISPLACE_FREE,
+            displaceCost: DISPLACE_COST,
+            longJump: LONG_JUMP,
+            culled: [...lastCulled],
+            frame: frameNo,
+            cacheSize: placementCache.size,
+          },
           anchors: anchors.map((a) => a.text),
           shown: [...shownLabels],
           // Canvas CSS px, exactly what the live view and exports draw.

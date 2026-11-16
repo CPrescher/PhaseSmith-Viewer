@@ -2,6 +2,8 @@
 
 A standalone browser application for exploring crystal structures and measuring the distance between atomic sites. CIF parsing and symmetry expansion run locally in a Web Worker using PhaseSmith compiled to WebAssembly. Three.js renders the resulting structure using WebGL.
 
+[Open the viewer](https://cprescher.github.io/PhaseSmith-Viewer/) · [Source on GitHub](https://github.com/CPrescher/PhaseSmith-Viewer) · [CI and deployments](https://github.com/CPrescher/PhaseSmith-Viewer/actions)
+
 ## Run locally
 
 Use Node.js 22.12 or newer.
@@ -16,6 +18,8 @@ Open the local address printed by Vite. Pick **Open CIF** to load a file from th
 ## Orientation
 
 Left-drag continuously in any direction to turn the model over its poles around the current view center. The wheel zooms about the cursor. Right-drag pans with the point you grab held under the cursor. A right-click zooms out one step, and a double right-click fits the displayed structure while preserving its orientation. Use the **a**, **b**, or **c** views to align the camera with a direct lattice axis. For a custom direction, enter the three indices of [uvw]. The camera looks toward the structure from the positive side of the vector u**a** + v**b** + w**c**. The parallel projection aligns rows of atoms along that direction. These are direct lattice directions. In a nonorthogonal cell a direct direction and the normal to the plane with the same indices generally differ.
+
+**Turn** opens step controls for exact rotations. Choose 90°, 60°, 45°, 30°, 10° or 5°, or type a custom angle greater than 0° and at most 360° (decimals allowed). The arrow pad turns the crystal left, right, up, down or along one of the four diagonals by exactly that angle. **⟲** and **⟳** roll it counterclockwise or clockwise in the screen plane. Directions describe how the crystal appears to move. Every turn is about the current view center and keeps the zoom, atom coordinates, selections and measurements. The crystal stops exactly at the new orientation. The controls stay open for repeated turns and close with ✕, Escape or a tap elsewhere. On a phone they open in the lower panel so the crystal stays uncovered. Turns are unavailable while an image or movie is exported.
 
 ## Displaying more than one unit cell
 
@@ -39,7 +43,7 @@ Open `/?example=forsterite` for a worked example using the Mg end member of oliv
 
 ## Planes, directions and symmetry
 
-Choose **Lattice** in the sidebar. **＋ Plane** adds a Miller-index plane with integer indices and an editable fractional offset m in hx + ky + lz = m. A new plane starts at the m that passes through the center of the displayed extent, so it always cuts through the plotted cells, also for negative or mixed indices and shifted or repeated ranges. While m has not been typed in, it follows changes to the indices. Once you enter m yourself it stays fixed, also when the indices or the extent change.
+Choose **Lattice** in the sidebar. **＋ Plane** adds a Miller-index plane with integer indices and an editable fractional offset m in hx + ky + lz = m. A new plane starts at a whole-number m: the integer closest to the center of the displayed extent among those whose plane crosses its interior (ties go toward 0), otherwise the nearest integer on its boundary. In one cell, (100) starts at m = 1, (1̄00) at −1 and (11̄0) at 0. A very narrow fractional extent may contain no plane with an integer m; the plane's readout then says so, and you can type a fractional m, widen the extent or raise Size. While m has not been typed in, it follows changes to the indices. Once you enter m yourself it stays fixed, also when the indices or the extent change.
 
 **Family** draws the parallel planes at m + n for integer n intersecting the displayed extent. Changing m moves the whole family.
 
@@ -67,9 +71,15 @@ Choose **Sites** in the sidebar to see the original CIF site labels, fractional 
 
 ## Changing colors and sizes
 
-Choose **Style** in the sidebar's mode bar (**Pairs · Style · Lattice · Sites · Extent**); **‹ Pairs** returns. Choose an element to change all its spheres, or choose a pair to change all its polyhedra. Choose a swatch or a custom color, then adjust **Radius** or **Scale**. A polyhedron at 100% has its vertices at the coordinating atoms. Changing the display scale moves its faces and edges about the central atom. Distances use the original coordinates at every scale.
+Choose **Style** in the sidebar's mode bar (**Pairs · Style · Lattice · Sites · Extent**); the other tabs switch back. Choose an element to change all its spheres, or choose a pair to change all its polyhedra. Choose a swatch or a custom color, then adjust **Radius** or **Scale**. A polyhedron at 100% has its vertices at the coordinating atoms. Changing the display scale moves its faces and edges about the central atom. Distances use the original coordinates at every scale.
 
-To highlight one copy, enable **Pick one** and tap a sphere or a polyhedron face. **Reset** restores the inherited style for the selected target. Close the editor to return to measuring distances.
+To highlight one copy, enable **Pick one** and tap a sphere or a polyhedron face. Individually styled copies stay in the target list, also after a restart. The reset button names its target. **Reset atom** or **Reset polyhedron** removes only that copy's own style, so it follows the current element or pair style again. **Reset element** or **Reset pair** restores the defaults of the whole element or pair, including its individually styled copies. **Reset all … individual styles** removes every individual override at once. Resets never change coordinates. Leave the Style tab to return to measuring.
+
+The **View** readout above the atom legend shows the current viewing direction as a direct-lattice vector [u v w], pointing from the crystal toward you, like the **a**, **b** and **c** buttons. Exact small-integer directions are shown as they are. Other directions are marked with ≈.
+
+## Saved session
+
+The viewer saves its state on this device and restores it when you open the same page again, also after restarting the browser. This covers the loaded CIF and data block, the plotting extent, pairs and their cutoffs, colors and opacities, element and individual styles, atom visibility, size and labels, the asymmetric-unit view, planes, directions, symmetry and label settings, the camera, the turn angle, the measurement with its picked atoms in order, and the open sidebar panels. Nothing is uploaded. Opening a different example address starts that example instead. **Export → Session** shows the save status; **Start fresh** discards the saved session and reloads this page's structure.
 
 ## Images, movies and themes
 
@@ -106,6 +116,10 @@ The importer uses PhaseSmith’s conventional crystal-structure CIF reader. Insp
 The initial NaCl example is an idealized rock-salt structure with a rounded 5.64 Å unit-cell edge.
 
 ## Verification
+
+GitHub Actions runs the Rust importer tests, rebuilds its WebAssembly module from the pinned PhaseSmith revision, runs the JavaScript tests, and builds the application for its GitHub Pages path. A Chromium smoke test then checks all three examples, WebAssembly loading, plane placement, saved-session restoration, and the phone layout. Passing changes on `main` deploy automatically to GitHub Pages; pull requests run the same checks without deploying.
+
+To run the portable production browser check, install `tests/requirements-browser.txt` and Chromium (`python -m playwright install chromium`), serve the built app, then run `VIEWER_URL=http://localhost:4179 python tests/pages_smoke.py`. `BROWSER_CHANNEL=chrome` uses an installed Chrome instead of Playwright's bundled Chromium.
 
 Run the JavaScript geometry tests with `node --test tests/*.test.mjs`. The coordination browser test uses the packaged forsterite CIF (`python tests/coordination_smoke.py`). Run `python tests/steering_smoke.py` to check unrestricted rotation, axis views and custom directions in a triclinic cell. The plotting-range and display tests are `tests/ranges_smoke.py` and `tests/visibility_smoke.py`.
 

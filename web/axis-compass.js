@@ -129,8 +129,7 @@ export function createAxisCompass(svg, description) {
         "points",
         `${tipX.toFixed(2)},${tipY.toFixed(2)} ${(baseX - uy * w).toFixed(2)},${(baseY + ux * w).toFixed(2)} ${(baseX + uy * w).toFixed(2)},${(baseY - ux * w).toFixed(2)}`,
       );
-      // Axes pointing away are drawn slightly dimmer.
-      part.group.style.opacity = p.z < -0.05 ? 0.72 : 1;
+      // Keep axis colors constant; depth is conveyed by order and ⊙ / ⊗.
     });
     // Coarse words change rarely, so the live text stays calm.
     const words = (p) => {

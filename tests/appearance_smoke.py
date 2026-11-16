@@ -134,7 +134,7 @@ async def check(browser, width, height):
     assert sum(s["scale"] == 0.65 for face in now["faceMaterials"] for s in face["styles"]) == 1
     assert now["appearance"]["pickMarkerCount"] == 1
     assert not now["selectedIds"]
-    await page.locator("#style-close").tap()
+    await page.locator("#mode-pairs").tap()
     assert (await diagnostics(page))["appearance"]["pickMarkerCount"] == 0
     assert await page.evaluate("window.scrollY === 0")
     await page.close()

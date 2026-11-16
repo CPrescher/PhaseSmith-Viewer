@@ -84,8 +84,7 @@ export function createAppearanceEditor(host) {
     reset = $("style-reset"),
     resetIndividual = $("style-reset-individual"),
     pick = $("style-pick"),
-    open = $("style-open"),
-    close = $("style-close");
+    open = $("style-open");
   let target = "",
     picking = false,
     picked = null; // { value, label, group } of the last explicitly picked item
@@ -146,11 +145,8 @@ export function createAppearanceEditor(host) {
     refresh();
   };
   pick.onclick = () => setPicking(!picking);
+  // The Style tab toggles the editor; the sidebar tabs navigate away.
   open.onclick = () => setOpen(root.hidden);
-  close.onclick = () => {
-    setOpen(false);
-    open.focus({ preventScroll: true });
-  };
   root.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       if (picking) setPicking(false);
@@ -256,14 +252,37 @@ export function createAppearanceEditor(host) {
       showOpacity();
     }
     reset.disabled = !info.overridden;
+    // The reset names exactly what it resets. A one-copy reset removes only
+    // that copy's override, so it inherits the CURRENT element/pair style.
+    const kind = target.split(":")[0];
+    const resets = {
+      atom: ["Reset atom", "Remove this atom copy's own color and size; it then follows its element's current style"],
+      poly: ["Reset polyhedron", "Remove this polyhedron's own color and scale; it then follows its pair's current style"],
+      element: ["Reset element", "Restore the element's default color and radius, including its individually styled copies"],
+      pair: ["Reset pair", "Restore the pair's default color, scale and opacity, including its individually styled polyhedra"],
+    }[kind] ?? ["Reset", "Restore the default style"];
+    reset.textContent = resets[0];
+    reset.title = resets[1];
+    reset.setAttribute("aria-label", `${resets[0]}: ${resets[1]}`);
     // Every individually styled copy can be reset in one action.
     const individual = host.individualCount?.() ?? 0;
     resetIndividual.hidden = !individual;
-    resetIndividual.textContent = `Reset all ${individual} individual`;
+    resetIndividual.textContent = `Reset all ${individual} individual style${individual === 1 ? "" : "s"}`;
+    resetIndividual.title =
+      "Remove every individual atom and polyhedron override; each copy then follows its element or pair style";
     resetIndividual.setAttribute(
       "aria-label",
       `Reset all ${individual} individually styled atom and polyhedron copies to their element or pair style`,
     );
+  }
+  /** Session restore: select a target if it still exists in the list. */
+  function restoreTarget(value) {
+    if (typeof value !== "string" || !value) return false;
+    const item = host.targets().find((t) => t.value === value);
+    if (!item) return false;
+    target = value;
+    refresh();
+    return true;
   }
   return {
     get open() {
@@ -286,6 +305,7 @@ export function createAppearanceEditor(host) {
       refresh();
     },
     refresh,
+    restoreTarget,
     /** Unrelated file or block: forget picks and targets. */
     clear() {
       picked = null;

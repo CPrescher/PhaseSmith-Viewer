@@ -255,7 +255,7 @@ export function createExporter(ctx) {
       const color = colors[axis.name];
       g.strokeStyle = g.fillStyle = color;
       g.lineWidth = 2.2 * s;
-      g.globalAlpha = axis.z < -0.05 ? 0.72 : 1;
+      g.globalAlpha = 1;
       const len = axis.projectedLength;
       let lx, ly;
       if (axis.lineOfSight) {

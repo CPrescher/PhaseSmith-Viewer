@@ -9,6 +9,9 @@ import {
   rangeEdges,
 } from "./plot-range.js";
 import { latticeViewDirection } from "./view-direction.js";
+// Namespace import: describeViewDirection is root's helper (readout).
+import * as viewDirection from "./view-direction.js";
+import { createSessionStore } from "./session-store.js";
 import { buildCoordinationEnvironments, convexHull } from "./coordination.js";
 import { angleAt, hullVolume } from "./crystal-math.js";
 import { createLatticeTools } from "./lattice-tools.js";
@@ -17,6 +20,8 @@ import { createThemeSwitch } from "./theme.js";
 import { createExporter, validDpi } from "./export.js";
 import { createFaceSorter } from "./face-sort.js";
 import { createDepthPeeler } from "./peel.js";
+import { rotatedView } from "./view-rotation.js";
+import { createTurnControls } from "./turn-controls.js";
 import {
   createAppearance,
   clearAppearance,
@@ -106,6 +111,8 @@ function initialize() {
     next.maxDistance = 1000;
     next.target.copy(target);
     next.addEventListener("change", invalidate);
+    // Camera autosave once motion (including damping) has settled.
+    next.addEventListener("change", () => scheduleSave(1200));
     next.addEventListener("start", invalidate);
     return next;
   }
@@ -152,8 +159,15 @@ function initialize() {
     coordinationTotals = {},
     nextRule = 0;
   const pairColors = ["#62d5df", "#efa04c", "#c6a0ef", "#8cdf9b", "#ef95b3"];
+  const CA_O_CUTOFF = 2.6; // default Ca–O polyhedron cutoff (Å)
   const faceMeshes = new Map();
   const phoneLayout = matchMedia("(max-width: 640px)");
+  // Local session autosave state, declared early: controls "change"
+  // events may call scheduleSave() before the session code below runs.
+  // saveSuspended > 0 blocks saving (startup/restore, export, Start fresh).
+  let saveTimer = 0,
+    saveSuspended = 1, // released after the startup document is displayed
+    startupHold = true;
   // Batch faces of all pairs; the peeler establishes their per-pixel order.
   const faceSorter = createFaceSorter(THREE);
   scene.add(faceSorter.mesh);
@@ -228,6 +242,7 @@ function initialize() {
     syncStudio();
     faceSorter.sync([...faceMeshes.values()], viewCamera);
     peeler.render(scene, viewCamera);
+    updateViewReadout();
     if (labelsOn || shownLabels) updateLabels();
     latticeTools.updateLabels(viewCamera, renderer.domElement);
     // Lattice-axis compass follows the rendered camera's rotation.
@@ -303,7 +318,8 @@ function initialize() {
     lastAtomLabels = placed;
   }
   let lastAtomLabels = [];
-  let activeView = null;
+  let activeView = null,
+    lastOrientIndices = null;
   function setActiveView(id, dir) {
     activeView = id ? { id, dir: dir.clone() } : null;
     for (const axis of ["a", "b", "c"])
@@ -314,6 +330,31 @@ function initialize() {
   }
   function invalidate() {
     if (!frame) frame = requestAnimationFrame(render);
+  }
+  // Viewing direction readout ("View [uvw]") above the atom legend: the
+  // eye vector (camera − pivot, crystal toward viewer, as the a/b/c
+  // buttons) in direct-lattice coordinates. O(1) per frame; the DOM text
+  // changes only when the description does.
+  const readoutEye = new THREE.Vector3();
+  let readoutText = "";
+  function updateViewReadout() {
+    const el = $("view-readout");
+    const describe = viewDirection.describeViewDirection;
+    if (typeof describe !== "function" || !structure?.basis) {
+      if (!el.hidden) el.hidden = true;
+      return;
+    }
+    let text = "";
+    try {
+      text = describe(structure.basis, readoutEye.copy(camera.position).sub(controls.target).toArray())?.text ?? "";
+    } catch {
+      text = "";
+    }
+    if (text !== readoutText) {
+      readoutText = text;
+      el.replaceChildren("View ", Object.assign(document.createElement("b"), { textContent: text }));
+    }
+    if (el.hidden !== !text) el.hidden = !text;
   }
   renderer.domElement.addEventListener("wheel", invalidate, { passive: true });
   const resize = new ResizeObserver(() => {
@@ -630,7 +671,7 @@ function initialize() {
   function resetRules() {
     nextRule = 0;
     const elements = [...new Set(structure.atoms.map((a) => a.element))];
-    const cutoffs = { Si: 2.1, Mg: 2.6, Al: 2.3, Fe: 2.7, Ca: 3.0, Ti: 2.5 };
+    const cutoffs = { Si: 2.1, Mg: 2.6, Al: 2.3, Fe: 2.7, Ca: CA_O_CUTOFF, Ti: 2.5 };
     rules = elements.includes("O")
       ? elements
           .filter((e) => cutoffs[e])
@@ -1196,11 +1237,14 @@ function initialize() {
   $("add-rule").onclick = () => {
     if (!structure) return;
     const elements = [...new Set(structure.atoms.map((a) => a.element))];
+    const center = elements.find((e) => e !== "O") || elements[0],
+      neighbor = elements.includes("O") ? "O" : elements.at(-1);
     rules.push({
       id: ++nextRule,
-      center: elements.find((e) => e !== "O") || elements[0],
-      neighbor: elements.includes("O") ? "O" : elements.at(-1),
-      cutoff: 2.5,
+      center,
+      neighbor,
+      // Ca–O uses the same 2.6 Å default as the automatic pairs.
+      cutoff: center === "Ca" && neighbor === "O" ? CA_O_CUTOFF : 2.5,
       bonds: false,
       polyhedra: false,
       opacity: 0.34,
@@ -1661,6 +1705,7 @@ function initialize() {
       const target = controls.target.clone();
       const zoomDistance = camera.position.distanceTo(target);
       const dir = new THREE.Vector3(...direction).normalize();
+      lastOrientIndices = [...indices]; // for restoring the lit view button
       stopMotion();
       camera.up.set(...up);
       camera.position.copy(target).addScaledVector(dir, zoomDistance);
@@ -1707,7 +1752,10 @@ function initialize() {
     const view = viewport.getBoundingClientRect();
     const top = document.querySelector(".view-directions").getBoundingClientRect();
     const bottom = document.querySelector(".atoms-bar").getBoundingClientRect();
-    return Math.max(top.bottom - view.top, view.bottom - bottom.top, 0) + 4;
+    // The [uvw] readout sits above the legend; keep the fit clear of it.
+    const readout = $("view-readout").getBoundingClientRect();
+    const bottomTop = readout.height ? Math.min(bottom.top, readout.top) : bottom.top;
+    return Math.max(top.bottom - view.top, view.bottom - bottomTop, 0) + 4;
   }
   const boxCorners = (box) =>
     [0, 1, 2, 3, 4, 5, 6, 7].map(
@@ -2191,6 +2239,14 @@ function initialize() {
       else if (selection.length === (measureMode === "angle" ? 3 : 2)) selection = [];
       if (!selection.includes(atom)) selection.push(atom);
       updateSelection();
+    } else if (
+      selection.length &&
+      (measureMode === "info" || selection.length === (measureMode === "angle" ? 3 : 2))
+    ) {
+      // Only an un-dragged empty click reaches here. Keep partial
+      // measurements so an imprecise tap never discards the first picks.
+      selection = [];
+      updateSelection();
     }
   });
   // ---- Appearance editor host -------------------------------------------
@@ -2391,7 +2447,7 @@ function initialize() {
     // Marker follows editor visibility: cleared on close, restored on open.
     onOpen(open) {
       updatePickMarker(open ? styleEditor?.target : null);
-      // Style is opened by its tab (or closed by ‹ Pairs / Escape).
+      // Style is opened by its tab and can also be closed with Escape.
       if (open && !openModes.includes("style")) pinMode("style");
       else if (!open && openModes.includes("style")) unpinMode("style");
       applyMode();
@@ -2624,6 +2680,16 @@ function initialize() {
     $("open").disabled = false;
     $("block").disabled = false;
     if (data.error) {
+      if (task.restore) {
+        // A saved block that no longer opens: retry the saved file without
+        // it; if the file itself fails, start this page's structure.
+        if (task.block !== undefined) load(task.text, task.filename, undefined, task.restore);
+        else {
+          sessionStatus("The saved structure could not be opened, so this page's structure was loaded instead.", true);
+          loadExample();
+        }
+        return;
+      }
       if (structure) $("block").value = structure.block;
       $("error").textContent = `Could not open this CIF: ${data.error}`;
       $("error").hidden = false;
@@ -2633,6 +2699,26 @@ function initialize() {
     currentText = task.text;
     currentFilename = task.filename;
     display(data);
+    if (task.restore) {
+      try {
+        restoreViewerState(task.restore);
+        sessionStatus(`Restored the session saved on this device${restoredAt ? ` at ${timeText(restoredAt)}` : ""}.`);
+      } catch (error) {
+        console.error(error);
+        sessionStatus("Part of the saved session could not be restored; the rest is shown.", true);
+      }
+    }
+    // Save only after the final layout/resize has settled (two frames),
+    // so the restored camera is captured as restored, not refitted.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (startupHold) {
+          startupHold = false;
+          saveSuspended--;
+        }
+        scheduleSave(task.restore ? 300 : 0);
+      }),
+    );
   };
   worker.onerror = (e) => {
     $("loading").hidden = true;
@@ -2642,12 +2728,12 @@ function initialize() {
     $("error").hidden = false;
     console.error(e);
   };
-  function load(text, filename, block) {
+  function load(text, filename, block, restore = null) {
     $("error").hidden = true;
     $("loading").hidden = false;
     $("open").disabled = true;
     $("block").disabled = true;
-    pending.push({ id: ++request, text, filename, intent: userIntent });
+    pending.push({ id: ++request, text, filename, block, restore, intent: userIntent });
     worker.postMessage({ text, block });
   }
   $("open").onclick = () => $("file").click();
@@ -2679,6 +2765,37 @@ function initialize() {
     updateSelection();
   };
   $("reset").onclick = () => reset();
+  // Discrete step turns (Turn panel). Inertia is cancelled FIRST
+  // (stopMotion replaces the controls, so the current `controls` is read
+  // afterwards); then camera position/up come from the tested helper.
+  // The pivot (controls.target), zoom distance, atoms, selection and
+  // measurements stay untouched, and nothing keeps moving afterwards.
+  function turnView(action, degrees) {
+    if (exporter.busy) return; // never touch camera/controls while exporting
+    stopMotion();
+    const next = rotatedView(
+      camera.position.toArray(),
+      camera.up.toArray(),
+      controls.target.toArray(),
+      action,
+      degrees,
+    );
+    camera.position.fromArray(next.position);
+    camera.up.fromArray(next.up);
+    controls.update();
+    setActiveView(null);
+    invalidate();
+    scheduleSave();
+  }
+  const turnControls = createTurnControls({
+    onTurn: turnView,
+    isBusy: () => exporter.busy,
+    phoneLayout,
+    paneAnchor: $("atom-info"),
+    onOpenChange: invalidate, // plane labels re-place around the popover
+  });
+  // The [uvw] form is a label obstacle too while open.
+  document.querySelector(".view-directions details")?.addEventListener("toggle", invalidate);
   // CIF warnings stay to two lines until opened, keeping controls in reach.
   const toggleWarnings = () => {
     const open = $("warnings").getAttribute("aria-expanded") !== "true";
@@ -2866,6 +2983,16 @@ function initialize() {
       // View-space unit directions of a, b, c as drawn by the compass
       // (x right, y up, z toward the viewer).
       axisCompass: compassState,
+      turn: turnControls.diagnostics(),
+      viewReadout: { text: readoutText, visible: !$("view-readout").hidden },
+      session: {
+        entrypoint: ENTRYPOINT,
+        suspended: saveSuspended > 0,
+        pending: Boolean(saveTimer),
+        restoredAt,
+        status: $("session-status").textContent.trim(),
+        error: $("session-status").classList.contains("error"),
+      },
       theme: { current: themeSwitch.theme, explicit: themeSwitch.explicit },
       export: {
         busy: exporter.busy,
@@ -2921,6 +3048,16 @@ function initialize() {
       peeler.setExportMode(busy);
       viewport.classList.toggle("exporting", busy);
       controls.enabled = !busy;
+      // Step turns are blocked while exporting (buttons and handler).
+      turnControls.setDisabled(busy);
+      // No autosave of turntable frames; save the real view afterwards.
+      if (busy) {
+        saveSuspended++;
+        clearTimeout(saveTimer);
+      } else {
+        saveSuspended = Math.max(0, saveSuspended - 1);
+        scheduleSave();
+      }
       for (const id of ["export-png", "export-video"]) $(id).disabled = busy || (id === "export-video" && !videoFormat.mime);
     },
   });
@@ -3020,33 +3157,352 @@ function initialize() {
       invalidate();
     },
   });
-  const wollastoniteExample =
-    new URLSearchParams(location.search).get("example") === "wollastonite";
-  const forsteriteExample =
-    new URLSearchParams(location.search).get("example") === "forsterite";
-  fetch(
-    `${import.meta.env.BASE_URL}${wollastoniteExample ? "examples/wollastonite.cif" : forsteriteExample ? "examples/forsterite.cif" : "example.cif"}`,
-  )
-    .then((r) => {
-      if (!r.ok) throw Error("Example unavailable");
-      return r.text();
-    })
-    .then((text) => {
-      if (!userIntent && !request)
-        load(
-          text,
-          wollastoniteExample
-            ? "Wollastonite example"
-            : forsteriteExample
-              ? "Forsterite example"
-              : "Example structure",
-        );
-    })
-    .catch(() => {
-      if (userIntent || request || structure) return;
-      $("loading").hidden = true;
-      $("name").textContent = "Your next crystal";
-      $("source").textContent = "Open a CIF file to begin.";
-    });
+  // ---- Local session (this device only) ----------------------------------
+  // Plain settings are saved with the loaded CIF text in IndexedDB
+  // (session-store.js) and restored on the next start of the same page
+  // entrypoint. Derived geometry, Three.js objects and label caches are
+  // rebuilt, never stored. Transient popovers are not reopened.
+  const ENTRYPOINT = (() => {
+    const v = new URLSearchParams(location.search).get("example");
+    return v === "forsterite" || v === "wollastonite" ? v : "";
+  })();
+  const sessionStore = createSessionStore();
+  let restoredAt = 0;
+  const timeText = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  function sessionStatus(text, error = false) {
+    const el = $("session-status");
+    el.textContent = text;
+    el.classList.toggle("error", error);
+  }
+  const SIDEBAR_MODES = ["pairs", "style", "lattice", "sites", "extent", "export"];
+  function exportViewerState() {
+    return {
+      block: structure?.block ?? null,
+      ranges: plotRanges.map((r) => [...r]),
+      boundary: $("boundary").checked,
+      cell: $("cell").checked,
+      polyhedraOnly: $("polyhedra-only").checked,
+      rules: rules.map((r) => ({
+        id: r.id,
+        center: r.center,
+        neighbor: r.neighbor,
+        cutoff: r.cutoff,
+        bonds: Boolean(r.bonds),
+        polyhedra: Boolean(r.polyhedra),
+        opacity: r.opacity ?? DEFAULT_FACE_OPACITY,
+        ...(r.color != null ? { color: r.color } : {}),
+        ...(r.scale != null ? { scale: r.scale } : {}),
+      })),
+      appearance: {
+        elements: [...appearance.elements].map(([k, v]) => [k, { ...v }]),
+        atoms: [...appearance.atoms].map(([k, v]) => [k, { ...v }]),
+        polyhedra: [...appearance.polyhedra].map(([k, v]) => [k, { ...v }]),
+      },
+      atoms: {
+        show: $("show-atoms").checked,
+        hidden: [...hiddenElements],
+        size: Number($("size").value),
+        labels: labelsOn,
+      },
+      asymmetric,
+      highlightedSite,
+      lattice: latticeTools.exportState(),
+      camera: {
+        position: camera.position.toArray(),
+        up: camera.up.toArray(),
+        target: controls.target.toArray(),
+      },
+      turnAngle: turnControls.angle,
+      measure: { mode: measureMode, keys: selection.map(atomKey) },
+      panels: [...openModes],
+      // Added later in version 1 (optional on restore).
+      uvwText: $("view-direction").value,
+      activeView: activeView && lastOrientIndices ? { id: activeView.id, indices: [...lastOrientIndices] } : null,
+      styleTarget: styleEditor.target || null,
+      export: {
+        scale: exportScale(),
+        dpi: $("export-dpi").value,
+        transparent: $("export-transparent").checked,
+        seconds: $("export-seconds").value,
+        fps: $("export-fps").value,
+      },
+    };
+  }
+  // Apply a saved state to the freshly displayed document. Every value is
+  // validated; unknown fields are ignored and references that do not
+  // exist in this structure (elements, rules, atoms, sites) are dropped.
+  function restoreViewerState(s) {
+    if (!s || typeof s !== "object") return;
+    const finite = (v) => typeof v === "number" && Number.isFinite(v);
+    const triple = (v) => Array.isArray(v) && v.length === 3 && v.every(finite);
+    const hex = (v) => typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v);
+    const pairs = (v) => (Array.isArray(v) ? v.filter((e) => Array.isArray(e) && e.length === 2 && typeof e[0] === "string" && e[1] && typeof e[1] === "object") : []);
+    const elements = new Set(structure.atoms.map((a) => a.element));
+    // Extent and display toggles.
+    if (Array.isArray(s.ranges))
+      try {
+        plotRanges = validateRanges(s.ranges);
+      } catch {
+        /* keep the default extent */
+      }
+    writeRanges();
+    for (const [id, key] of [
+      ["boundary", "boundary"],
+      ["cell", "cell"],
+      ["polyhedra-only", "polyhedraOnly"],
+    ])
+      if (typeof s[key] === "boolean") $(id).checked = s[key];
+    // Pair rules.
+    if (Array.isArray(s.rules)) {
+      const seen = new Set();
+      rules = [];
+      for (const r of s.rules.slice(0, 24)) {
+        if (!r || !elements.has(r.center) || !elements.has(r.neighbor)) continue;
+        if (!finite(r.cutoff) || r.cutoff < CUTOFF_MIN || r.cutoff > 50) continue;
+        if (!Number.isInteger(r.id) || r.id <= 0 || seen.has(r.id)) continue;
+        seen.add(r.id);
+        rules.push({
+          id: r.id,
+          center: r.center,
+          neighbor: r.neighbor,
+          cutoff: r.cutoff,
+          bonds: r.bonds === true,
+          polyhedra: r.polyhedra === true,
+          opacity: finite(r.opacity) && r.opacity >= 0 && r.opacity <= 1 ? r.opacity : DEFAULT_FACE_OPACITY,
+          ...(hex(r.color) ? { color: r.color } : {}),
+          ...(finite(r.scale) && r.scale >= 0.2 && r.scale <= 2 ? { scale: r.scale } : {}),
+        });
+      }
+      nextRule = Math.max(0, ...rules.map((r) => r.id));
+      renderRules();
+    }
+    // Appearance overrides.
+    clearAppearance(appearance);
+    const style = (v, min, max) => {
+      const o = {};
+      if (hex(v.color)) o.color = v.color;
+      if (finite(v.scale) && v.scale >= min && v.scale <= max) o.scale = v.scale;
+      return o;
+    };
+    for (const [e, v] of pairs(s.appearance?.elements)) {
+      const o = style(v, 0.3, 2.5);
+      if (elements.has(e) && Object.keys(o).length) appearance.elements.set(e, o);
+    }
+    for (const [k, v] of pairs(s.appearance?.atoms)) {
+      const o = style(v, 0.3, 2.5);
+      if (elements.has(v.element) && Object.keys(o).length) appearance.atoms.set(k, { ...o, element: v.element });
+    }
+    const ruleIds = new Set(rules.map((r) => r.id));
+    for (const [k, v] of pairs(s.appearance?.polyhedra)) {
+      const o = style(v, 0.2, 2);
+      if (ruleIds.has(Number(k.split("|")[0])) && Object.keys(o).length) appearance.polyhedra.set(k, o);
+    }
+    // Atom display.
+    const a = s.atoms && typeof s.atoms === "object" ? s.atoms : {};
+    if (typeof a.show === "boolean") $("show-atoms").checked = a.show;
+    hiddenElements.clear();
+    for (const e of Array.isArray(a.hidden) ? a.hidden : []) if (elements.has(e)) hiddenElements.add(e);
+    for (const button of document.querySelectorAll("#elements .element"))
+      button.setAttribute("aria-pressed", String(!hiddenElements.has(button.dataset.element)));
+    const size = $("size");
+    if (finite(a.size) && a.size >= Number(size.min) && a.size <= Number(size.max)) {
+      size.value = String(a.size);
+      size.setAttribute("aria-valuetext", `${Math.round(a.size * 100)}%`);
+    }
+    if (typeof a.labels === "boolean") {
+      labelsOn = a.labels;
+      $("labels-toggle").checked = a.labels;
+    }
+    if (typeof s.asymmetric === "boolean") {
+      asymmetric = s.asymmetric;
+      $("asym-toggle").checked = asymmetric;
+    }
+    // Rebuild everything derived from these settings.
+    build(false);
+    updateAsymmetricNote();
+    for (const e of elements) refreshElementDot(e);
+    // Labels for individually styled copies in the Style target list.
+    for (const key of appearance.atoms.keys()) {
+      const atom = atoms.find((x) => atomKey(x) === key);
+      if (atom) targetMeta.set(`atom:${key}`, { element: atom.element, label: atom.label, frac: fracText(atom) });
+    }
+    for (const key of appearance.polyhedra.keys()) {
+      const centerKey = key.slice(key.indexOf("|") + 1);
+      const atom = atoms.find((x) => atomKey(x) === centerKey);
+      if (atom) targetMeta.set(`poly:${key}`, { label: atom.label, frac: fracText(atom) });
+    }
+    latticeTools.restoreState(s.lattice);
+    if (typeof s.highlightedSite === "string" && independentSites().some((x) => x.label === s.highlightedSite))
+      highlightSite(s.highlightedSite);
+    if (s.turnAngle != null) turnControls.setAngle(s.turnAngle);
+    // Measurement: the mode, then the picked copies IN ORDER (the angle
+    // vertex stays second). Restored only if every saved copy still exists.
+    const m = s.measure && typeof s.measure === "object" ? s.measure : {};
+    if (["distance", "angle", "info"].includes(m.mode)) setMeasureMode(m.mode);
+    if (Array.isArray(m.keys) && m.keys.length && m.keys.every((k) => typeof k === "string")) {
+      const limit = { distance: 2, angle: 3, info: 1 }[measureMode];
+      const found = m.keys.slice(0, limit).map((k) => atoms.find((x) => atomKey(x) === k && atomVisible(x)));
+      if (found.every(Boolean)) selection = found;
+    }
+    updateSelection();
+    // Sidebar panes (no transient popovers).
+    if (Array.isArray(s.panels)) {
+      const valid = [...new Set(s.panels.filter((p) => SIDEBAR_MODES.includes(p)))];
+      if (valid.length) {
+        openModes = wideInspector.matches ? valid.slice(-MAX_PINNED) : [valid.at(-1)];
+        sidebarMode = openModes.at(-1);
+        if (styleEditor.open !== openModes.includes("style"))
+          styleEditor.setOpen(openModes.includes("style"));
+        applyMode();
+      }
+    }
+    styleEditor.refresh();
+    // Typed [uvw] text (not submitted; the camera below is the real pose).
+    if (typeof s.uvwText === "string" && s.uvwText.length <= 64) $("view-direction").value = s.uvwText;
+    // Style target, only if it is still a valid entry (element, pair or an
+    // individually styled copy; overrides and targetMeta are restored above).
+    if (typeof s.styleTarget === "string") styleEditor.restoreTarget(s.styleTarget);
+    // Export preferences.
+    const ex = s.export && typeof s.export === "object" ? s.export : {};
+    const scaleInput = document.querySelector(`input[name="export-scale"][value="${Number(ex.scale)}"]`);
+    if ([1, 2, 4].includes(Number(ex.scale)) && scaleInput) scaleInput.checked = true;
+    if (validDpi(ex.dpi)) $("export-dpi").value = String(validDpi(ex.dpi));
+    if (typeof ex.transparent === "boolean") $("export-transparent").checked = ex.transparent;
+    for (const [id, value] of [
+      ["export-seconds", ex.seconds],
+      ["export-fps", ex.fps],
+    ])
+      if (value != null && [...$(id).options].some((o) => o.value === String(value))) $(id).value = String(value);
+    updateExportInfo();
+    // Camera last: nothing after this refits the view.
+    const c = s.camera && typeof s.camera === "object" ? s.camera : null;
+    if (c && triple(c.position) && triple(c.up) && triple(c.target)) {
+      const eye = new THREE.Vector3().fromArray(c.position).sub(new THREE.Vector3().fromArray(c.target));
+      const up = new THREE.Vector3().fromArray(c.up);
+      if (eye.lengthSq() > 1e-12 && up.lengthSq() > 1e-12 && up.clone().cross(eye).lengthSq() > 1e-12 * eye.lengthSq() * up.lengthSq()) {
+        stopMotion();
+        controls.target.fromArray(c.target);
+        camera.position.fromArray(c.position);
+        camera.up.copy(up.normalize());
+        controls.update();
+        setActiveView(null);
+        // Lit view button only if the restored pose still looks along it.
+        const v = s.activeView && typeof s.activeView === "object" ? s.activeView : null;
+        if (v && ["a", "b", "c", "uvw"].includes(v.id) && triple(v.indices) && v.indices.some((x) => x !== 0)) {
+          try {
+            const dir = new THREE.Vector3(...latticeViewDirection(structure.basis, v.indices).direction).normalize();
+            if (eye.clone().normalize().dot(dir) > 0.99995) {
+              lastOrientIndices = [...v.indices];
+              setActiveView(v.id, dir);
+            }
+          } catch {
+            /* not a valid direction for this cell */
+          }
+        }
+      }
+    }
+    invalidate();
+  }
+  // Debounced autosave; the CIF text is only rewritten when it changed
+  // (session-store keeps it separately).
+  function scheduleSave(delay = 800) {
+    if (saveSuspended > 0 || !structure || !currentText) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveNow, delay);
+  }
+  function saveNow() {
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    if (saveSuspended > 0 || !structure || !currentText || exporter.busy) return Promise.resolve(false);
+    let state;
+    try {
+      state = exportViewerState();
+    } catch (error) {
+      sessionStatus(`Could not collect the settings to save: ${error.message}`, true);
+      return Promise.resolve(false);
+    }
+    return sessionStore
+      .save({ document: { text: currentText, filename: currentFilename }, state, entrypoint: ENTRYPOINT })
+      .then(({ savedAt }) => {
+        sessionStatus(`Saved on this device at ${timeText(savedAt)}.`);
+        return true;
+      })
+      .catch((error) => {
+        // The last good snapshot stays in storage; the viewer keeps working.
+        sessionStatus(`Could not save on this device (${error?.message ?? error}). The viewer keeps working.`, true);
+        return false;
+      });
+  }
+  // Settings edits anywhere in the sidebar or the view overlays, picks and
+  // wheel zoom schedule a save; camera drags save via controls "change".
+  for (const type of ["change", "input"]) document.addEventListener(type, () => scheduleSave(), true);
+  document.addEventListener("pointerup", () => scheduleSave(), true);
+  renderer.domElement.addEventListener("wheel", () => scheduleSave(1200), { passive: true });
+  const flushSave = () => {
+    if (saveTimer) saveNow();
+  };
+  addEventListener("pagehide", flushSave);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushSave();
+  });
+  $("session-save").onclick = () => {
+    if (saveSuspended > 0) return sessionStatus("Saving resumes once the current structure is shown.");
+    saveNow();
+  };
+  // Start fresh: autosave stays suspended so the old session is not
+  // written back, then the page entrypoint loads cleanly.
+  $("session-fresh").onclick = async () => {
+    saveSuspended++;
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    $("session-fresh").disabled = true;
+    try {
+      await sessionStore.clear();
+    } catch (error) {
+      sessionStatus(`Could not clear the saved session (${error?.message ?? error}).`, true);
+      $("session-fresh").disabled = false;
+      saveSuspended--;
+      return;
+    }
+    location.reload();
+  };
+  function loadExample() {
+    const wollastoniteExample = ENTRYPOINT === "wollastonite";
+    const forsteriteExample = ENTRYPOINT === "forsterite";
+    fetch(
+      `${import.meta.env.BASE_URL}${wollastoniteExample ? "examples/wollastonite.cif" : forsteriteExample ? "examples/forsterite.cif" : "example.cif"}`,
+    )
+      .then((r) => {
+        if (!r.ok) throw Error("Example unavailable");
+        return r.text();
+      })
+      .then((text) => {
+        if (!userIntent && (!request || !structure))
+          load(text, wollastoniteExample ? "Wollastonite example" : forsteriteExample ? "Forsterite example" : "Example structure");
+      })
+      .catch(() => {
+        if (userIntent || structure) return;
+        $("loading").hidden = true;
+        $("name").textContent = "Your next crystal";
+        $("source").textContent = "Open a CIF file to begin.";
+      });
+  }
+  // Startup: a saved session for THIS entrypoint resumes (including a file
+  // imported later); a different example URL starts that example. A file
+  // the user opens meanwhile wins (userIntent).
+  (async () => {
+    let session = null;
+    try {
+      session = await sessionStore.load();
+    } catch (error) {
+      sessionStatus(`Saved sessions are unavailable on this device (${error?.message ?? error}). The viewer keeps working.`, true);
+    }
+    if (userIntent || request) return;
+    if (session && (session.entrypoint ?? "") === ENTRYPOINT) {
+      restoredAt = session.savedAt ?? 0;
+      const block = typeof session.state.block === "string" ? session.state.block : undefined;
+      load(session.document.text, session.document.filename, block, session.state);
+    } else loadExample();
+  })();
 }
 initialize();
