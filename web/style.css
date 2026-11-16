@@ -2545,3 +2545,8 @@ button.element[aria-pressed="false"] .dot {
 /* Parked tools share a fixed palette; desktop positions remain untouched. */
 #app[data-parked="true"] .tool-window-head { cursor: default; touch-action: auto; }
 #app[data-parked="true"] .window-grip { display: none; }
+
+/* Persistent history controls, independent of open or parked tool windows. */
+.history-controls { position: absolute; top: calc(100% + 6px); left: 0; width: 148px; display: flex; gap: 6px; }
+.history-controls button { flex: 1; padding: 0 8px; color: var(--overlay-text); background: var(--overlay-bg); border-color: var(--overlay-line); border-radius: 10px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+@media (max-width: 640px) { .history-controls { left: 60px; } }
