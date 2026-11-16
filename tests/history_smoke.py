@@ -7,7 +7,7 @@ from smoke import URL, HERE, diagnostics, choose_tool
 
 
 async def idle(page):
-    await page.wait_for_function("viewerDiagnostics().history.ready && !viewerDiagnostics().history.pending")
+    await page.wait_for_function("viewerDiagnostics().history.ready && !viewerDiagnostics().history.pending", timeout=90000)
     await page.evaluate("new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
 
 
@@ -221,6 +221,12 @@ async def check(browser, phone):
     assert (await diagnostics(page))["history"]["redoCount"] == 0
     await press("#show-atoms")
     await press("#mode-pairs")
+    # Camera history needs a real nonorthogonal crystal, without the
+    # expensive intersecting overlays exercised above. A compact fixture
+    # keeps the settling animation independent of software-GPU throughput.
+    await page.locator("#file").set_input_files(HERE / "skew-direction.cif")
+    await page.wait_for_function("viewerDiagnostics().block === 'skew_direction' && viewerDiagnostics().history.ready")
+    await idle(page)
     # Camera rotation, including damping, is one entry. Pinch on the phone.
     canvas = page.locator("canvas").first
     box = await canvas.bounding_box()
