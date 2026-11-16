@@ -25,6 +25,66 @@
             >Data block<select id="block"></select
           ></label>
           <div id="stats" class="stats"></div>
+          <section class="plot-range">
+            <div class="section-title">Fractional plotting range</div>
+            <form id="range-form" novalidate>
+              <div class="range-grid">
+                <span>Axis</span><span>Minimum</span><span>Maximum</span>
+                <strong>a</strong
+                ><input
+                  id="range-a-min"
+                  type="number"
+                  step="any"
+                  value="0"
+                  aria-label="a minimum"
+                /><input
+                  id="range-a-max"
+                  type="number"
+                  step="any"
+                  value="1"
+                  aria-label="a maximum"
+                />
+                <strong>b</strong
+                ><input
+                  id="range-b-min"
+                  type="number"
+                  step="any"
+                  value="0"
+                  aria-label="b minimum"
+                /><input
+                  id="range-b-max"
+                  type="number"
+                  step="any"
+                  value="1"
+                  aria-label="b maximum"
+                />
+                <strong>c</strong
+                ><input
+                  id="range-c-min"
+                  type="number"
+                  step="any"
+                  value="0"
+                  aria-label="c minimum"
+                /><input
+                  id="range-c-max"
+                  type="number"
+                  step="any"
+                  value="1"
+                  aria-label="c maximum"
+                />
+              </div>
+              <div class="range-actions">
+                <button type="submit" class="primary">Apply range</button
+                ><button type="button" id="range-reset">Reset range</button>
+              </div>
+              <p id="range-error" role="alert"></p>
+            </form>
+            <p class="coordination-help">
+              Negative and fractional bounds are allowed. Lower faces are
+              included; Boundary atoms includes the exact upper faces. Polyhedra
+              remain complete beyond these bounds.
+            </p>
+          </section>
           <section class="coordination">
             <div class="section-title">
               Bonds &amp; polyhedra
@@ -39,9 +99,19 @@
               ><input id="polyhedra-only" type="checkbox"
             /></label>
             <p id="isolation-note" class="coordination-help">
-              Full structure visible. Polyhedra only keeps completed polyhedra
-              and their atoms.
+              All atoms are included. Polyhedra only keeps completed polyhedra
+              and their atoms; Show atoms and Elements control sphere
+              visibility.
             </p>
+            <label class="toggle"
+              ><span>Show atoms</span
+              ><input
+                id="show-atoms"
+                type="checkbox"
+                checked
+                aria-label="Show atoms; preserves individual element visibility choices"
+                title="Show or hide all spheres, preserving choices in Elements"
+            /></label>
             <div id="pair-rules"></div>
             <p class="coordination-help">
               New structures reset the pairs. Suggested oxide cutoffs are

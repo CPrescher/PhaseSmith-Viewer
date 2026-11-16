@@ -1,6 +1,12 @@
 import * as THREE from "three";
 import { TrackballControls } from "three/addons/controls/TrackballControls.js";
 import "./style.css";
+import {
+  defaultRanges,
+  validateRanges,
+  translatedSites,
+  rangeEdges,
+} from "./plot-range.js";
 import { latticeViewDirection } from "./view-direction.js";
 import { buildCoordinationEnvironments, convexHull } from "./coordination.js";
 const $ = (id) => document.getElementById(id),
@@ -86,6 +92,11 @@ function initialize() {
     coordinationTotals = {},
     nextRule = 0;
   const pairColors = ["#62d5df", "#efa04c", "#c6a0ef", "#8cdf9b", "#ef95b3"];
+  const faceMeshes = new Map();
+  const hiddenElements = new Set();
+  const atomVisible = (a) =>
+    $("show-atoms").checked && !hiddenElements.has(a.element);
+  let plotRanges = defaultRanges();
   let structure,
     atoms = [],
     meshes = [],
@@ -180,8 +191,16 @@ function initialize() {
   function atomKey(a) {
     return `${a.sourceIndex}:${a.frac.map((v) => Math.round(v * 1e9)).join(",")}`;
   }
-  function build(preserve = true) {
+  function build(
+    preserve = true,
+    plottedSites = translatedSites(
+      structure.atoms,
+      plotRanges,
+      $("boundary").checked,
+    ),
+  ) {
     const selectedKeys = preserve ? selection.map(atomKey) : [];
+    faceMeshes.clear();
     dispose(model);
     scene.remove(model);
     model = new THREE.Group();
@@ -193,33 +212,22 @@ function initialize() {
     updateSelection();
     const corners = [];
     for (let i = 0; i < 8; i++)
-      corners.push(cart([i & 1, (i >> 1) & 1, (i >> 2) & 1]));
+      corners.push(cart(plotRanges.map((r, axis) => r[(i >> axis) & 1])));
     const box = new THREE.Box3().setFromPoints(corners);
     modelCenter = box.getCenter(new THREE.Vector3());
-    const boundary = $("boundary").checked;
-    structure.atoms.forEach((a, index) => {
-      // PhaseSmith already returns canonical fractions in [0, 1). Keep their
-      // float64 precision: a small positive coordinate is not a cell face.
-      const f = a.frac;
-
-      const options = f.map((v) => (boundary && v === 0 ? [0, 1] : [v]));
-      for (const x of options[0])
-        for (const y of options[1])
-          for (const z of options[2]) {
-            const frac = [x, y, z],
-              p = cart(frac);
-            atoms.push({
-              ...a,
-              id: atoms.length,
-              sourceIndex: index,
-              frac,
-              position: p.clone().sub(modelCenter),
-              cartesian: p.toArray(),
-            });
-          }
+    atoms = plottedSites.map((a, id) => {
+      const p = cart(a.frac);
+      return {
+        ...a,
+        id,
+        position: p.clone().sub(modelCenter),
+        cartesian: p.toArray(),
+      };
     });
     buildCoordination();
-    selection = atoms.filter((a) => selectedKeys.includes(atomKey(a)));
+    selection = atoms.filter(
+      (a) => selectedKeys.includes(atomKey(a)) && atomVisible(a),
+    );
     const byElement = new Map();
     atoms.forEach((a) => {
       if (!byElement.has(a.element)) byElement.set(a.element, []);
@@ -246,6 +254,7 @@ function initialize() {
         }),
         list.length,
       );
+      mesh.visible = atomVisible(list[0]);
       mesh.userData.atoms = list;
       list.forEach((a, i) => {
         a.radius = (radii[e] || 0.42) * size;
@@ -264,14 +273,7 @@ function initialize() {
       fitBounds.expandByPoint(atom.position.clone().addScalar(atom.radius));
       fitBounds.expandByPoint(atom.position.clone().addScalar(-atom.radius));
     }
-    const points = [];
-    for (let i = 0; i < 8; i++)
-      for (let axis = 0; axis < 3; axis++)
-        if (!(i & (1 << axis)))
-          points.push(
-            corners[i].clone().sub(modelCenter),
-            corners[i | (1 << axis)].clone().sub(modelCenter),
-          );
+    const points = rangeEdges(plotRanges).map((p) => cart(p).sub(modelCenter));
     cellLines = new THREE.LineSegments(
       new THREE.BufferGeometry().setFromPoints(points),
       new THREE.LineBasicMaterial({
@@ -288,8 +290,7 @@ function initialize() {
     camera.near = Math.max(fitDistance / 1000, 0.001);
     camera.far = fitDistance * 100;
     camera.updateProjectionMatrix();
-    $("atom-summary").textContent =
-      `${atoms.length.toLocaleString()} visible atoms`;
+    updateAtomSummary();
     updateSelection();
     invalidate();
   }
@@ -307,6 +308,7 @@ function initialize() {
             cutoff: cutoffs[e],
             bonds: false,
             polyhedra: false,
+            opacity: 0.34,
           }))
       : [];
     rules.sort((a, b) => (a.center === "Si" ? -1 : b.center === "Si" ? 1 : 0));
@@ -318,6 +320,14 @@ function initialize() {
       rules = rules.filter((r) => r.center === "Si" || r.center === "Mg");
       rules.forEach((r) => {
         r.cutoff = r.center === "Si" ? 1.8 : 2.3;
+        r.polyhedra = true;
+      });
+      $("polyhedra-only").checked = true;
+      $("boundary").checked = false;
+    } else if (currentFilename === "Wollastonite example") {
+      rules = rules.filter((r) => r.center === "Si");
+      rules.forEach((r) => {
+        r.cutoff = 1.8;
         r.polyhedra = true;
       });
       $("polyhedra-only").checked = true;
@@ -388,6 +398,12 @@ function initialize() {
             rule[field] =
               field === "cutoff" ? Number(input.value) : input.value;
             title.textContent = `${rule.center} → ${rule.neighbor}`;
+            card
+              .querySelector('[data-field="opacity"]')
+              .setAttribute(
+                "aria-label",
+                `${rule.center} to ${rule.neighbor} polyhedra face opacity`,
+              );
             build();
           };
           label.append(input);
@@ -421,7 +437,41 @@ function initialize() {
         const counts = document.createElement("p");
         counts.className = "pair-counts";
         counts.id = `pair-count-${rule.id}`;
-        card.append(heading, fields, switches, counts);
+        const opacityLabel = document.createElement("label");
+        opacityLabel.className = "polyhedra-opacity";
+        const opacityHeading = document.createElement("span");
+        opacityHeading.textContent = "Face opacity";
+        const opacityValue = document.createElement("output");
+        opacityValue.id = `pair-opacity-value-${rule.id}`;
+        const opacityInput = document.createElement("input");
+        opacityInput.type = "range";
+        opacityInput.min = "0";
+        opacityInput.max = "100";
+        opacityInput.step = "1";
+        opacityInput.value = Math.round((rule.opacity ?? 0.34) * 100);
+        opacityInput.id = `pair-opacity-${rule.id}`;
+        opacityInput.dataset.field = "opacity";
+        opacityInput.setAttribute(
+          "aria-label",
+          `${rule.center} to ${rule.neighbor} polyhedra face opacity`,
+        );
+        opacityInput.setAttribute("aria-describedby", opacityValue.id);
+        opacityValue.htmlFor = opacityInput.id;
+        const updateOpacity = () => {
+          rule.opacity = Number(opacityInput.value) / 100;
+          opacityValue.value = `${opacityInput.value}%`;
+          opacityInput.setAttribute("aria-valuetext", `${opacityInput.value}%`);
+          const stat = coordinationStats.find((s) => s.id === rule.id);
+          if (stat) stat.opacity = rule.opacity;
+          const mesh = faceMeshes.get(rule.id);
+          if (mesh) setFaceOpacity(mesh, rule.opacity);
+          invalidate();
+        };
+        opacityInput.oninput = updateOpacity;
+        opacityValue.value = `${opacityInput.value}%`;
+        opacityInput.setAttribute("aria-valuetext", `${opacityInput.value}%`);
+        opacityLabel.append(opacityHeading, opacityValue, opacityInput);
+        card.append(heading, fields, switches, opacityLabel, counts);
         return card;
       }),
     );
@@ -436,6 +486,7 @@ function initialize() {
       cutoff: 2.5,
       bonds: false,
       polyhedra: false,
+      opacity: 0.34,
     });
     renderRules();
     build();
@@ -443,6 +494,30 @@ function initialize() {
   $("polyhedra-only").onchange = () => {
     if (structure) build();
   };
+  function setFaceOpacity(mesh, opacity) {
+    mesh.visible = opacity > 0;
+    mesh.material.opacity = opacity;
+    const transparencyChanged = mesh.material.transparent !== opacity < 1;
+    mesh.material.transparent = opacity < 1;
+    mesh.material.depthWrite = opacity === 1;
+    if (transparencyChanged) mesh.material.needsUpdate = true;
+  }
+  function updateAtomSummary() {
+    const visible = atoms.filter(atomVisible).length;
+    const hidden = atoms.length - visible;
+    $("atom-summary").textContent =
+      `${visible.toLocaleString()} visible atoms${hidden ? ` · ${hidden.toLocaleString()} hidden` : ""}`;
+  }
+  function updateAtomVisibility() {
+    meshes.forEach((mesh) => {
+      mesh.visible = atomVisible(mesh.userData.atoms[0]);
+    });
+    selection = selection.filter(atomVisible);
+    updateSelection();
+    updateAtomSummary();
+    invalidate();
+  }
+  $("show-atoms").onchange = updateAtomVisibility;
   function buildCoordination() {
     const base = [...atoms];
     const all = new Map(base.map((a) => [atomKey(a), a]));
@@ -551,7 +626,12 @@ function initialize() {
       );
       acceptedBonds.flat().forEach((atom) => participating.add(atomKey(atom)));
       plan.stat.outsideAtomCount = [...participating].filter((key) =>
-        all.get(key)?.frac.some((v) => v < -1e-8 || v > 1 + 1e-8),
+        all
+          .get(key)
+          ?.frac.some(
+            (v, i) =>
+              v < plotRanges[i][0] - 1e-8 || v > plotRanges[i][1] + 1e-8,
+          ),
       ).length;
       if (acceptedBonds.length) {
         const cylinders = new THREE.InstancedMesh(
@@ -592,29 +672,27 @@ function initialize() {
           new THREE.Float32BufferAttribute(positions, 3),
         );
         geometry.computeVertexNormals();
-        model.add(
-          new THREE.Mesh(
-            geometry,
-            new THREE.MeshStandardMaterial({
-              color: plan.color,
-              transparent: true,
-              opacity: 0.34,
-              side: THREE.DoubleSide,
-              depthWrite: false,
-              roughness: 0.8,
-            }),
-          ),
+        const faces = new THREE.Mesh(
+          geometry,
+          new THREE.MeshStandardMaterial({
+            color: plan.color,
+            side: THREE.DoubleSide,
+            roughness: 0.8,
+          }),
         );
-        model.add(
-          new THREE.LineSegments(
-            new THREE.BufferGeometry().setFromPoints(edges),
-            new THREE.LineBasicMaterial({
-              color: plan.color,
-              transparent: true,
-              opacity: 0.9,
-            }),
-          ),
+        setFaceOpacity(faces, plan.stat.opacity ?? 0.34);
+        faceMeshes.set(plan.stat.id, faces);
+        model.add(faces);
+        const outline = new THREE.LineSegments(
+          new THREE.BufferGeometry().setFromPoints(edges),
+          new THREE.LineBasicMaterial({
+            color: plan.color,
+            transparent: true,
+            opacity: 0.9,
+          }),
         );
+        faces.userData.outline = outline;
+        model.add(outline);
       }
     }
     atoms = [...visible.values()];
@@ -622,7 +700,9 @@ function initialize() {
       a.id = i;
     });
     const outside = atoms.filter((a) =>
-      a.frac.some((v) => v < -1e-8 || v > 1 + 1e-8),
+      a.frac.some(
+        (v, i) => v < plotRanges[i][0] - 1e-8 || v > plotRanges[i][1] + 1e-8,
+      ),
     ).length;
     coordinationTotals = {
       bondCount: bondKeys.size,
@@ -643,9 +723,9 @@ function initialize() {
     }
     $("isolation-note").textContent = isolated
       ? polyhedronCount
-        ? "Showing completed polyhedra, their centers, and all ligand atoms. Unconnected atoms are hidden."
+        ? "Includes completed polyhedra, their centers, and all ligand atoms. Unconnected atoms are excluded; Show atoms and Elements control sphere visibility."
         : "No complete polyhedra at these cutoffs. Adjust the cutoff, enable another pair, or turn off Polyhedra only to inspect the full structure."
-      : "Full structure visible. Polyhedra only keeps completed polyhedra and their atoms.";
+      : "All atoms are included. Polyhedra only keeps completed polyhedra and their atoms; Show atoms and Elements control sphere visibility.";
   }
   function orient(indices) {
     if (!structure) return;
@@ -693,8 +773,8 @@ function initialize() {
     }
     orient(fields.map(Number));
   };
-  function reset() {
-    selection = [];
+  function reset(keepOrientation = false) {
+    if (!keepOrientation) selection = [];
     updateSelection();
     const sphere = fitBounds.getBoundingSphere(new THREE.Sphere());
     const vertical = THREE.MathUtils.degToRad(camera.fov / 2);
@@ -703,9 +783,11 @@ function initialize() {
       (Math.max(sphere.radius, 1) / Math.sin(Math.min(vertical, horizontal))) *
       1.12;
     const target = sphere.center;
-    const direction = new THREE.Vector3(0.68, 0.48, 0.8).normalize();
+    const direction = keepOrientation
+      ? camera.position.clone().sub(controls.target).normalize()
+      : new THREE.Vector3(0.68, 0.48, 0.8).normalize();
     stopMotion();
-    camera.up.set(0, 1, 0);
+    if (!keepOrientation) camera.up.set(0, 1, 0);
     camera.position.copy(target).addScaledVector(direction, fitDistance);
     controls.target.copy(target);
     controls.maxDistance = fitDistance * 12;
@@ -763,7 +845,9 @@ function initialize() {
           )
           .join(" ↔ ") +
         (selection.length === 1 ? " · Select a second atom." : "")
-      : "Tap two atoms to measure their separation.";
+      : $("show-atoms").checked
+        ? "Tap two atoms to measure their separation."
+        : "Show atoms to measure their separation.";
     invalidate();
   }
   const raycaster = new THREE.Raycaster(),
@@ -808,7 +892,11 @@ function initialize() {
     );
     syncViewCamera();
     raycaster.setFromCamera(pointer, viewCamera);
-    const hit = raycaster.intersectObjects(meshes, false)[0];
+    if (!$("show-atoms").checked) return;
+    const hit = raycaster.intersectObjects(
+      meshes.filter((mesh) => mesh.visible),
+      false,
+    )[0];
     if (hit) {
       const atom = hit.object.userData.atoms[hit.instanceId];
       if (selection.length === 2) selection = [];
@@ -828,6 +916,8 @@ function initialize() {
   }
   function display(data) {
     structure = data;
+    hiddenElements.clear();
+    $("show-atoms").checked = true;
     $("name").textContent = data.name || data.block || "Crystal structure";
     $("source").textContent = currentFilename || "Example structure · built in";
     $("stats").replaceChildren(
@@ -841,8 +931,22 @@ function initialize() {
     $("element-count").textContent = counts.size;
     $("elements").replaceChildren(
       ...[...counts].map(([e, n]) => {
-        const d = document.createElement("div");
+        const d = document.createElement("button");
+        d.type = "button";
         d.className = "element";
+        d.dataset.element = e;
+        d.setAttribute(
+          "aria-label",
+          `Show ${e} atoms; remembered when Show atoms is off`,
+        );
+        d.setAttribute("aria-pressed", "true");
+        d.title = `Toggle ${e} spheres. Bonds and polyhedra stay visible; Show atoms preserves this choice.`;
+        d.onclick = () => {
+          if (hiddenElements.has(e)) hiddenElements.delete(e);
+          else hiddenElements.add(e);
+          d.setAttribute("aria-pressed", String(!hiddenElements.has(e)));
+          updateAtomVisibility();
+        };
         const dot = document.createElement("span");
         dot.className = "dot";
         dot.style.background = colorFor(e);
@@ -866,9 +970,13 @@ function initialize() {
     const warnings = data.warnings || [];
     $("warnings").hidden = !warnings.length;
     $("warnings").textContent = warnings.join(" ");
+    plotRanges = defaultRanges();
+    if (currentFilename === "Wollastonite example") plotRanges[1] = [0, 3];
+    writeRanges();
     resetRules();
     build(false);
     reset();
+    if (currentFilename === "Wollastonite example") orient([0, 0, 1]);
   }
   const worker = new Worker(new URL("./import-worker.js", import.meta.url), {
     type: "module",
@@ -936,13 +1044,58 @@ function initialize() {
     selection = [];
     updateSelection();
   };
-  $("reset").onclick = reset;
+  $("reset").onclick = () => reset();
+  function writeRanges() {
+    for (const [i, axis] of ["a", "b", "c"].entries())
+      for (const [j, end] of ["min", "max"].entries())
+        $(`range-${axis}-${end}`).value = plotRanges[i][j];
+    $("range-error").textContent = "";
+  }
+  function applyRanges(next) {
+    try {
+      next = validateRanges(next);
+      const sites = translatedSites(
+        structure.atoms,
+        next,
+        $("boundary").checked,
+      );
+      plotRanges = next;
+      build(true, sites);
+      reset(true);
+      writeRanges();
+    } catch (error) {
+      $("range-error").textContent = error.message;
+    }
+  }
+  $("range-form").onsubmit = (e) => {
+    e.preventDefault();
+    if (!structure) return;
+    applyRanges(
+      ["a", "b", "c"].map((axis) =>
+        ["min", "max"].map((end) => {
+          const value = $(`range-${axis}-${end}`).value.trim();
+          return value === "" ? NaN : Number(value);
+        }),
+      ),
+    );
+  };
+  $("range-reset").onclick = () => {
+    if (structure) applyRanges(defaultRanges());
+  };
   $("cell").onchange = () => {
     if (cellLines) cellLines.visible = $("cell").checked;
     invalidate();
   };
   $("boundary").onchange = () => {
-    if (structure) build();
+    if (structure) {
+      try {
+        build();
+        $("range-error").textContent = "";
+      } catch (error) {
+        $("boundary").checked = !$("boundary").checked;
+        $("range-error").textContent = error.message;
+      }
+    }
   };
   $("size").oninput = () => {
     if (!structure) return;
@@ -971,17 +1124,40 @@ function initialize() {
         const p = a.position.clone().project(viewCamera);
         return {
           id: a.id,
+          visible: atomVisible(a),
           element: a.element,
           label: a.label,
           frac: [...a.frac],
           cartesian: [...a.cartesian],
           sourceIndex: a.sourceIndex,
-          outsideCell: a.frac.some((v) => v < -1e-8 || v > 1 + 1e-8),
+          outsideCell: a.frac.some(
+            (v, i) =>
+              v < plotRanges[i][0] - 1e-8 || v > plotRanges[i][1] + 1e-8,
+          ),
           x: rect.left + ((p.x + 1) * rect.width) / 2,
           y: rect.top + ((1 - p.y) * rect.height) / 2,
           z: p.z,
         };
       }),
+      atomsVisible: $("show-atoms").checked,
+      visibleAtomCount: atoms.filter(atomVisible).length,
+      renderedAtomCount: meshes
+        .filter((mesh) => mesh.visible)
+        .reduce((sum, mesh) => sum + mesh.count, 0),
+      hiddenElements: [...hiddenElements],
+      selectionObjectCount: selectionGroup.children.length,
+      sphereGeometry: meshes.map((mesh) => mesh.geometry.uuid),
+      faceMaterials: [...faceMeshes].map(([id, mesh]) => ({
+        id,
+        opacity: mesh.material.opacity,
+        visible: mesh.visible,
+        transparent: mesh.material.transparent,
+        depthWrite: mesh.material.depthWrite,
+        geometry: mesh.geometry.uuid,
+        material: mesh.material.uuid,
+        outlineVisible: mesh.userData.outline?.visible,
+        vertexCount: mesh.geometry.attributes.position.count,
+      })),
       selectedIds: selection.map((a) => a.id),
       distance,
       camera: {
@@ -995,14 +1171,18 @@ function initialize() {
         ...coordinationTotals,
         isolated: $("polyhedra-only").checked,
       },
+      ranges: plotRanges.map((r) => [...r]),
+      cellSegmentCount: cellLines?.geometry.attributes.position.count / 2,
       block: structure?.block,
       basis: structure?.basis,
     };
   };
+  const wollastoniteExample =
+    new URLSearchParams(location.search).get("example") === "wollastonite";
   const forsteriteExample =
     new URLSearchParams(location.search).get("example") === "forsterite";
   fetch(
-    `${import.meta.env.BASE_URL}${forsteriteExample ? "examples/forsterite.cif" : "example.cif"}`,
+    `${import.meta.env.BASE_URL}${wollastoniteExample ? "examples/wollastonite.cif" : forsteriteExample ? "examples/forsterite.cif" : "example.cif"}`,
   )
     .then((r) => {
       if (!r.ok) throw Error("Example unavailable");
@@ -1012,7 +1192,11 @@ function initialize() {
       if (!userIntent && !request)
         load(
           text,
-          forsteriteExample ? "Forsterite example" : "Example structure",
+          wollastoniteExample
+            ? "Wollastonite example"
+            : forsteriteExample
+              ? "Forsterite example"
+              : "Example structure",
         );
     })
     .catch(() => {

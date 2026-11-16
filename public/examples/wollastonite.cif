@@ -1,0 +1,37 @@
+# Aus der Koordinatentabelle der Freiburger Kristalle-Uebung 4 (2023).
+data_wollastonite
+_chemical_name_mineral 'Wollastonite'
+_chemical_formula_sum 'Ca Si O3'
+_symmetry_space_group_name_H-M 'P -1'
+_space_group_IT_number 2
+_cell_length_a 7.9258
+_cell_length_b 7.3202
+_cell_length_c 7.0653
+_cell_angle_alpha 90.055
+_cell_angle_beta 95.217
+_cell_angle_gamma 103.426
+loop_
+_space_group_symop_operation_xyz
+'x,y,z'
+'-x,-y,-z'
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+CaM1 Ca .19831 .42266 .76060
+CaM2 Ca .20241 .92919 .76401
+CaM3 Ca .50333 .75040 .52691
+Si1 Si .18510 .38750 .26840
+Si2 Si .18490 .95420 .26910
+Si3 Si .39730 .72360 .05610
+OA1 O .30340 .46160 .46280
+OA2 O .30140 .93850 .46410
+OA3 O .57050 .76880 .19880
+OB1 O .98320 .37390 .26550
+OB2 O .98190 .86770 .26480
+OB3 O .40180 .72660 .82960
+OC1 O .21830 .17850 .22540
+OC2 O .27130 .87040 .09380
+OC3 O .27350 .51260 .09310

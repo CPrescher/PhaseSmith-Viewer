@@ -714,3 +714,73 @@ select {
     min-height: 42px;
   }
 }
+
+.range-grid {
+  display: grid;
+  grid-template-columns: 30px 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.range-grid input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  min-height: 44px;
+  border: 1px solid #9baebe;
+  border-radius: 5px;
+  font: inherit;
+}
+.range-grid > span {
+  font-size: 11px;
+}
+.range-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.range-actions button {
+  min-height: 44px;
+  padding: 9px 12px;
+  border-radius: 6px;
+}
+#range-error {
+  color: #a63e34;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.polyhedra-opacity {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  align-items: center;
+  font-size: 12px;
+  margin-top: 12px;
+}
+.polyhedra-opacity output {
+  font-variant-numeric: tabular-nums;
+}
+.polyhedra-opacity input {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  accent-color: var(--pair-color);
+  touch-action: pan-y;
+}
+
+button.element {
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  min-height: 44px;
+}
+button.element[aria-pressed="false"] {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+button.element:focus-visible {
+  outline: 2px solid #267f90;
+  outline-offset: 2px;
+}
