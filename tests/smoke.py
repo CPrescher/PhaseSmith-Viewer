@@ -71,6 +71,7 @@ async def run_browser(browser_type, touch=False):
     loaded = await diagnostics(page)
     assert len(loaded['atoms']) == 9, loaded
     assert sorted(round(math.sqrt(sum(v*v for v in axis)), 6) for axis in loaded['basis']) == [4,5,6], loaded
+    await page.locator('#measure-distance').click()
     a,b = await pair(page)
     for atom in (a,b):
         if touch:

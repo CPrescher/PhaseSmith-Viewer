@@ -45,6 +45,7 @@ async def run(browser_type, touch):
     await settle(page)
     # The public example is a real teaching CIF, not a synthetic chain.
     assert "wollaston" in (await diagnostics(page))["block"].lower()
+    await click_control(page, page.locator("#measure-distance"), touch)
     rows = page.locator("#pair-rules .pair-rule")
     while await rows.count():
         await click_control(page, rows.first.locator('button[aria-label^="Delete "]'), touch)

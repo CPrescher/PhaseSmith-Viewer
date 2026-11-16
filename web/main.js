@@ -46,7 +46,7 @@ function initialize() {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.domElement.setAttribute(
     "aria-label",
-    "Interactive crystal structure. Drag to rotate, scroll or pinch to zoom, and select two atoms to measure.",
+    "Interactive crystal structure. Drag to rotate, scroll or pinch to zoom, and select an atom for information. Choose Distance or Angle to measure.",
   );
   renderer.domElement.setAttribute("role", "img");
   viewport.append(renderer.domElement);
@@ -217,7 +217,7 @@ function initialize() {
     modelCenter = new THREE.Vector3(),
     distance = null,
     angle = null,
-    measureMode = "distance";
+    measureMode = "info";
   scene.add(selectionGroup);
   function render() {
     frame = 0;

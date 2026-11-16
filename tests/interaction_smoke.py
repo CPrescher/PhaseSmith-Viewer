@@ -52,7 +52,8 @@ async def check(browser, width, height):
         rel_tol=1e-7,
     )
 
-    await page.locator("#measure-info").tap()
+    assert (await diagnostics(page))["measureMode"] == "info"
+    assert await page.locator("#measure-info").get_attribute("aria-pressed") == "true"
     picked = []
     for reverse in [False, True]:
         current = await diagnostics(page)

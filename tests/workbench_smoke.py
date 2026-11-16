@@ -93,6 +93,8 @@ async def check_phone(browser):
     if not await page.locator("#boundary").is_checked():
         await page.locator("#boundary").tap()
         await settle(page)
+    await page.locator("#measure-distance").tap()
+    await settle(page)
     for atom in await pair(page):
         await page.touchscreen.tap(atom["x"], atom["y"])
     await settle(page)

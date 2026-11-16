@@ -155,6 +155,7 @@ async def run(browser_type, touch):
     await frames(page, 60)
     assert abs(norm(eye(await diagnostics(page))) - before) > 0.01
     # Real taps remain functional after complete rotations and zoom.
+    await page.locator("#measure-distance").click()
     async def exposed_atoms():
         atoms = (await diagnostics(page))["atoms"]
         hit_ids = await page.evaluate(

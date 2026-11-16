@@ -97,18 +97,27 @@
             </div>
             <section
               id="measure-overlay"
-              class="measurement"
-              aria-label="Measurement"
+              class="measurement info-mode"
+              aria-label="Atom info"
             >
               <div class="measure-row">
                 <div id="distance" class="distance" aria-live="polite">
-                  — <span>Å</span>
+                  —
                 </div>
-                <div class="measure-mode" role="group" aria-label="Measure">
+                <div class="measure-mode" role="group" aria-label="Selection mode">
+                  <button
+                    id="measure-info"
+                    class="view-button info-button"
+                    aria-pressed="true"
+                    aria-label="Info"
+                    title="Details of one atom: label, occupancy, coordinates, CN and volume"
+                  >
+                    i
+                  </button>
                   <button
                     id="measure-distance"
                     class="view-button"
-                    aria-pressed="true"
+                    aria-pressed="false"
                     aria-label="Distance"
                     title="Distance between two atoms"
                   >
@@ -123,26 +132,17 @@
                   >
                     ∠
                   </button>
-                  <button
-                    id="measure-info"
-                    class="view-button info-button"
-                    aria-pressed="false"
-                    aria-label="Info"
-                    title="Details of one atom: label, occupancy, coordinates, CN and volume"
-                  >
-                    i
-                  </button>
                 </div>
                 <button
                   id="clear"
                   class="view-button"
-                  aria-label="Clear measurement"
-                  title="Clear measurement"
+                  aria-label="Clear selection"
+                  title="Clear selection"
                 >
                   ✕
                 </button>
               </div>
-              <p id="selection">Tap two atoms to measure.</p>
+              <p id="selection">Tap an atom for its details.</p>
             </section>
           </div>
           <div id="atom-labels" class="atom-labels" aria-hidden="true"></div>

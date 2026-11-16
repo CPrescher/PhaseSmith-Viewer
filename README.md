@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open the local address printed by Vite. Pick **Open CIF** to load a file from the device. Drag to rotate, use the wheel or pinch to zoom, then click or tap two atoms. The result is the Cartesian distance in ångströms between the selected images. This distinction matters across cell faces: two periodic copies of the same crystallographic site can be a lattice translation apart.
+Open the local address printed by Vite. Pick **Open CIF** to load a file from the device. Drag to rotate and use the wheel or pinch to zoom. **Info** is active by default: click or tap an atom to inspect it. To measure, choose **Distance** (↔) and select two atoms, or **Angle** (∠) and select three. Distances are Cartesian separations in ångströms between the selected images. This distinction matters across cell faces: two periodic copies of the same crystallographic site can be a lattice translation apart.
 
 ## Orientation
 
