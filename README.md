@@ -63,7 +63,7 @@ The Lattice **Labels** toggle annotates added planes and directions. **Show m in
 
 Choose **Info** to inspect one atom at a time, including its CIF label, element, occupancy, displayed coordinates and configured coordination information.
 
-The left-click action buttons stay fixed at the top right of the crystal view. Atom details and measurement results appear in a separate card below them; **Clear** keeps its place and is dimmed until an atom is selected. On phones, the buttons stay in a vertical column and the full details remain in the lower panel.
+The left-click action buttons stay fixed at the top right of the crystal view. Switching between **Info**, **Distance**, and **Angle** clears the current selection so the new mode starts fresh. Atom details and measurement results appear in a separate card below them; **Clear** keeps its place and is dimmed until an atom is selected. On phones, the buttons stay in a vertical column and the full details remain in the lower panel.
 
 Use **∠** in the measurement control and pick three atoms in A–B–C order. The second atom is the angle vertex. Select **↔** (Distance) to return to two-atom distance measurements.
 

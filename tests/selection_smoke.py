@@ -96,9 +96,38 @@ async def check(browser, w, h, touch):
     await pick("C")
     await pick("A")
     await count(1)
+
+    # Every mode transition clears both partial and completed selections.
+    # Pressing the current mode again preserves the picks.
+    for source, labels in [("info", "A"), ("distance", "AB"), ("angle", "ABC")]:
+        for target in ("info", "distance", "angle"):
+            if source == target:
+                continue
+            for n in range(1, len(labels) + 1):
+                await act(page.locator(f"#measure-{source}"))
+                if await page.locator("#clear").is_enabled():
+                    await act(page.locator("#clear"))
+                for label in labels[:n]:
+                    await pick(label)
+                await count(n)
+                picked = (await diagnostics(page))["selectedIds"]
+                await act(page.locator(f"#measure-{source}"))
+                assert (await diagnostics(page))["selectedIds"] == picked
+                await act(page.locator(f"#measure-{target}"))
+                await count(0)
+                state = await diagnostics(page)
+                assert state["measureMode"] == target
+                assert state["distance"] is None and state["angle"] is None
+                assert state["atomInfo"] is None
+                assert await page.locator("#clear").is_disabled()
+                assert not await page.locator("#measure-overlay").evaluate(
+                    "el => el.classList.contains('active')"
+                )
+                await pick("A")
+                await count(1)
     await page.close()
     print(
-        f"{w}×{h}: Info/completed clear, partial picks and drag/right-click preserved",
+        f"{w}×{h}: mode switches reset picks; empty clicks and gestures behave correctly",
         flush=True,
     )
 

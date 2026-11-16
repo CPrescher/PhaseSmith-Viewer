@@ -2015,9 +2015,9 @@ function initialize() {
       ...lines.map((line) => Object.assign(document.createElement("span"), { textContent: line, title: line })),
     );
   }
-  // Distance (2 atoms) · Angle (3) · Info (1). Switching keeps the picked
-  // atoms that still fit the new mode.
+  // Distance (2 atoms) · Angle (3) · Info (1). Each mode starts a fresh selection.
   function setMeasureMode(mode) {
+    if (mode !== measureMode) selection = [];
     measureMode = mode;
     for (const [id, m] of [
       ["measure-distance", "distance"],
@@ -2030,8 +2030,6 @@ function initialize() {
       { angle: "Angle measurement", distance: "Distance measurement", info: "Atom info" }[mode],
     );
     $("measure-overlay").classList.toggle("info-mode", mode === "info");
-    const limit = { distance: 2, angle: 3, info: 1 }[mode];
-    if (selection.length > limit) selection = selection.slice(-limit);
     updateSelection();
   }
   $("measure-distance").onclick = () => setMeasureMode("distance");
