@@ -1,0 +1,1304 @@
+[
+  {
+    "id": "albite",
+    "name": "Albite",
+    "formula": "NaAlSi3O8",
+    "family": "Feldspars",
+    "spaceGroup": "C -1",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "plagioclase sodium low albite"
+    ],
+    "description": "Low-albite reference using the single-Na-site refinement; near-end-member composition.",
+    "kind": "Reference structure",
+    "file": "structures/albite.cif",
+    "sha256": "06ef5b155374eca4ddc37b578d68d24a46cad323bb9faac8b42907eeffbb55b2",
+    "source": {
+      "label": "COD 9000783",
+      "url": "https://www.crystallography.net/cod/9000783.html",
+      "citation": "Harlow, G. E.; Brown, G. E. (1980). Low albite: An X-Ray and neutron diffraction study Sample: X-ray single Na atom Note: this sample of feldspar is from Amelia, Virginia. American Mineralogist 65, 986–995.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al1.005 Na0.986 O8 Si2.995 -"
+  },
+  {
+    "id": "almandine",
+    "name": "Almandine",
+    "formula": "Fe3Al2Si3O12",
+    "family": "Garnets",
+    "spaceGroup": "I a -3 d",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "garnet nesosilicate"
+    ],
+    "description": "Synthetic Fe-Al garnet end member at 293 K.",
+    "kind": "Reference structure",
+    "file": "structures/almandine.cif",
+    "sha256": "f31dc463c0f0d919b97ac347d26bb4d28eca063249a3e303d8b059337f397127",
+    "source": {
+      "label": "COD 9001431",
+      "url": "https://www.crystallography.net/cod/9001431.html",
+      "citation": "Armbruster, T.; Geiger, C. A.; Lager, G. A. (1992). Single-crystal X-ray structure study of synthetic pyrope almandine garnets at 100 and 293 K Py0-Alm100 at T = 293 K, Pyrope - Almandine join. American Mineralogist 77, 512–521.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al2 Fe3 O12 Si3 -"
+  },
+  {
+    "id": "andalusite",
+    "name": "Andalusite",
+    "formula": "Al2SiO5",
+    "family": "Aluminosilicates",
+    "spaceGroup": "P n n m",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "nesosilicate metamorphic index mineral"
+    ],
+    "description": "Al2SiO5 polymorph; the 25 °C reference structure.",
+    "kind": "Reference structure",
+    "file": "structures/andalusite.cif",
+    "sha256": "7e0c81e924134fccc152ff687feee35cb12a7123c071badef463bed5eaab0fe4",
+    "source": {
+      "label": "COD 9000715",
+      "url": "https://www.crystallography.net/cod/9000715.html",
+      "citation": "Winter, J. K.; Ghose, S. (1979). Thermal expansion and high-temperature crystal chemistry of the Al2SiO5 polymorphs T = 25 deg C. American Mineralogist 64, 573–586.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al2 O5 Si -"
+  },
+  {
+    "id": "anhydrite",
+    "name": "Anhydrite",
+    "formula": "CaSO4",
+    "family": "Sulfates",
+    "spaceGroup": "A m m a",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "evaporite"
+    ],
+    "description": "Orthorhombic anhydrous calcium sulfate.",
+    "kind": "Reference structure",
+    "file": "structures/anhydrite.cif",
+    "sha256": "0eeb5c43f90f63c9aecfa6aa28b7744e0c95aeaf34310ce7c2b0632c12480b70",
+    "source": {
+      "label": "COD 9004096",
+      "url": "https://www.crystallography.net/cod/9004096.html",
+      "citation": "Hawthorne, F. C.; Ferguson, R. B. (1975). Anhydrous sulphates. II. Refinement of the crystal structure of anhydrite. The Canadian Mineralogist 13, 289–292.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Ca O4 S -"
+  },
+  {
+    "id": "annite",
+    "name": "Annite",
+    "formula": "KFe3(AlSi3O10)(OH)2",
+    "family": "Micas & clays",
+    "spaceGroup": "C 1 2/m 1",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "biotite Fe mica phyllosilicate"
+    ],
+    "description": "Synthetic Fe mica, sample A44. Hydrogen positions are not reported in this CIF.",
+    "kind": "Reference structure",
+    "file": "structures/annite.cif",
+    "sha256": "50544ae77c48b81cbab734eda54b9ca8c08435fc6157822036339a79a46f2ad7",
+    "source": {
+      "label": "COD 9002308",
+      "url": "https://www.crystallography.net/cod/9002308.html",
+      "citation": "Redhammer, G. J.; Beran, A.; Schneider, J.; Amthauer, G.; Lottermoser, W. (2000). Spectroscopic and structural properties of synthetic micas on the annite-siderophyllite binary: Synthesis, crystal structure refinement, Mossbauer, and infrared spectroscopy Sample: A44. American Mineralogist 85, 449–465.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al Fe3 K0.956 O12 Si3 -"
+  },
+  {
+    "id": "anorthite",
+    "name": "Anorthite",
+    "formula": "CaAl2Si2O8",
+    "family": "Feldspars",
+    "spaceGroup": "P -1",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "plagioclase calcium"
+    ],
+    "description": "Calcium end member of the plagioclase feldspars.",
+    "kind": "Reference structure",
+    "file": "structures/anorthite.cif",
+    "sha256": "b92d6c699388b5c626417cbd7ce5784c0e08c19a1c0e8eaf095b32cd892984b4",
+    "source": {
+      "label": "COD 1000034",
+      "url": "https://www.crystallography.net/cod/1000034.html",
+      "citation": "Wainwright, J E; Starkey, J (1971). A refinement of the structure of anorthite. Zeitschrift fuer Kristallographie, Kristallgeometrie, Kristallphysik, Kristallchemie (-144,1977) 133, 75–84.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al2 Ca O8 Si2 -"
+  },
+  {
+    "id": "aragonite",
+    "name": "Aragonite",
+    "formula": "CaCO3",
+    "family": "Carbonates",
+    "spaceGroup": "P m c n",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "orthorhombic carbonate"
+    ],
+    "description": "Orthorhombic CaCO3 polymorph, distinct from calcite.",
+    "kind": "Reference structure",
+    "file": "structures/aragonite.cif",
+    "sha256": "e52a6ee6e1a428c8597ea16f92ab057a844b1437a72091bf8482166a6ffd26ae",
+    "source": {
+      "label": "COD 9000229",
+      "url": "https://www.crystallography.net/cod/9000229.html",
+      "citation": "Dal Negro, A.; Ungaretti, L. (1971). Refinement of the crystal structure of aragonite. American Mineralogist 56, 768–772.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- C Ca O3 -"
+  },
+  {
+    "id": "brucite",
+    "name": "Brucite",
+    "formula": "Mg(OH)2",
+    "family": "Hydroxides",
+    "spaceGroup": "P -3 m 1",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "C6 hydroxide"
+    ],
+    "description": "Layered hydroxide structure from neutron diffraction.",
+    "kind": "Reference structure",
+    "file": "structures/brucite.cif",
+    "sha256": "1ed399e34ded7a955099e802062a504fb9ecf7bc735aa141e87c226e701ce9a6",
+    "source": {
+      "label": "COD 1000054",
+      "url": "https://www.crystallography.net/cod/1000054.html",
+      "citation": "Zigan, F; Rothbauer, R (1967). Neutronenbeugungsmessungen am Brucit. Neues Jahrbuch fuer Mineralogie. Monatshefte (Band=Jahr) (1950-) 1967, 137–143.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- H2 Mg O2 -"
+  },
+  {
+    "id": "calcite",
+    "name": "Calcite",
+    "formula": "CaCO3",
+    "family": "Carbonates",
+    "spaceGroup": "R -3 c :H",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "rhombohedral carbonate"
+    ],
+    "description": "Trigonal calcite reference; planar carbonate groups.",
+    "kind": "Reference structure",
+    "file": "structures/calcite.cif",
+    "sha256": "d8a1cf92866da8814ef104b1626117490d9d4fbad823ef5dbf1cd2954488da52",
+    "source": {
+      "label": "COD 9000095",
+      "url": "https://www.crystallography.net/cod/9000095.html",
+      "citation": "Graf, D. L. (1961). Crystallographic tables for the rhombohedral carbonates. American Mineralogist 46, 1283–1316.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- C Ca O3 -"
+  },
+  {
+    "id": "cscl",
+    "name": "Cesium chloride",
+    "formula": "CsCl",
+    "family": "Halides",
+    "spaceGroup": "P m -3 m",
+    "collections": [
+      "types"
+    ],
+    "aliases": [
+      "CsCl caesium chloride B2"
+    ],
+    "description": "CsCl structure type with eightfold coordination; a = 4.12 Å (rounded).",
+    "kind": "Idealized model",
+    "file": "structures/cscl.cif",
+    "sha256": "beb8d011e70c461ccb8b5bb977ab69b94aa14759dc9d4544770dc24541887020",
+    "source": {
+      "label": "AFLOW topology",
+      "url": "https://aflow.org/p/AB_cP2_221_a_b-002/",
+      "citation": "Idealized coordinates constructed for PhaseSmith Viewer from the AB_cP2_221_a_b-002 structure type in the AFLOW Encyclopedia of Crystallographic Prototypes. Cell lengths are rounded illustrative values; no experimental refinement is claimed."
+    }
+  },
+  {
+    "id": "clinochlore",
+    "name": "Clinochlore",
+    "formula": "Mg5Al(AlSi3O10)(OH)8",
+    "family": "Micas & clays",
+    "spaceGroup": "C 1 2/c 1",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "chlorite phyllosilicate"
+    ],
+    "description": "Chlorite structure, originally described as sheridanite; includes hydroxide interlayers. H positions are not reported in this CIF.",
+    "kind": "Reference structure",
+    "file": "structures/clinochlore.cif",
+    "sha256": "edd838d3775f0b999e307ec6f3490b1229ce67e325e7360e4eaab01f747c2ae3",
+    "source": {
+      "label": "COD 9008042",
+      "url": "https://www.crystallography.net/cod/9008042.html",
+      "citation": "McMurchy, R. C. (1934). The crystal structure of the chlorite minerals Note: originally called sheridanite. Zeitschrift fur Kristallographie 88, 420–432.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al2 H8 Mg5 O18 Si3 -"
+  },
+  {
+    "id": "copper-fcc",
+    "name": "Copper (fcc)",
+    "formula": "Cu",
+    "family": "Elements",
+    "spaceGroup": "F m -3 m",
+    "collections": [
+      "types"
+    ],
+    "aliases": [
+      "A1 face centered cubic close packing"
+    ],
+    "description": "Face-centered cubic packing; a = 3.61 Å (rounded).",
+    "kind": "Idealized model",
+    "file": "structures/copper-fcc.cif",
+    "sha256": "1fd9c7c1e351a00f94d8fd39ec30dcaf42b1583508a2f868a1dc99c1a1bd4059",
+    "source": {
+      "label": "AFLOW topology",
+      "url": "https://aflow.org/p/A_cF4_225_a-001/",
+      "citation": "Idealized coordinates constructed for PhaseSmith Viewer from the A_cF4_225_a-001 structure type in the AFLOW Encyclopedia of Crystallographic Prototypes. Cell lengths are rounded illustrative values; no experimental refinement is claimed."
+    }
+  },
+  {
+    "id": "corundum",
+    "name": "Corundum",
+    "formula": "Al2O3",
+    "family": "Oxides",
+    "spaceGroup": "R -3 c :H",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "D51 alumina"
+    ],
+    "description": "Corundum structure with octahedral Al coordination.",
+    "kind": "Reference structure",
+    "file": "structures/corundum.cif",
+    "sha256": "fbc95a4d3d0800ce24defbc28137269e6b5ffa9e6afb9603558a949781c13923",
+    "source": {
+      "label": "COD 9007496",
+      "url": "https://www.crystallography.net/cod/9007496.html",
+      "citation": "Lewis, J.; Schwarzenbach, D.; Flack, H. D. (1982). Electric field gradients and charge density in corundum alpha-Al2O3. Acta Crystallographica, Section A 38, 733–739.",
+      "doi": "10.1107/S0567739482001478",
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al2 O3 -"
+  },
+  {
+    "id": "diamond",
+    "name": "Diamond",
+    "formula": "C",
+    "family": "Elements",
+    "spaceGroup": "F d -3 m :1",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "A4"
+    ],
+    "description": "Cubic tetrahedral carbon framework.",
+    "kind": "Reference structure",
+    "file": "structures/diamond.cif",
+    "sha256": "ba61fbf894db1bced1337192aa90298486845d200e1ae0aec2c6e9514fd95b16",
+    "source": {
+      "label": "COD 9008564",
+      "url": "https://www.crystallography.net/cod/9008564.html",
+      "citation": "Wyckoff, R. W. G. (1963). Second edition. Interscience Publishers, New York, New York. Crystal Structures 1, 7–83.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- C -"
+  },
+  {
+    "id": "diopside",
+    "name": "Diopside",
+    "formula": "CaMgSi2O6",
+    "family": "Pyroxenes",
+    "spaceGroup": "C 1 2/c 1",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "clinopyroxene single chain inosilicate"
+    ],
+    "description": "Ca-Mg clinopyroxene; the 1 atm reference of the pressure series.",
+    "kind": "Reference structure",
+    "file": "structures/diopside.cif",
+    "sha256": "519dd231c62909eb50349b54a518f454fc5c21d1b005a777ede51ead83ede4e3",
+    "source": {
+      "label": "COD 1000007",
+      "url": "https://www.crystallography.net/cod/1000007.html",
+      "citation": "Thompson, R. M.; Downs, R. T. (2008). The crystal structure of diopside at pressure to 10 GPa Sample: P = 1 atm. American Mineralogist 93, 177–186.",
+      "doi": "10.2138/am.2008.2684",
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Ca Mg O6 Si2 -"
+  },
+  {
+    "id": "dolomite",
+    "name": "Dolomite",
+    "formula": "CaMg(CO3)2",
+    "family": "Carbonates",
+    "spaceGroup": "R -3 :H",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "rhombohedral carbonate"
+    ],
+    "description": "Ordered Ca-Mg carbonate with alternating cation layers.",
+    "kind": "Reference structure",
+    "file": "structures/dolomite.cif",
+    "sha256": "07bc82e782056f4911e2cf0c17451a8d580681173462afb9d374d846edc28624",
+    "source": {
+      "label": "COD 9000573",
+      "url": "https://www.crystallography.net/cod/9000573.html",
+      "citation": "Althoff, P. L. (1977). Structural refinements of dolomite and a magnesian calcite and implications for dolomite formation in the marine environment. American Mineralogist 62, 772–783.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- C2 Ca Mg O6 -"
+  },
+  {
+    "id": "enstatite",
+    "name": "Enstatite",
+    "formula": "MgSiO3",
+    "family": "Pyroxenes",
+    "spaceGroup": "P b c a",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "orthopyroxene orthoenstatite single chain inosilicate"
+    ],
+    "description": "Orthorhombic Mg pyroxene with single SiO4 chains.",
+    "kind": "Reference structure",
+    "file": "structures/enstatite.cif",
+    "sha256": "fcf2ba7dd46c494176195f537a9bac3c766b78e8388bcc95dc01004b1b6a32a8",
+    "source": {
+      "label": "COD 9004117",
+      "url": "https://www.crystallography.net/cod/9004117.html",
+      "citation": "Hawthorne, F. C.; Ito, J. (1977). Synthesis and crystal-structure refinement of transition-metal orthopyroxenes I: Orthoenstatite and (Mg, Mn, Co) orthopyroxene. The Canadian Mineralogist 15, 321–338.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Mg O3 Si -"
+  },
+  {
+    "id": "epidote",
+    "name": "Epidote",
+    "formula": "Ca2Al2FeSi3O12(OH)",
+    "family": "Epidote group",
+    "spaceGroup": "P 1 21/m 1",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "sorosilicate"
+    ],
+    "description": "Epidote reference with mixed Al/Fe occupancy and Si2O7 groups. H positions are not reported in this CIF.",
+    "kind": "Reference structure",
+    "file": "structures/epidote.cif",
+    "sha256": "799ab0d9f04e8f8d966426b265ad3c6eca42eee8a5cd171fd5b038bc07123465",
+    "source": {
+      "label": "COD 9000220",
+      "url": "https://www.crystallography.net/cod/9000220.html",
+      "citation": "Dollase, W. A. (1971). Refinement of the crystal structures of epidote, allanite and hancockite. American Mineralogist 56, 447–464.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al2.17 Ca2 Fe0.81 H O13 Si3 -"
+  },
+  {
+    "id": "fluorapatite",
+    "name": "Fluorapatite",
+    "formula": "Ca5(PO4)3F",
+    "family": "Phosphates",
+    "spaceGroup": "P 63/m",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "apatite accessory mineral"
+    ],
+    "description": "Fluorapatite reference from Durango, Mexico.",
+    "kind": "Reference structure",
+    "file": "structures/fluorapatite.cif",
+    "sha256": "568d5c8ddf24218fd14eaa00e04797503b071f51ad06e391eedc6dbd3cbbabe9",
+    "source": {
+      "label": "COD 9001232",
+      "url": "https://www.crystallography.net/cod/9001232.html",
+      "citation": "Hughes J M; Cameron M; Crowley K D (1989). Structural variations in natural F, OH, and Cl apatites Locality: Durango Mexico. American Mineralogist 74, 870–876.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Ca5 F O12 P3 -"
+  },
+  {
+    "id": "fluorite",
+    "name": "Fluorite",
+    "formula": "CaF2",
+    "family": "Halides",
+    "spaceGroup": "F m -3 m",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "C1"
+    ],
+    "description": "Fluorite reference at 0 GPa; eightfold Ca and tetrahedral F coordination.",
+    "kind": "Reference structure",
+    "file": "structures/fluorite.cif",
+    "sha256": "56eae02a0213076058dcdb086dbaee147978cf417dd29bf9e4c19674a3f9d3aa",
+    "source": {
+      "label": "COD 9007060",
+      "url": "https://www.crystallography.net/cod/9007060.html",
+      "citation": "Speziale, S.; Duffy, T. S. (2002). Single-crystal elastic constants of fluorite (CaF2) to 9.3 GPa Sample: P = 0 GPa. Physics and Chemistry of Minerals 29, 465–472.",
+      "doi": "10.1007/s00269-002-0250-x",
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Ca F2 -"
+  },
+  {
+    "id": "forsterite",
+    "name": "Forsterite",
+    "formula": "Mg2SiO4",
+    "family": "Olivines",
+    "spaceGroup": "P b n m",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "olivine nesosilicate"
+    ],
+    "description": "Mg olivine end member; isolated SiO4 tetrahedra and MgO6 octahedra.",
+    "kind": "Reference structure",
+    "file": "examples/forsterite.cif",
+    "source": {
+      "label": "AMCSD 0001118",
+      "url": "https://www.crystallography.net/cod/result?text1=0001118",
+      "citation": "Boström, D. (1987). Single-crystal X-ray diffraction studies of synthetic Ni-Mg olivine solid solutions. American Mineralogist 72, 965–972. Sample XNi2+ = 0.00."
+    },
+    "sha256": "aab06d80e1f8ccf041ab3496d6a38835a235eca31b7290193a62e9b924b328a0"
+  },
+  {
+    "id": "graphite",
+    "name": "Graphite",
+    "formula": "C",
+    "family": "Elements",
+    "spaceGroup": "P 63/m m c",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "A9 hexagonal"
+    ],
+    "description": "Hexagonal graphite from neutron diffraction on natural crystals.",
+    "kind": "Reference structure",
+    "file": "structures/graphite.cif",
+    "sha256": "35d1661c3131acc9b1c33dad65358d094b93105d6aae711465ac4352ae809748",
+    "source": {
+      "label": "COD 9011577",
+      "url": "https://www.crystallography.net/cod/9011577.html",
+      "citation": "Trucano, P.; Chen, R. (1975). Structure of graphite by neutron diffraction Note: natural crystals. Nature 258, 136–137.",
+      "doi": "10.1038/258136a0",
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- C -"
+  },
+  {
+    "id": "grossular",
+    "name": "Grossular",
+    "formula": "Ca3Al2Si3O12",
+    "family": "Garnets",
+    "spaceGroup": "I a -3 d",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "grossularite garnet nesosilicate"
+    ],
+    "description": "Ca-Al garnet reference.",
+    "kind": "Reference structure",
+    "file": "structures/grossular.cif",
+    "sha256": "ce741f086de1f3b596c8ec7836b1bbbeb8b07de6cdecdd9f8ba0082e6fafaddf",
+    "source": {
+      "label": "COD 9000236",
+      "url": "https://www.crystallography.net/cod/9000236.html",
+      "citation": "Novak, G. A.; Gibbs, G. V. (1971). The crystal chemistry of the silicate garnets sample Gr. American Mineralogist 56, 791–825.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al2 Ca3 O12 Si3 -"
+  },
+  {
+    "id": "gypsum",
+    "name": "Gypsum",
+    "formula": "CaSO4·2H2O",
+    "family": "Sulfates",
+    "spaceGroup": "I 1 2/c 1",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "evaporite hydrate"
+    ],
+    "description": "Hydrated calcium sulfate reference. H positions are not reported in this CIF.",
+    "kind": "Reference structure",
+    "file": "structures/gypsum.cif",
+    "sha256": "459cb8143bdc98a2ff26d07cdfdc7e558592b4cd0a2d33cc741c993767307d39",
+    "source": {
+      "label": "COD 5000039",
+      "url": "https://www.crystallography.net/cod/5000039.html",
+      "citation": "Cole, W. F.; Lancucki, C. J. (1974). A refinement of the crystal structure of gypsum CaSO~4~.2H~2~O. Acta Crystallographica, Section B: Structural Crystallography and Crystal Chemistry 30, 921–929.",
+      "doi": "10.1107/S0567740874004055",
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Ca H4 O6 S -"
+  },
+  {
+    "id": "halite",
+    "name": "Halite",
+    "formula": "NaCl",
+    "family": "Halides",
+    "spaceGroup": "F m -3 m",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "Rock salt B1"
+    ],
+    "description": "Rock-salt reference structure; octahedral coordination.",
+    "kind": "Reference structure",
+    "file": "structures/halite.cif",
+    "sha256": "f6719e52179a49082ab777a772f08ae22000d738d08b45e73c801c40e81752b1",
+    "source": {
+      "label": "COD 9008678",
+      "url": "https://www.crystallography.net/cod/9008678.html",
+      "citation": "Wyckoff, R. W. G. (1963). Second edition. Interscience Publishers, New York, New York rocksalt structure. Crystal Structures 1, 85–237.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Cl Na -"
+  },
+  {
+    "id": "hematite",
+    "name": "Hematite",
+    "formula": "Fe2O3",
+    "family": "Oxides",
+    "spaceGroup": "R -3 c :H",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "corundum iron oxide"
+    ],
+    "description": "Trigonal iron oxide in the corundum family.",
+    "kind": "Reference structure",
+    "file": "structures/hematite.cif",
+    "sha256": "bf051ac87f26bafa6ecad8d669727b3c055185f8a1b9fb0d9f42e2143112df18",
+    "source": {
+      "label": "COD 2101167",
+      "url": "https://www.crystallography.net/cod/2101167.html",
+      "citation": "Maslen, E. N.; Streltsov, V. A.; Streltsova, N. R.; Ishizawa, N. (1994). Synchrotron X-ray study of the electron density in α-Fe~2~O~3~. Acta Crystallographica Section B 50, 435–441.",
+      "doi": "10.1107/S0108768194002284",
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Fe2 O3 -"
+  },
+  {
+    "id": "cubic-perovskite",
+    "name": "Ideal cubic perovskite",
+    "formula": "CaTiO3",
+    "family": "Oxides",
+    "spaceGroup": "P m -3 m",
+    "collections": [
+      "types"
+    ],
+    "aliases": [
+      "E21 ABO3"
+    ],
+    "description": "Undistorted teaching model, a = 3.90 Å. Ambient CaTiO3 is orthorhombic; this is an idealized parent structure.",
+    "kind": "Idealized model",
+    "file": "structures/cubic-perovskite.cif",
+    "sha256": "4b943983f15354196f21fea723388f3724e8e96292a168d2dbb08387d0b4ecee",
+    "source": {
+      "label": "AFLOW topology",
+      "url": "https://aflow.org/p/AB3C_cP5_221_a_c_b-001/",
+      "citation": "Idealized coordinates constructed for PhaseSmith Viewer from the AB3C_cP5_221_a_c_b-001 structure type in the AFLOW Encyclopedia of Crystallographic Prototypes. Cell lengths are rounded illustrative values; no experimental refinement is claimed."
+    }
+  },
+  {
+    "id": "iron-bcc",
+    "name": "Iron (bcc)",
+    "formula": "Fe",
+    "family": "Elements",
+    "spaceGroup": "I m -3 m",
+    "collections": [
+      "types"
+    ],
+    "aliases": [
+      "A2 body centered cubic alpha iron ferrite"
+    ],
+    "description": "Body-centered cubic packing; a = 2.87 Å (rounded).",
+    "kind": "Idealized model",
+    "file": "structures/iron-bcc.cif",
+    "sha256": "7b19b2cb8c08aba71c3ea59990f47023c7764f56c382a032c09cdaf4db0faf94",
+    "source": {
+      "label": "AFLOW topology",
+      "url": "https://aflow.org/p/A_cI2_229_a-001/",
+      "citation": "Idealized coordinates constructed for PhaseSmith Viewer from the A_cI2_229_a-001 structure type in the AFLOW Encyclopedia of Crystallographic Prototypes. Cell lengths are rounded illustrative values; no experimental refinement is claimed."
+    }
+  },
+  {
+    "id": "jadeite",
+    "name": "Jadeite",
+    "formula": "NaAlSi2O6",
+    "family": "Pyroxenes",
+    "spaceGroup": "C 1 2/c 1",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "clinopyroxene jade single chain inosilicate"
+    ],
+    "description": "Na-Al clinopyroxene with single tetrahedral chains.",
+    "kind": "Reference structure",
+    "file": "structures/jadeite.cif",
+    "sha256": "72312ec3f025a5f52ecd4acfe4ef0024f78730ea230832ffffbd0d76185e9f29",
+    "source": {
+      "label": "COD 9000143",
+      "url": "https://www.crystallography.net/cod/9000143.html",
+      "citation": "Prewitt, C. T.; Burnham, C. W. (1966). The crystal structure of jadeite, NaAlSi2O6. American Mineralogist 51, 956–975.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al Na O6 Si2 -"
+  },
+  {
+    "id": "kaolinite",
+    "name": "Kaolinite",
+    "formula": "Al2Si2O5(OH)4",
+    "family": "Micas & clays",
+    "spaceGroup": "C 1",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "clay phyllosilicate 1:1 layer"
+    ],
+    "description": "Kaolinite layer structure from a refinement of non-hydrogen positions; H positions are omitted.",
+    "kind": "Reference structure",
+    "file": "structures/kaolinite.cif",
+    "sha256": "46e613d0a51cfdb51832b4349a1f10a0573efd825789ec295c21ff3f75f19184",
+    "source": {
+      "label": "COD 9009230",
+      "url": "https://www.crystallography.net/cod/9009230.html",
+      "citation": "Bish, D. L.; Von Dreele, R. B. (1989). Rietveld refinement of non-hydrogen atomic positions in kaolinite Note: clay. Clays and Clay Minerals 37, 289–296.",
+      "doi": "10.1346/CCMN.1989.0370401",
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al2 H4 O9 Si2 -"
+  },
+  {
+    "id": "kyanite",
+    "name": "Kyanite",
+    "formula": "Al2SiO5",
+    "family": "Aluminosilicates",
+    "spaceGroup": "P -1",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "disthene nesosilicate metamorphic index mineral"
+    ],
+    "description": "Triclinic Al2SiO5 polymorph with octahedral Al sites.",
+    "kind": "Reference structure",
+    "file": "structures/kyanite.cif",
+    "sha256": "0d776c5e5c0fff0a45eb763a9dcaa4ab51af2e0d81937fddaa863eea810e36c3",
+    "source": {
+      "label": "COD 1008755",
+      "url": "https://www.crystallography.net/cod/1008755.html",
+      "citation": "de Rango, C; Tsoucaris, G; Zelwer, C; Devaux, J (1966). Comparaison de deux affinements de la structure de la cyanite. Bulletin de la Societe Francaise de Mineralogie et de Cristallographie (72,1949-100,1977) 89, 419–424.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al2 O5 Si -"
+  },
+  {
+    "id": "magnesium-hcp",
+    "name": "Magnesium (hcp)",
+    "formula": "Mg",
+    "family": "Elements",
+    "spaceGroup": "P 63/m m c",
+    "collections": [
+      "types"
+    ],
+    "aliases": [
+      "A3 hexagonal close packing"
+    ],
+    "description": "Hexagonal close-packed structure; a = 3.21 Å, c = 5.21 Å (rounded).",
+    "kind": "Idealized model",
+    "file": "structures/magnesium-hcp.cif",
+    "sha256": "43116e78ee62504a82614a63f5b360a6069775c2ce0e36727e9ea2a502c5672c",
+    "source": {
+      "label": "AFLOW topology",
+      "url": "https://aflow.org/p/A_hP2_194_c-001/",
+      "citation": "Idealized coordinates constructed for PhaseSmith Viewer from the A_hP2_194_c-001 structure type in the AFLOW Encyclopedia of Crystallographic Prototypes. Cell lengths are rounded illustrative values; no experimental refinement is claimed."
+    }
+  },
+  {
+    "id": "magnetite",
+    "name": "Magnetite",
+    "formula": "Fe3O4",
+    "family": "Oxides",
+    "spaceGroup": "F d -3 m :2",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "inverse spinel iron oxide"
+    ],
+    "description": "Cubic magnetite reference in the inverse-spinel family.",
+    "kind": "Reference structure",
+    "file": "structures/magnetite.cif",
+    "sha256": "f54428aa7cb97ba4a8bda7d676548c229b54f3d955098ff1d44d2e68b976074f",
+    "source": {
+      "label": "COD 9000926",
+      "url": "https://www.crystallography.net/cod/9000926.html",
+      "citation": "Wechsler, B. A.; Lindsley, D. H.; Prewitt, C. T. (1984). Crystal structure and cation distribution in titanomagnetites (Fe3-xTixO4) MT100-1350. American Mineralogist 69, 754–770.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Fe3 O4 -"
+  },
+  {
+    "id": "microcline",
+    "name": "Microcline",
+    "formula": "KAlSi3O8",
+    "family": "Feldspars",
+    "spaceGroup": "C -1",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "alkali feldspar potassium"
+    ],
+    "description": "Triclinic K-feldspar reference from a strained intermediate microcline.",
+    "kind": "Reference structure",
+    "file": "structures/microcline.cif",
+    "sha256": "d4a1d4ce9d18922395f1ac8f2a89282c34894b92023757db18677abc2c22fb76",
+    "source": {
+      "label": "COD 9000701",
+      "url": "https://www.crystallography.net/cod/9000701.html",
+      "citation": "Ribbe, P. H. (1979). The structure of a strained intermediate microcline in cryptoperthitic association with twinned plagioclase feldspar. American Mineralogist 64, 402–408.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al K O8 Si3 -"
+  },
+  {
+    "id": "muscovite",
+    "name": "Muscovite",
+    "formula": "KAl2(AlSi3O10)(OH)2",
+    "family": "Micas & clays",
+    "spaceGroup": "C 1 2/c 1",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "white mica phyllosilicate 2M1"
+    ],
+    "description": "Dioctahedral mica with tetrahedral-octahedral-tetrahedral layers. H positions are not reported in this CIF.",
+    "kind": "Reference structure",
+    "file": "structures/muscovite.cif",
+    "sha256": "5532a591ea16575d0e0a1a08becee16c73ed998767004a99be7041d04f5ff2d2",
+    "source": {
+      "label": "COD 9000837",
+      "url": "https://www.crystallography.net/cod/9000837.html",
+      "citation": "Richardson, S. M.; Richardson, J. W. (1982). Crystal structure of a pink muscovite from Archer's Post, Kenya: Implications for reverse pleochroism in dioctahedral micas. American Mineralogist 67, 69–75.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al3 H2 K O12 Si3 -"
+  },
+  {
+    "id": "nepheline",
+    "name": "Nepheline",
+    "formula": "(Na,K)AlSiO4",
+    "family": "Feldspathoids",
+    "spaceGroup": "P 63",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "tectosilicate framework"
+    ],
+    "description": "Natural nepheline, sample 1; retains its reported Na-K composition and substitutions.",
+    "kind": "Reference structure",
+    "file": "structures/nepheline.cif",
+    "sha256": "668b8894ebeb017db97e35569583b8c8cf1acd6daf1da63d307fa2831c5e551b",
+    "source": {
+      "label": "COD 9004729",
+      "url": "https://www.crystallography.net/cod/9004729.html",
+      "citation": "Tait, K. T.; Sokolova, E. V.; Hawthorne, F. C.; Khomyakov, A. P. (2003). The crystal chemistry of nepheline Note: sample 1. The Canadian Mineralogist 41, 61–70.",
+      "doi": "10.2113/gscanmin.41.1.61",
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al3.88 Fe0.04 K0.955 Na3 O16 Si4.08 -"
+  },
+  {
+    "id": "periclase",
+    "name": "Periclase",
+    "formula": "MgO",
+    "family": "Oxides",
+    "spaceGroup": "F m -3 m",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "rock salt B1"
+    ],
+    "description": "MgO in the rock-salt structure.",
+    "kind": "Reference structure",
+    "file": "structures/periclase.cif",
+    "sha256": "d4ea4453e9712fc12dff925cb7812b8a5b68a19e9afa03449be062540b8ad9c7",
+    "source": {
+      "label": "COD 1000053",
+      "url": "https://www.crystallography.net/cod/1000053.html",
+      "citation": "Sasaki, Satoshi; Fujino, Kiyoshi; Takéuchi, Yoshio (1979). X-Ray Determination of Electron-Density Distributions in Oxides, MgO, MnO, CoO, and NiO, and Atomic Scattering Factors of their Constituent Atoms. Proceedings of the Japan Academy, Series B: Physical and Biological Sciences 55, 43–48.",
+      "doi": "10.2183/pjab.55.43",
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Mg O -"
+  },
+  {
+    "id": "perovskite",
+    "name": "Perovskite (orthorhombic)",
+    "formula": "CaTiO3",
+    "family": "Oxides",
+    "spaceGroup": "P b n m",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "distorted perovskite"
+    ],
+    "description": "Orthorhombic CaTiO3 with tilted TiO6 octahedra; compare with the ideal cubic model.",
+    "kind": "Reference structure",
+    "file": "structures/perovskite.cif",
+    "sha256": "b1ee97152eb789f98594bbab9d68c3faf520c5d2fc2f04d17cefa80bd16ddde9",
+    "source": {
+      "label": "COD 1000022",
+      "url": "https://www.crystallography.net/cod/1000022.html",
+      "citation": "Beran, A; Libowitzky, E; Armbruster, T (1996). A single-crystal infrared spectroscopic and X-ray diffraction study of untwinned San Benito perovskite containing O H groups. Canadian Mineralogist 34, 803–809.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Ca O3 Ti -"
+  },
+  {
+    "id": "phlogopite",
+    "name": "Phlogopite",
+    "formula": "KMg3(AlSi3O10)(OH)2",
+    "family": "Micas & clays",
+    "spaceGroup": "C 1 2/m 1",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "biotite Mg mica phyllosilicate 1M"
+    ],
+    "description": "Mg mica representing the biotite family; single-layer mica structure. H positions are not reported in this CIF.",
+    "kind": "Reference structure",
+    "file": "structures/phlogopite.cif",
+    "sha256": "adddeb2d984737e2f8b9ad8acede63b2ac1c41f4121cf6d3ce9ef38f0f2ae9ef",
+    "source": {
+      "label": "COD 9000074",
+      "url": "https://www.crystallography.net/cod/9000074.html",
+      "citation": "Pabst, A. (1955). Redescription of the single layer structure of the micas. American Mineralogist 40, 967–974.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al H2 K Mg3 O12 Si3 -"
+  },
+  {
+    "id": "pyrite",
+    "name": "Pyrite",
+    "formula": "FeS2",
+    "family": "Sulfides",
+    "spaceGroup": "P a -3",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "C2 disulfide"
+    ],
+    "description": "Cubic pyrite structure with disulfide pairs.",
+    "kind": "Reference structure",
+    "file": "structures/pyrite.cif",
+    "sha256": "8be808336a36a776bd460a114b8d75052a1db081484d9b3e63c6b8e287eec93b",
+    "source": {
+      "label": "COD 5000115",
+      "url": "https://www.crystallography.net/cod/5000115.html",
+      "citation": "Brostigen, G; Kjekshus, A (1969). Redetermined crystal structure of Fe S2 (pyrite). Acta Chemica Scandinavica (1-27,1973-42,1988) 23, 2186–2188.",
+      "doi": "10.3891/acta.chem.scand.23-2186",
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Fe S2 -"
+  },
+  {
+    "id": "pyrope",
+    "name": "Pyrope",
+    "formula": "Mg3Al2Si3O12",
+    "family": "Garnets",
+    "spaceGroup": "I a -3 d",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "garnet nesosilicate"
+    ],
+    "description": "Mg-Al garnet reference with isolated SiO4 tetrahedra.",
+    "kind": "Reference structure",
+    "file": "structures/pyrope.cif",
+    "sha256": "2c69d236210926d64a21d38ae7ca46e12f9a8b588f2eeb8e34eb20b090e7b5b5",
+    "source": {
+      "label": "COD 9000231",
+      "url": "https://www.crystallography.net/cod/9000231.html",
+      "citation": "Novak, G. A.; Gibbs, G. V. (1971). The crystal chemistry of the silicate garnets sample Py. American Mineralogist 56, 791–825.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al2 Mg3 O12 Si3 -"
+  },
+  {
+    "id": "quartz",
+    "name": "Quartz (alpha)",
+    "formula": "SiO2",
+    "family": "Silica",
+    "spaceGroup": "P 32 2 1",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "low quartz framework tectosilicate"
+    ],
+    "description": "Trigonal alpha-quartz; a framework of corner-sharing SiO4 tetrahedra.",
+    "kind": "Reference structure",
+    "file": "structures/quartz.cif",
+    "sha256": "1f25a1829bb47405a6b991ab83c771d3867e77e3d076e93dd326467e4ebd2cc0",
+    "source": {
+      "label": "COD 5000035",
+      "url": "https://www.crystallography.net/cod/5000035.html",
+      "citation": "Will, G; Bellotto, M; Parrish, W; Hart, M (1988). Crystal structures of quartz and magnesium germanate by profile analysis of synchrotron-radiation high-resolution powder data.. Journal of Applied Crystallography 21, 182–191.",
+      "doi": "10.1107/S0021889887011567",
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- O2 Si -"
+  },
+  {
+    "id": "rutile",
+    "name": "Rutile",
+    "formula": "TiO2",
+    "family": "Oxides",
+    "spaceGroup": "P 42/m n m",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "C4"
+    ],
+    "description": "Room-temperature rutile with chains of edge-sharing TiO6 octahedra.",
+    "kind": "Reference structure",
+    "file": "structures/rutile.cif",
+    "sha256": "ce9abab142351e802bde3eb40dbb554bb3ccec08e8c6ddc4299c0c532e9794ce",
+    "source": {
+      "label": "COD 9004141",
+      "url": "https://www.crystallography.net/cod/9004141.html",
+      "citation": "Meagher, E. P.; Lager, G. A. (1979). Polyhedral thermal expansion in the TiO2 polymorphs: Refinement of the crystal structure of rutile and brookite at high temperature Sample at 25 degrees C. The Canadian Mineralogist 17, 77–85.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- O2 Ti -"
+  },
+  {
+    "id": "sanidine",
+    "name": "Sanidine",
+    "formula": "KAlSi3O8",
+    "family": "Feldspars",
+    "spaceGroup": "C 1 2/m 1",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "alkali feldspar potassium"
+    ],
+    "description": "Monoclinic potassium-rich feldspar.",
+    "kind": "Reference structure",
+    "file": "structures/sanidine.cif",
+    "sha256": "971611cd77f6056e3671b02d933aa0cee156552429e04a22b1afc2d40add40e7",
+    "source": {
+      "label": "COD 9000303",
+      "url": "https://www.crystallography.net/cod/9000303.html",
+      "citation": "Phillips, M. W.; Ribbe, P. H. (1973). The structures of monoclinic potassium-rich feldspars. American Mineralogist 58, 263–270.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al K O8 Si3 -"
+  },
+  {
+    "id": "sillimanite",
+    "name": "Sillimanite",
+    "formula": "Al2SiO5",
+    "family": "Aluminosilicates",
+    "spaceGroup": "P b n m",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "fibrolite metamorphic index mineral"
+    ],
+    "description": "Orthorhombic Al2SiO5 polymorph from neutron powder diffraction.",
+    "kind": "Reference structure",
+    "file": "structures/sillimanite.cif",
+    "sha256": "12ba0d94c6d0b8e6978041af932efe06ba22307933ece4eaa16a874028de720b",
+    "source": {
+      "label": "COD 9001408",
+      "url": "https://www.crystallography.net/cod/9001408.html",
+      "citation": "Bish, D. L.; Burnham, C. W. (1992). Rietveld refinement of the crystal structure of fibrolitic sillimanite using neutron powder diffraction data. American Mineralogist 77, 374–379.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al2 O5 Si -"
+  },
+  {
+    "id": "sphalerite",
+    "name": "Sphalerite",
+    "formula": "ZnS",
+    "family": "Sulfides",
+    "spaceGroup": "F -4 3 m",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "Zinc blende B3"
+    ],
+    "description": "Cubic zinc-blende structure with tetrahedral coordination.",
+    "kind": "Reference structure",
+    "file": "structures/sphalerite.cif",
+    "sha256": "dddecf4f62130927a46105edcd7e5ea3379014d351e28556f93dac200f99bc05",
+    "source": {
+      "label": "COD 1100043",
+      "url": "https://www.crystallography.net/cod/1100043.html",
+      "citation": "Jumpertz, E. A. (1955). Electron-density distribution in zinc blende. Zeitschrift für Elektrochemie und angewandte physikalische Chemie 59, 419–425.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- S Zn -"
+  },
+  {
+    "id": "spinel",
+    "name": "Spinel",
+    "formula": "MgAl2O4",
+    "family": "Oxides",
+    "spaceGroup": "F d -3 m :1",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "H11"
+    ],
+    "description": "Spinel reference structure with tetrahedral and octahedral cation sites.",
+    "kind": "Reference structure",
+    "file": "structures/spinel.cif",
+    "sha256": "1e13b0061d0c9e58430d55e92cace3e8c4934d741f44ffd3e0f0788b3370496d",
+    "source": {
+      "label": "COD 5000120",
+      "url": "https://www.crystallography.net/cod/5000120.html",
+      "citation": "Yamanaka, T (1983). Thermal movement of atoms in the spinel structure.. Kobutsugaku Zasshi (= Journal of the Mineralogical Society of Japan) 16, 221–231.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Al2 Mg O4 -"
+  },
+  {
+    "id": "titanite",
+    "name": "Titanite",
+    "formula": "CaTiSiO5",
+    "family": "Accessory minerals",
+    "spaceGroup": "P 1 21/a 1",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "sphene nesosilicate"
+    ],
+    "description": "Synthetic titanite reference; monoclinic Ca-Ti silicate.",
+    "kind": "Reference structure",
+    "file": "structures/titanite.cif",
+    "sha256": "f82a99165a23af3945f084041e5f6272d9cc18f1efe2f8d8fa53123e28015cde",
+    "source": {
+      "label": "COD 9000489",
+      "url": "https://www.crystallography.net/cod/9000489.html",
+      "citation": "Speer, J. A.; Gibbs, G. V. (1976). The crystal structure of synthetic titanite, CaTiOSiO4, and the domain textures of natural titanites. American Mineralogist 61, 238–247.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Ca O5 Si Ti -"
+  },
+  {
+    "id": "tremolite",
+    "name": "Tremolite",
+    "formula": "Ca2Mg5Si8O22(OH)2",
+    "family": "Amphiboles",
+    "spaceGroup": "C 1 2/m 1",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "double chain inosilicate"
+    ],
+    "description": "Calcic amphibole reference from Val Tremola; double tetrahedral chains.",
+    "kind": "Reference structure",
+    "file": "structures/tremolite.cif",
+    "sha256": "3cb2b21a80f69bf4e15906299d3179e1f6cfb08035540d2f88be7344f45d3764",
+    "source": {
+      "label": "COD 9002334",
+      "url": "https://www.crystallography.net/cod/9002334.html",
+      "citation": "Merli, M.; Ungaretti, L.; Oberti, R. (2000). Leverage analysis and structure refinement of minerals Sample: from Val Tremola 9527. American Mineralogist 85, 532–542.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- Ca2 H2 Mg5 O24 Si8 -"
+  },
+  {
+    "id": "wollastonite",
+    "name": "Wollastonite",
+    "formula": "CaSiO3",
+    "family": "Pyroxenoids",
+    "spaceGroup": "P -1",
+    "collections": [
+      "minerals"
+    ],
+    "aliases": [
+      "single chain inosilicate"
+    ],
+    "description": "Triclinic chain silicate; compare its tetrahedral chains with the pyroxenes.",
+    "kind": "Teaching reference",
+    "file": "examples/wollastonite.cif",
+    "source": {
+      "label": "Bundled CIF",
+      "url": "https://github.com/CPrescher/PhaseSmith-Viewer/blob/main/public/examples/wollastonite.cif",
+      "citation": "Coordinate table from Freiburg Physik und Chemie der Kristalle exercise 4 (2023), as recorded in the bundled CIF."
+    },
+    "sha256": "b3391811a578f678a9c7b70daaef79d70e46feeffe73615696e17f80e7f28077"
+  },
+  {
+    "id": "wurtzite",
+    "name": "Wurtzite",
+    "formula": "ZnS",
+    "family": "Sulfides",
+    "spaceGroup": "P 63 m c",
+    "collections": [
+      "types"
+    ],
+    "aliases": [
+      "B4 hexagonal ZnS"
+    ],
+    "description": "Hexagonal counterpart of zinc blende; tetrahedral coordination.",
+    "kind": "Reference structure",
+    "file": "structures/wurtzite.cif",
+    "sha256": "58803a8f10ea78984d8833b8f1edd263ccda2f189a4554cc844e4484a9f6a40b",
+    "source": {
+      "label": "COD 1100044",
+      "url": "https://www.crystallography.net/cod/1100044.html",
+      "citation": "Kisi, E. H.; Elcombe, M. M. (1989). u parameters for the wurtzite structure of ZnS and ZnO using powder neutron diffraction. Acta Crystallographica Section C 45, 1867–1870.",
+      "doi": "10.1107/S0108270189004269",
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- S Zn -"
+  },
+  {
+    "id": "zircon",
+    "name": "Zircon",
+    "formula": "ZrSiO4",
+    "family": "Accessory minerals",
+    "spaceGroup": "I 41/a m d :2",
+    "collections": [
+      "types",
+      "minerals"
+    ],
+    "aliases": [
+      "C11 nesosilicate"
+    ],
+    "description": "Pure synthetic zircon reference, sample 38.",
+    "kind": "Reference structure",
+    "file": "structures/zircon.cif",
+    "sha256": "11040099bdbed4302a85a97c03017e20bb3ca45dea21613882640733ef88f0c4",
+    "source": {
+      "label": "COD 9002554",
+      "url": "https://www.crystallography.net/cod/9002554.html",
+      "citation": "Finch, R. J.; Hanchar, J. M.; Hoskin, P. W. O.; Burns, P. C. (2001). Rare-earth elements in synthetic zircon: Part 2. A single-crystal X-ray study of xenotime substitution Sample: pure zircon #38. American Mineralogist 86, 681–689.",
+      "doi": null,
+      "retrieved": "2026-11-16"
+    },
+    "reportedFormula": "- O4 Si Zr -"
+  }
+]

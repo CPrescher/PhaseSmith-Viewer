@@ -49,10 +49,24 @@
         >
           <span aria-hidden="true">☀</span>
         </button>
+        <button id="library-open" class="view-button" aria-haspopup="dialog" aria-controls="structure-library">Library</button>
         <button id="open" class="primary">
           ＋ Open CIF<span class="desktop"> file</span></button
         ><input id="file" type="file" accept=".cif,.mcif,text/plain" hidden />
       </header>
+      <dialog id="structure-library" aria-labelledby="library-title" aria-describedby="library-intro">
+        <div class="library-head">
+          <div><h2 id="library-title">Structure library</h2><p id="library-intro">Crystal-chemistry types and rock-forming minerals, ready to explore.</p></div>
+          <button id="library-close" class="view-button" aria-label="Close structure library">✕</button>
+        </div>
+        <div class="library-filters">
+          <label for="library-search">Search<input id="library-search" type="search" placeholder="Quartz, feldspar, NaCl, spinel…" autocomplete="off" /></label>
+          <label for="library-collection">Collection<select id="library-collection"><option value="">All structures</option><option value="types">Structure types</option><option value="minerals">Rock-forming &amp; common minerals</option></select></label>
+        </div>
+        <p class="library-note">Formulas identify the mineral or type; each CIF retains its reported composition, substitutions, and occupancies. Idealized teaching models are labeled separately. References and CIF downloads are under each entry.</p>
+        <p id="library-count" role="status" aria-live="polite"></p>
+        <div id="library-results"></div>
+      </dialog>
       <main>
         <div id="viewport">
           <div class="view-top">

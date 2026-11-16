@@ -260,9 +260,15 @@ fn structure(text: &str, requested: Option<&str>) -> Result<Value, String> {
             "This browser viewer limits symmetry expansion to 200,000 candidate atoms to bound memory and rendering work; use a smaller structure or a desktop viewer (this is not a CIF format limit)".into(),
         );
     }
+    // Published CIFs commonly round symmetry-constrained thirds to 0.3333.
+    // A numerical tolerance of 1e-8 then treats equivalent special-position
+    // images as separate atoms (e.g. six O instead of two in brucite).
+    // Deduplication is per independent source site, so coincident mixed or
+    // split sites keep their labels and occupancies. Original coordinates
+    // remain unchanged; only nearly identical symmetry images are merged.
     let expanded = structure
         .space_group
-        .expand_sites(&coords, 1e-8)
+        .expand_sites(&coords, 1e-4)
         .map_err(|err| err.to_string())?;
     let atoms = expanded
         .fractional_xyz
@@ -399,6 +405,30 @@ mod tests {
         assert_eq!(atoms[1]["occupancy"], 0.5);
         assert_eq!(atoms[0]["frac"][0], 0.25);
         assert_eq!(atoms[1]["frac"][0], 0.75);
+    }
+
+    #[test]
+    fn rounded_special_positions_keep_the_correct_multiplicity() {
+        for (cif, expected) in [
+            (include_str!("../../public/structures/brucite.cif"), 5),
+            (include_str!("../../public/structures/quartz.cif"), 9),
+            (include_str!("../../public/structures/wurtzite.cif"), 4),
+            (include_str!("../../public/structures/fluorapatite.cif"), 42),
+            (include_str!("../../public/structures/graphite.cif"), 4),
+        ] {
+            let value = structure(cif, None).unwrap();
+            assert_eq!(value["atoms"].as_array().unwrap().len(), expected);
+        }
+        let text = format!(
+            "data_mixed\n{}",
+            CELL.replace("'P 1'", "'P -1'")
+                .replace("Si1 Si 0.25(2) 0 0", "Si1 Si 0 0 0\nAl1 Al 0.00001 0 0")
+        );
+        let value = structure(&text, None).unwrap();
+        let atoms = value["atoms"].as_array().unwrap();
+        assert_eq!(atoms.len(), 2);
+        assert_ne!(atoms[0]["siteIndex"], atoms[1]["siteIndex"]);
+        assert_eq!(value["independentSites"][1]["frac"][0], 0.00001);
     }
 
     #[test]

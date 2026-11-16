@@ -24,6 +24,7 @@ import { createFaceSorter } from "./face-sort.js";
 import { createDepthPeeler } from "./peel.js";
 import { rotatedView } from "./view-rotation.js";
 import { createTurnControls } from "./turn-controls.js";
+import { createStructureLibrary, libraryEntry, libraryFilename, entryForFilename } from "./structure-library.js";
 import {
   createAppearance,
   clearAppearance,
@@ -46,6 +47,7 @@ function initialize() {
     $("name").textContent = "3D view unavailable";
     $("source").textContent = "The graphics context could not be created.";
     $("open").disabled = true;
+    $("library-open").disabled = true;
     return;
   }
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -2600,7 +2602,18 @@ function initialize() {
     hiddenElements.clear();
     $("show-atoms").checked = true;
     $("name").textContent = data.name || data.block || "Crystal structure";
-    $("source").textContent = currentFilename || "Example structure · built in";
+    const reference = entryForFilename(currentFilename);
+    $("source").replaceChildren();
+    if (reference) {
+      $("name").textContent = reference.name;
+      const link = document.createElement("a");
+      link.href = reference.source.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = `${reference.formula} · ${reference.source.label} ↗`;
+      link.title = reference.source.citation;
+      $("source").append(link);
+    } else $("source").textContent = currentFilename || "Example structure · built in";
     $("stats").replaceChildren(
       textStat("V", `${Number(data.volume).toFixed(2)} Å³`),
       textStat("Sites", data.atoms.length.toLocaleString()),
@@ -2729,6 +2742,27 @@ function initialize() {
     pending.push({ id: ++request, text, filename, block, restore, intent: userIntent });
     worker.postMessage({ text, block });
   }
+  async function openLibraryEntry(entry, startup = false) {
+    if (exporter.busy) return;
+    const intent = startup ? userIntent : ++userIntent;
+    $("error").hidden = true;
+    $("loading").hidden = false;
+    try {
+      const response = await fetch(`${import.meta.env.BASE_URL}${entry.file}`);
+      if (!response.ok) throw new Error(`Structure unavailable (${response.status})`);
+      const text = await response.text();
+      if (intent !== userIntent) return;
+      load(text, libraryFilename(entry));
+    } catch (error) {
+      if (intent !== userIntent) return;
+      $("loading").hidden = true;
+      $("open").disabled = false;
+      $("block").disabled = false;
+      $("error").hidden = false;
+      $("error").textContent = `Could not open ${entry.name}: ${error.message}`;
+    }
+  }
+  createStructureLibrary({ onSelect: openLibraryEntry, isBusy: () => exporter.busy });
   $("open").onclick = () => $("file").click();
   $("file").onchange = async (e) => {
     const file = e.target.files[0];
@@ -3043,6 +3077,7 @@ function initialize() {
       controls.enabled = !busy;
       // Step turns are blocked while exporting (buttons and handler).
       turnControls.setDisabled(busy);
+      $("library-open").disabled = busy;
       // No autosave of turntable frames; save the real view afterwards.
       if (busy) {
         saveSuspended++;
@@ -3156,7 +3191,10 @@ function initialize() {
   // entrypoint. Derived geometry, Three.js objects and label caches are
   // rebuilt, never stored. Transient popovers are not reopened.
   const ENTRYPOINT = (() => {
-    const v = new URLSearchParams(location.search).get("example");
+    const params = new URLSearchParams(location.search);
+    const entry = libraryEntry(params.get("structure"));
+    if (entry) return `structure:${entry.id}`;
+    const v = params.get("example");
     return v === "forsterite" || v === "wollastonite" ? v : "";
   })();
   const sessionStore = createSessionStore();
@@ -3458,6 +3496,10 @@ function initialize() {
     location.reload();
   };
   function loadExample() {
+    if (ENTRYPOINT.startsWith("structure:")) {
+      openLibraryEntry(libraryEntry(ENTRYPOINT.slice(10)), true);
+      return;
+    }
     const wollastoniteExample = ENTRYPOINT === "wollastonite";
     const forsteriteExample = ENTRYPOINT === "forsterite";
     fetch(

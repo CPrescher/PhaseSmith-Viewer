@@ -1,0 +1,20 @@
+# PhaseSmith Viewer idealized teaching model. Not a refined experimental structure.
+# Rounded illustrative unit cell. Structure topology: https://aflow.org/p/A_cI2_229_a-001/
+data_iron_bcc
+_chemical_name_common 'Iron (bcc)'
+_chemical_formula_sum 'Fe'
+_symmetry_space_group_name_H-M 'I m -3 m'
+_space_group_IT_number 229
+_cell_length_a 2.87
+_cell_length_b 2.87
+_cell_length_c 2.87
+_cell_angle_alpha 90
+_cell_angle_beta 90
+_cell_angle_gamma 90
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Fe1 Fe 0 0 0

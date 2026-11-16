@@ -1,0 +1,20 @@
+PhaseSmith Viewer structure library
+
+The CIFs identified by a COD accession in web/structure-library.json are
+redistributed unchanged from the Crystallography Open Database. The original
+authors' bibliographic information and COD notices remain in each file.
+COD data and the database are dedicated to the public domain under CC0:
+https://www.crystallography.net/cod/
+https://creativecommons.org/publicdomain/zero/1.0/
+Please acknowledge the original authors when using a reference structure.
+
+The five CIFs labeled "Idealized model" were constructed for PhaseSmith
+Viewer. They use standard structure topologies documented by the AFLOW
+Encyclopedia of Crystallographic Prototypes, with rounded illustrative cell
+lengths. They are not downloaded AFLOW data or experimental refinements.
+Each model cites the corresponding prototype URL in its CIF and catalog
+entry. The catalog source field describes the topology reference.
+
+The existing forsterite example retains Bostrom (1987), American Mineralogist
+72, 965-972, AMCSD 0001118. The existing wollastonite example is a coordinate
+table from Freiburg's crystal-chemistry exercise 4 (2023).
