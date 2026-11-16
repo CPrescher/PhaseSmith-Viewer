@@ -3551,7 +3551,9 @@ function initialize() {
     if (!historyReady || historyApplying || saveSuspended > 0) return;
     // Stop residual trackball inertia at an action boundary. Subsequent
     // frames cannot move a camera whose snapshot has already been stored.
-    if (cameraGesture) stopMotion();
+    const moving = cameraGesture;
+    cameraGesture = false;
+    if (moving) stopMotion();
     if (pendingBuild) {
       cancelScheduledBuild();
       build(); // include the last live edit and its resulting selection

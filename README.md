@@ -107,7 +107,7 @@ The **View** readout above the atom legend shows the current viewing direction a
 
 ## Undo and redo
 
-**Undo** and **Redo** stay below the view controls, beside **Turn** on phones. They cover pairs and cutoffs, styles and resets, visibility, plotting extent, lattice overlays, symmetry, measurements, site highlighting, and camera changes. A slider drag, held slider key, camera drag (including its settling motion), pinch, or burst of wheel zoom is one step. Axis views, exact turns and Reset are individual steps. Hover over either button to see its next action.
+**Undo** and **Redo** stay below the view controls, beside **Turn** on phones. In short landscape views, they use 44 px icon buttons on the direction-toolbar row, clear of the settings editor. They cover pairs and cutoffs, styles and resets, visibility, plotting extent, lattice overlays, symmetry, measurements, site highlighting, and camera changes. A slider drag, held slider key, camera drag (including its settling motion), pinch, or burst of wheel zoom is one step. Axis views, exact turns and Reset are individual steps. Hover over either button to see its next action.
 
 Use **Ctrl/Cmd+Z** to undo, **Ctrl/Cmd+Shift+Z** to redo, or **Ctrl+Y** to redo. Text fields retain their normal text undo. Switching tabs, selecting a style target, and changing export preferences do not create steps. New edits after undo discard redo. The last 100 actions are kept in memory; successfully opening another structure or data block, or reloading the page, starts a fresh history. Autosave saves the current result after undo or redo. Undo and redo pause during image/movie export.
 
