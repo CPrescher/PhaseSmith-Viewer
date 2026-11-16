@@ -184,3 +184,28 @@ test("saved window state is validated", () => {
   // A round trip is lossless.
   assert.deepEqual(validateState(s), s);
 });
+
+
+test("a kept tool can tune on a narrow screen even without a main palette", () => {
+  let s = pinTool(initialState("pairs"), "pairs");
+  s = setTune(s, true);
+  assert.equal(s.main, null);
+  assert.equal(s.tune, true);
+  assert.equal(validateState(s).tune, true);
+  s = chooseTool(s, "lattice");
+  assert.equal(s.tune, false);
+  s = chooseTool(s, "pairs");
+  s = setTune(s, true);
+  assert.equal(frontTool(s), "pairs");
+  assert.equal(s.main, "lattice");
+  assert.equal(s.tune, true);
+  assert.equal(chooseTool(s, "lattice").tune, false);
+  assert.equal(closeTool(s, "pairs").tune, false);
+});
+
+test("only one extra tool can stay open, including restored state", () => {
+  let s = pinTool(initialState("pairs"), "pairs");
+  s = chooseTool(s, "lattice");
+  assert.equal(pinTool(s, "lattice"), s);
+  assert.deepEqual(validateState({ ...s, pinned: ["pairs", "sites", "export"] }).pinned, ["pairs"]);
+});

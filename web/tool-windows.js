@@ -253,6 +253,7 @@ export const frontTool = (s) => stacking(s).at(-1) ?? null;
 export function chooseTool(state, tool) {
   if (!TOOL_IDS.includes(tool)) return state;
   const s = copy(state);
+  if (frontTool(state) !== tool) s.tune = false;
   if (!s.pinned.includes(tool) && s.main !== tool) {
     s.main = tool;
     s.tune = false; // a different tool always opens in full
@@ -263,6 +264,7 @@ export function chooseTool(state, tool) {
 }
 export function closeTool(state, tool) {
   const s = copy(state);
+  if (frontTool(state) === tool) s.tune = false;
   if (s.main === tool) {
     s.main = null;
     s.tune = false;
@@ -285,7 +287,7 @@ export function minimizeTool(state, tool, minimized = true) {
 /** Keep the main palette open at `rect` (anchored); the next tool opens in
  *  a new main palette. */
 export function pinTool(state, tool, rect) {
-  if (state.main !== tool) return state;
+  if (state.main !== tool || state.pinned.length >= 1) return state;
   const s = copy(state);
   s.pinned.push(tool);
   s.main = null;
@@ -325,7 +327,7 @@ export function tidyState(state) {
 }
 export function setTune(state, on) {
   const s = copy(state);
-  s.tune = Boolean(on) && Boolean(s.main);
+  s.tune = Boolean(on) && Boolean(frontTool(s));
   return s;
 }
 
@@ -334,7 +336,7 @@ export function validateState(raw) {
   if (!raw || typeof raw !== "object") return null;
   const tool = (t) => TOOL_IDS.includes(t);
   const main = tool(raw.main) ? raw.main : null;
-  const pinned = Array.isArray(raw.pinned) ? [...new Set(raw.pinned.filter((t) => tool(t) && t !== main))] : [];
+  const pinned = Array.isArray(raw.pinned) ? [...new Set(raw.pinned.filter((t) => tool(t) && t !== main))].slice(0, 1) : [];
   const open = [main, ...pinned].filter(Boolean);
   const minimized = Array.isArray(raw.minimized) ? [...new Set(raw.minimized.filter((t) => open.includes(t)))] : [];
   const order = Array.isArray(raw.order) ? [...new Set(raw.order.filter((t) => open.includes(t)))] : [];
@@ -342,7 +344,7 @@ export function validateState(raw) {
   const rects = {};
   const src = raw.rects && typeof raw.rects === "object" ? raw.rects : {};
   for (const key of ["main", ...pinned]) if (validAnchored(src[key])) rects[key] = { ...src[key] };
-  return { main, pinned, minimized, order, rects, tune: raw.tune === true && Boolean(main) };
+  return { main, pinned, minimized, order, rects, tune: raw.tune === true && open.length > 0 };
 }
 
 // ---- DOM window manager -----------------------------------------------------
@@ -445,7 +447,7 @@ export function createToolWindows(options) {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       e.preventDefault();
       if (e.target.matches?.("input, select, textarea")) title.focus({ preventScroll: true });
-      else if (state.tune && state.main === tool.id && profile === "sheet") toggleTune(tool.id);
+      else if (state.tune && frontTool(state) === tool.id && profile === "sheet") toggleTune(tool.id);
       else closeWindow(tool.id, true);
     });
     // The tunable entry last touched in this tool (pair, plane, arrow).
@@ -463,7 +465,7 @@ export function createToolWindows(options) {
     b.setAttribute("aria-controls", `tool-window-${tool.id}`);
     b.onclick = (e) => {
       closeMenu();
-      choose(tool.id, { focus: e.detail === 0 });
+      choose(tool.id, { focus: e.detail === 0 || launcher === "menu" });
     };
   }
   tidyButton?.addEventListener("click", () => commit(tidyState(state)));
@@ -524,7 +526,7 @@ export function createToolWindows(options) {
   }
   // Keep open is offered only while another palette would still fit.
   function canPin() {
-    if (profile !== "float" || !state.main) return false;
+    if (profile !== "float" || !state.main || state.pinned.length >= 1) return false;
     const occupied = [...state.pinned, state.main].map((t) => rectFor(t));
     return Boolean(placeWindow(defaultRect("float", ws, metrics()), occupied, ws));
   }
@@ -538,7 +540,7 @@ export function createToolWindows(options) {
   function markTunePath(tool) {
     const { body, title } = windows.get(tool);
     for (const el of body.querySelectorAll(".tune-path, .tune-item")) el.classList.remove("tune-path", "tune-item");
-    const item = state.tune && state.main === tool && profile === "sheet" ? tuneItem(tool) : null;
+    const item = state.tune && frontTool(state) === tool && profile === "sheet" ? tuneItem(tool) : null;
     title.querySelector(".tool-sub").textContent = item ? ` · ${item.dataset.tuneName || item.getAttribute("aria-label") || ""}` : "";
     if (!item) return false;
     item.classList.add("tune-item");
@@ -546,7 +548,7 @@ export function createToolWindows(options) {
     return true;
   }
   function toggleTune(tool) {
-    if (profile !== "sheet" || state.main !== tool) return;
+    if (profile !== "sheet" || frontTool(state) !== tool) return;
     const win = windows.get(tool);
     if (!state.tune) {
       if (!tuneItem(tool)) return;
@@ -562,18 +564,24 @@ export function createToolWindows(options) {
   function refreshTuneButton(tool) {
     const win = windows.get(tool);
     win.buttons.tune.hidden =
-      profile !== "sheet" || state.main !== tool || state.minimized.includes(tool) || !win.body.querySelector("[data-tune-item]");
+      profile !== "sheet" || frontTool(state) !== tool || state.minimized.includes(tool) || !win.body.querySelector("[data-tune-item]");
+    if (state.tune && frontTool(state) === tool && profile === "sheet") {
+      const item = tuneItem(tool);
+      const subtitle = item ? ` · ${item.dataset.tuneName || item.getAttribute("aria-label") || ""}` : "";
+      if (win.title.querySelector(".tool-sub").textContent !== subtitle)
+        win.title.querySelector(".tool-sub").textContent = subtitle;
+    }
   }
   // Re-rendered lists (a pair added or removed) keep the tuned entry.
   const tuneObserver = new MutationObserver(() => {
-    if (state.main) refreshTuneButton(state.main);
-    if (!state.tune || !state.main) return;
-    const tool = state.main;
+    const tool = frontTool(state);
+    if (tool) refreshTuneButton(tool);
+    if (!state.tune || !tool) return;
     if (windows.get(tool).body.querySelector(".tune-item")) return;
     if (!markTunePath(tool)) commit(setTune(state, false));
     else apply();
   });
-  for (const { body } of windows.values()) tuneObserver.observe(body, { childList: true, subtree: true });
+  for (const { body } of windows.values()) tuneObserver.observe(body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-tune-name"] });
 
   // ---- Move / resize (floating palettes) ----
   function startDrag(e, tool, kind) {
@@ -694,12 +702,13 @@ export function createToolWindows(options) {
       refreshTuneButton(id);
       tune.setAttribute("aria-pressed", String(tuning));
       tune.textContent = tuning ? "All settings" : "Tune";
+      tune.setAttribute("aria-label", tuning ? `Show all settings for ${win.tool.title}` : `Tune the chosen ${win.tool.title} entry with the crystal in view`);
       tune.title = tuning ? "Show all settings of this tool again" : "Keep only the chosen entry, with more room for the crystal";
       pin.hidden = profile !== "float";
       const kept = state.pinned.includes(id);
       pin.setAttribute("aria-pressed", String(kept));
       pin.disabled = !kept && !canPin();
-      pin.title = kept ? "Kept open · press to make this the main palette again" : pin.disabled ? "Keep open: no room for another palette" : "Keep open: the next tool opens in its own palette";
+      pin.title = kept ? "Kept open · press to make this the main palette again" : state.pinned.length ? "Keep open: one other tool is already kept open" : pin.disabled ? "Keep open: no room for another palette" : "Keep open: the next tool opens in its own palette";
       min.innerHTML = svg(minimized ? ICONS.max : ICONS.min);
       min.title = minimized ? "Restore" : "Minimize";
       min.setAttribute("aria-label", `${min.title} ${win.tool.title}`);

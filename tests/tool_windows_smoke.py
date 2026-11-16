@@ -104,6 +104,8 @@ async def open_page(browser, width, height, touch, theme):
 async def check_defaults(page, where, guide):
     d = await diag(page)
     assert d["windows"]["visible"] == ["pairs"], (where, d["windows"]["visible"])
+    if d["windows"]["profile"] == "sheet":
+        assert await page.locator("#tool-window-pairs .tune-button").is_visible(), (where, "initial Tune unavailable")
     for sel in ORIGINAL:
         assert await page.evaluate(HITS, sel), (where, "original control covered", sel)
     await stage_frames_crystal(page, where)
@@ -350,7 +352,14 @@ async def phone(browser, width, height, theme):
     clear = (await diag(page))["stage"]["clear"]
     assert pop["y"] + pop["height"] <= canvas["y"] + clear["y"] + clear["h"] + 1, (where, "Details over the sheet", pop, clear)
     assert "occupancy" in await page.locator("#selection").inner_text(), where
+    footer = await page.locator(".view-bottom").bounding_box()
+    assert pop["y"] + pop["height"] <= footer["y"] - 4, (where, "Details over the atom controls", pop, footer)
+    assert await page.evaluate(HITS, "#measure-more"), (where, "Details covered its own close button")
+    await page.locator("#measure-more").press("Escape")
+    assert await page.locator("#measure-more").get_attribute("aria-expanded") == "false", where
     await tap(page, "#measure-more", True)
+    await tap(page, "#view-c", True)
+    assert await page.locator("#measure-more").get_attribute("aria-expanded") == "false", where
     # Orientation round trip keeps tool, sheet and scroll.
     kept = await body.evaluate("el => (el.scrollTo(0, 30), el.scrollTop)")
     assert kept > 0, where
@@ -371,6 +380,37 @@ async def phone(browser, width, height, theme):
     assert not errors, (where, errors)
     await context.close()
     print(f"{where}: menu, sheet, Tune/All settings, bounded Details, rotation state, known volumes")
+
+
+async def parked_tool(browser):
+    context, page, errors = await open_page(browser, 1440, 900, True, "dark")
+    await tap(page, '#tool-window-pairs [data-action="pin"]', True)
+    await choose(page, "#mode-lattice", True)
+    await tap(page, "#plane-add", True)
+    assert await page.locator('#tool-window-lattice [data-action="pin"]').is_disabled()
+    await page.set_viewport_size({"width": 390, "height": 844})
+    await settle(page)
+    await choose(page, "#mode-pairs", True)
+    assert await page.locator("#tool-window-pairs .tune-button").is_visible()
+    assert await page.evaluate("document.activeElement.id") == "tool-title-pairs"
+    await tap(page, "#tool-window-pairs .tune-button", True)
+    d = await diag(page)
+    assert d["windows"]["state"]["tune"] and d["windows"]["state"]["pinned"] == ["pairs"]
+    fonts = await page.locator('#tool-window-pairs input[type="text"], #tool-window-pairs select').evaluate_all("els => els.map(el => parseFloat(getComputedStyle(el).fontSize))")
+    assert min(fonts) >= 16, fonts
+    await choose(page, "#mode-lattice", True)
+    assert not (await diag(page))["windows"]["state"]["tune"]
+    await tap(page, "#tool-window-lattice .tune-button", True)
+    field = page.locator('[aria-label="Miller indices (h k l), integers"]')
+    await field.fill("1 1 0")
+    await field.press("Tab")
+    await page.locator("#tool-title-lattice").filter(has_text="1 1 0").wait_for()
+    await page.set_viewport_size({"width": 1440, "height": 900})
+    await settle(page)
+    assert sorted((await diag(page))["windows"]["visible"]) == ["lattice", "pairs"]
+    assert not errors, errors
+    await context.close()
+    print("Kept tool: phone Tune, named parameter refresh, readable fields, focus, desktop restoration")
 
 
 async def main():
@@ -396,6 +436,7 @@ async def main():
         assert not errors, errors
         await context.close()
         print("768×1024: sheet below the rail, controls and crystal clear")
+        await parked_tool(browser)
         await browser.close()
 
 

@@ -406,9 +406,13 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     ".axis-compass",
     "#atom-summary",
   ];
-  let obstacles = [];
+  let obstacles = [], exportMode = false, exportObstacles = [], savedPlacement = null;
   function refreshObstacles(canvasRect) {
     obstacles = [];
+    if (exportMode) {
+      obstacles = exportObstacles;
+      return;
+    } // Application windows/toolbars are absent from image output.
     for (const selector of OBSTACLES)
       for (const el of document.querySelectorAll(selector)) {
         const r = el.getBoundingClientRect();
@@ -1245,6 +1249,24 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   return {
     rebuild,
     updateLabels,
+    // Export frames use their own placement history and full canvas. Restore
+    // the live history afterward so a movie never changes on-screen labels.
+    setExportObstacles(rects) { exportObstacles = rects; },
+    setExportMode(on) {
+      if (exportMode === on) return;
+      exportMode = on;
+      if (on) {
+        savedPlacement = { cache: new Map(placementCache), nextRank, frameNo, cachedPosition, shownLabels, lastPlaced, lastCulled, obstacles };
+        placementCache.clear();
+        nextRank = frameNo = 0;
+        exportObstacles = obstacles = [];
+      } else if (savedPlacement) {
+        placementCache.clear();
+        for (const [key, entry] of savedPlacement.cache) placementCache.set(key, entry);
+        ({ nextRank, frameNo, cachedPosition, shownLabels, lastPlaced, lastCulled, obstacles } = savedPlacement);
+        savedPlacement = null;
+      }
+    },
     /** Scene bounds of drawn planes, arrows and symmetry elements (cached
      *  at each rebuild; cheap enough to read every frame). */
     bounds: () => cachedBounds.clone(),
@@ -1363,6 +1385,8 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       for (const e of result?.elements ?? []) counts[elementCategory(e)] = (counts[elementCategory(e)] || 0) + 1;
       return {
         labels: {
+          exporting: exportMode,
+          obstacleCount: obstacles.length,
           enabled: labelsOn,
           includeOffsets: labelOffsets,
           position: labelPosition,

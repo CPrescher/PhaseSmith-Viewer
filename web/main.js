@@ -2013,16 +2013,36 @@ function initialize() {
   }
   function boundDetails() {
     const details = $("selection");
-    if (!detailsOpen) {
-      details.style.maxHeight = "";
+    if (!detailsOpen || !$("measure-more").getClientRects().length) {
+      details.style.maxHeight = details.style.top = "";
       return;
     }
     const view = viewport.getBoundingClientRect();
     const clear = stage.clear ?? { y: 0, h: view.height };
-    const top = $("measure-overlay").querySelector(".measure-details").getBoundingClientRect().top;
-    details.style.maxHeight = `${Math.max(72, view.top + clear.y + clear.h - top - 8)}px`;
+    const footer = document.querySelector(".view-bottom").getBoundingClientRect();
+    const bottom = Math.min(view.top + clear.y + clear.h, footer.height ? footer.top : view.bottom) - 8;
+    const cardTop = $("measure-overlay").querySelector(".measure-details").getBoundingClientRect().top;
+    let top = cardTop;
+    if (bottom - top < 72) {
+      // Beside the action column, above the legend on short phones. The
+      // Details/Hide button and every scientific editor remain reachable.
+      const toolbarBottom = Math.max(document.querySelector(".view-directions").getBoundingClientRect().bottom, $("turn-open").getBoundingClientRect().bottom);
+      top = Math.max(toolbarBottom + 8, bottom - 120);
+    }
+    details.style.top = `${top - cardTop}px`;
+    details.style.maxHeight = `${Math.max(36, bottom - top)}px`;
   }
   $("measure-more").onclick = () => setDetailsOpen(!detailsOpen);
+  document.addEventListener("pointerdown", (event) => {
+    if (detailsOpen && !$("measure-overlay").contains(event.target)) setDetailsOpen(false);
+  });
+  $("measure-overlay").addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && detailsOpen) {
+      event.preventDefault();
+      setDetailsOpen(false);
+      $("measure-more").focus({ preventScroll: true });
+    }
+  });
   // Info: one atom at a time — label, element, occupancy, fractional and
   // Cartesian position, and the CN/volume of configured polyhedra around
   // it. No distance is implied. On phones the label shows under the action
@@ -3044,6 +3064,7 @@ function initialize() {
     },
     atomLabels: () => (labelsOn ? lastAtomLabels : []),
     latticeLabels: () => latticeTools.placedLabels(),
+    exportObstacles: (rects) => latticeTools.setExportObstacles(rects),
     compass: () => compassState,
     // The measurement card, only while atoms are picked for it.
     measurement: () => {
@@ -3062,6 +3083,7 @@ function initialize() {
       stageSuspended = busy;
       // Exports peel the full layer budget in every frame.
       peeler.setExportMode(busy);
+      latticeTools.setExportMode(busy);
       viewport.classList.toggle("exporting", busy);
       controls.enabled = !busy;
       // Step turns are blocked while exporting (buttons and handler).

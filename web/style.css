@@ -2518,3 +2518,26 @@ button.element[aria-pressed="false"] .dot {
     pointer-events: auto;
   }
 }
+
+/* Editable touch fields retain readable text when the software keyboard opens. */
+@media (pointer: coarse), (max-width: 900px) {
+  #app input:is([type="text"], [type="number"], [type="search"], [type="email"], [type="url"], [type="tel"]),
+  #app input:not([type]), #app select, #app textarea { font-size: 16px; }
+}
+/* On short landscape screens the instruction competes with the scene.
+   Actual measurement results remain visible after a pick. */
+#app[data-profile="side"] .measurement:not(.active) .measure-details { display: none; }
+#library-open { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+#library-open svg { flex: none; }
+@media (max-width: 640px) {
+  #library-open { width: var(--touch); padding: 0; }
+  #library-open span, #open .open-kind { display: none; }
+}
+
+@media (pointer: coarse) {
+  .tool-window[data-place="float"] .window-grip {
+    width: 44px; height: 44px;
+    background-size: 22px 22px; background-position: right bottom; background-repeat: no-repeat;
+  }
+  .tool-window[data-place="float"] .tool-window-body { padding-bottom: 44px; }
+}

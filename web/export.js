@@ -209,9 +209,9 @@ export function createExporter(ctx) {
     }
   }
 
-  function measurement(g, w, s) {
+  function measurementLayout(g, w, s) {
     const m = ctx.measurement();
-    if (!m) return;
+    if (!m) return null;
     const pad = 10 * s,
       lineH = 16 * s;
     g.font = `500 ${22 * s}px Inter, ui-sans-serif, system-ui, sans-serif`;
@@ -222,6 +222,12 @@ export function createExporter(ctx) {
       boxH = pad * 2 + 26 * s + m.lines.length * lineH;
     const x = w - boxW - 12 * s,
       y = 12 * s;
+    return { m, pad, lineH, boxW, boxH, x, y };
+  }
+  function measurement(g, w, s) {
+    const layout = measurementLayout(g, w, s);
+    if (!layout) return;
+    const { m, pad, lineH, boxW, boxH, x, y } = layout;
     g.fillStyle = css("--overlay-bg");
     roundRect(g, x, y, boxW, boxH, 10 * s);
     g.fill();
@@ -319,12 +325,18 @@ export function createExporter(ctx) {
   /** Render the current view into a 2D canvas at `size`. */
   function composeFrame(target, size, transparent) {
     const g = target.getContext("2d");
+    const s = size.width / size.css.width;
+    // Label placement avoids only overlays actually drawn in the image,
+    // in CSS pixels; application tool windows are absent from the output.
+    const m = measurementLayout(g, size.width, s);
+    const obstacles = m ? [{ x: m.x / s, y: m.y / s, w: m.boxW / s, h: m.boxH / s }] : [];
+    if (ctx.compass()) obstacles.push({ x: size.width / s - 84, y: size.height / s - 84, w: 72, h: 72 });
+    ctx.exportObstacles?.(obstacles);
     withRenderSize(size, () => {
       ctx.render(); // updates labels/compass from the live camera as well
       background(g, size.width, size.height, transparent);
       g.drawImage(ctx.renderer.domElement, 0, 0, size.width, size.height);
     });
-    const s = size.width / size.css.width;
     labels(g, s);
     measurement(g, size.width, s);
     compass(g, size.width, size.height, s);
