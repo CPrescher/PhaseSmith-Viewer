@@ -71,7 +71,10 @@
 
         <button id="open" class="primary" aria-label="Open structure or project file" title="Open a CIF structure or a saved .psv project">
           ＋ Open<span class="desktop"> file</span></button
-        ><input id="file" type="file" accept=".cif,.mcif,.psv,text/plain" hidden />
+        >
+        <!-- No accept filter: iPadOS can disable CIF/PSV files with unrecognized types.
+             The importer validates the selected file's contents. -->
+        <input id="file" type="file" hidden />
       </header>
       <dialog id="structure-library" aria-labelledby="library-title" aria-describedby="library-intro">
         <div class="library-head">
@@ -813,7 +816,8 @@
             <div class="export-row session-actions">
               <button id="project-save" type="button" class="primary" disabled>Save project</button>
               <button id="project-open" type="button" class="secondary">Open project</button>
-              <input id="project-file" type="file" accept=".psv" hidden />
+              <!-- Keep this picker unfiltered too; iPadOS may not recognize .psv. -->
+              <input id="project-file" type="file" hidden />
             </div>
             <p id="project-status" class="note" role="status" aria-live="polite"></p>
             <!-- Local session (IndexedDB on this device only). -->
