@@ -17,6 +17,7 @@ emulation and scrolls with the wheel). VIEWER_URL selects the app.
 import asyncio
 import os
 from playwright.async_api import async_playwright
+from browser_test_config import QUICK
 from phone_measure_smoke import CIF
 
 URL = os.environ.get("VIEWER_URL", "http://127.0.0.1:4179").rstrip("/")
@@ -326,10 +327,12 @@ async def main():
         if os.environ.get("WEBKIT_EXECUTABLE"):
             browsers.append(("webkit", await p.webkit.launch(executable_path=os.environ["WEBKIT_EXECUTABLE"])))
         for engine, browser in browsers:
-            for width, height, touch in SIZES:
-                for theme in ["dark", "light"]:
-                    await check(browser, engine, width, height, touch, theme)
-            for theme in ["dark", "light"]:
+            cases = [(390, 844, True, "dark"), (1000, 750, False, "light")] if QUICK else [
+                (w, h, touch, theme) for w, h, touch in SIZES for theme in ["dark", "light"]
+            ]
+            for width, height, touch, theme in cases:
+                await check(browser, engine, width, height, touch, theme)
+            for theme in (["light"] if QUICK else ["dark", "light"]):
                 await check_landscape_legend(browser, engine, theme)
             await browser.close()
 

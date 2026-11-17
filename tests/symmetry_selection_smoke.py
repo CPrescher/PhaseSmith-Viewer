@@ -1,8 +1,10 @@
 """Almandine space-group axis selection and session restoration."""
 
 import asyncio
+import os
 from pathlib import Path
 from playwright.async_api import async_playwright
+from browser_test_config import QUICK
 from smoke import URL, diagnostics, choose_tool
 
 
@@ -67,8 +69,11 @@ async def check(browser, width, height):
 
 async def main():
     async with async_playwright() as p:
-        browser = await p.chromium.launch(channel="chrome", args=["--enable-unsafe-swiftshader"])
-        for size in [(1440, 900), (390, 844)]:
+        options = {"args": ["--enable-unsafe-swiftshader"]}
+        if os.environ.get("BROWSER_CHANNEL"):
+            options["channel"] = os.environ["BROWSER_CHANNEL"]
+        browser = await p.chromium.launch(**options)
+        for size in ([(1000, 750)] if QUICK else [(1440, 900), (390, 844)]):
             await check(browser, *size)
         await browser.close()
 

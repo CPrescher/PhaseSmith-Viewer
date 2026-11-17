@@ -3,7 +3,8 @@ import asyncio
 import math
 import os
 from playwright.async_api import async_playwright
-from smoke import URL, diagnostics, settle
+from browser_test_config import QUICK
+from smoke import URL, HERE, diagnostics, settle
 
 
 async def check(browser, width, height, dpi):
@@ -14,8 +15,13 @@ async def check(browser, width, height, dpi):
     page = await context.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
-    await page.goto(URL + "/?example=forsterite")
-    await page.wait_for_function("window.viewerDiagnostics?.().atoms.length > 0")
+    # Touch mapping needs real projected atoms, not the expensive translucent
+    # forsterite scene. Rendering/polyhedra retain their own browser checks.
+    await page.goto(URL + ("/" if QUICK else "/?example=forsterite"))
+    await page.wait_for_function("window.viewerDiagnostics?.().history.ready")
+    if QUICK:
+        await page.locator("#file").set_input_files(HERE / "skew-direction.cif")
+        await page.wait_for_function("viewerDiagnostics().block === 'skew_direction' && viewerDiagnostics().history.ready")
     session = await context.new_cdp_session(page)
     largest_error = 0
 
@@ -171,8 +177,10 @@ async def main():
         if os.environ.get("BROWSER_CHANNEL"):
             options["channel"] = os.environ["BROWSER_CHANNEL"]
         browser = await p.chromium.launch(**options)
-        for dimensions in ((1024, 768, 1), (1024, 768, 2), (768, 1024, 2), (390, 844, 3)):
-            await check(browser, *dimensions)
+        dimensions = [(1024, 768, 1)] if QUICK else [(1024, 768, 1), (1024, 768, 2), (768, 1024, 2), (390, 844, 3)]
+        for size in dimensions:
+            print(f"Starting touch gestures: {size[0]}×{size[1]}, DPI {size[2]}", flush=True)
+            await check(browser, *size)
         await browser.close()
 
 

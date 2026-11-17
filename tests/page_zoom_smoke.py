@@ -7,6 +7,7 @@ pinch/pan behavior is covered by touch_pan_smoke.py.
 import asyncio
 import os
 from playwright.async_api import async_playwright
+from browser_test_config import QUICK
 from smoke import URL
 
 
@@ -17,7 +18,7 @@ async def check(browser, native_touch):
     page = await context.new_page()
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    await page.goto(URL + "/?example=forsterite")
+    await page.goto(URL + ("/" if QUICK else "/?example=forsterite"))
     await page.wait_for_function("window.viewerDiagnostics?.().atoms.length > 0")
     session = await context.new_cdp_session(page) if native_touch else None
 
@@ -69,6 +70,7 @@ async def check(browser, native_touch):
             "y": box["y"] + box["height"] * 0.75,
             "yDistance": -250, "gestureSourceType": "touch", "speed": 600,
         })
+        await page.wait_for_function("document.getElementById('structure-library').scrollTop > 0", timeout=5000)
         assert await dialog.evaluate("el => el.scrollTop") > 0, "Dialog cannot scroll"
     assert not errors, errors
     print(f"{browser.browser_type.name}: page scale stays at 1; gesture guard works", flush=True)

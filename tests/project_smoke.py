@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 from playwright.async_api import async_playwright
+from browser_test_config import QUICK
 from smoke import URL, HERE, diagnostics, choose_tool
 from history_smoke import idle, equivalent
 
@@ -16,7 +17,7 @@ async def download_project(page):
 
 
 async def check(browser, phone):
-    options = dict(viewport={"width": 390 if phone else 1440, "height": 844 if phone else 900},
+    options = dict(viewport={"width": 390 if phone else (1000 if QUICK else 1440), "height": 844 if phone else (750 if QUICK else 900)},
                    has_touch=phone, is_mobile=phone, accept_downloads=True)
     context = await browser.new_context(**options)
     page = await context.new_page()

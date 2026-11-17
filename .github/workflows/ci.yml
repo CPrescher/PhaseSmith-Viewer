@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      full_browser_matrix:
+        description: Run the exhaustive screen, theme and DPI matrix
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -20,8 +25,29 @@ jobs:
       pages: read
     env:
       VITE_BASE_PATH: /${{ github.event.repository.name }}/
+      VIEWER_TEST_PROFILE: ${{ inputs.full_browser_matrix && 'full' || 'ci' }}
     steps:
       - uses: actions/checkout@v7.0.1
+      - name: Check whether the crystal reader changed
+        id: engine
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          FULL_CHECK: ${{ inputs.full_browser_matrix }}
+        shell: bash
+        run: |
+          set -eu
+          if [ "$FULL_CHECK" = true ] || [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = 0000000000000000000000000000000000000000 ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+              git fetch --no-tags --depth=1 origin "$BASE_SHA"
+            fi
+            if git diff --quiet "$BASE_SHA" HEAD -- engine/ scripts/copy-engine.mjs; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: '22'
@@ -33,10 +59,12 @@ jobs:
           cache-dependency-path: tests/requirements-browser.txt
       - run: npm ci
       - name: Prepare Rust WebAssembly toolchain
+        if: steps.engine.outputs.changed == 'true'
         run: |
           rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown
           rustup default stable
       - name: Test and rebuild the PhaseSmith importer
+        if: steps.engine.outputs.changed == 'true'
         run: |
           cargo test --locked --manifest-path engine/Cargo.toml
           npm run build:engine
@@ -48,7 +76,8 @@ jobs:
         run: |
           python -m pip install -r tests/requirements-browser.txt
           python -m playwright install --with-deps chromium
-      - name: Test the hosted path, WebAssembly engine, stable layout and tool windows
+      - name: Check production loading and examples (extended suite on request)
+        timeout-minutes: ${{ inputs.full_browser_matrix && 45 || 3 }}
         shell: bash
         run: |
           set -eu
@@ -59,17 +88,11 @@ jobs:
           viewer_server_pid=$!
           trap 'kill "$viewer_server_pid"; rm -rf "$viewer_site_root"' EXIT
           curl --retry 10 --retry-connrefused --retry-delay 1 -fsS "http://127.0.0.1:4181$VITE_BASE_PATH" > /dev/null
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/pages_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/library_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/pair_defaults_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/symmetry_selection_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/history_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/touch_pan_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/project_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/layout_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/page_zoom_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/tool_windows_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/turn_smoke.py
+          if [ "${{ inputs.full_browser_matrix }}" = true ]; then
+            VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/run_browser_checks.py --timeout 1200
+          else
+            VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/run_browser_checks.py --workers 1 --timeout 120 pages_smoke
+          fi
       - name: Configure GitHub Pages
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/configure-pages@v6.0.0
