@@ -757,6 +757,23 @@ export function symmetryElements(operations, basis, ranges) {
   };
 }
 
+/** Apply exact axis-type filters after merging coincident operations.
+ * A 4 axis also carries 2: selecting only 2 must keep that line and give
+ * it the twofold color rather than its unfiltered fourfold color. */
+export function filterSymmetryElements(elements, categories, hiddenTypes = new Set()) {
+  return elements.flatMap((e) => {
+    const category = elementCategory(e);
+    if (!categories.has(category)) return [];
+    if (e.kind !== "axis" && e.kind !== "rotoinversion") return [e];
+    const symbols = e.symbols.filter((s) => !hiddenTypes.has(`${category}:${s}`));
+    if (!symbols.length) return [];
+    const symbol = symbols.includes(e.symbol) ? e.symbol : symbols.at(-1);
+    const order = e.kind === "axis" ? Number(symbol[0]) : e.order;
+    const screw = e.kind === "axis" ? (symbol.length > 1 ? "₀₁₂₃₄₅₆₇₈₉".indexOf(symbol[1]) : 0) : e.screw;
+    return [{ ...e, symbol, symbols, order, screw }];
+  });
+}
+
 /** Category used for filters and colors. */
 export function elementCategory(e) {
   if (e.category) return e.category;

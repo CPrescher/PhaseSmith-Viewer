@@ -11,6 +11,8 @@
 // so the page layout and camera aspect do not change) and read right after
 // rendering, in the same task. Everything is restored afterwards.
 
+import { exportFrame } from "./export-framing.js";
+
 const MAX_IMAGE_SIDE = 4096,
   MAX_VIDEO_SIDE = 1920;
 
@@ -108,20 +110,71 @@ const css = (name) => getComputedStyle(document.documentElement).getPropertyValu
 
 /**
  * ctx: { renderer, camera, controls(), render, stopMotion, invalidate,
- *        cssSize(), atomLabels(), latticeLabels(), compass(), measurement(),
+ *        cssSize(), contentBounds(turntable), atomLabels(), latticeLabels(), compass(), measurement(),
  *        name(), setBusy(bool) }
  */
 export function createExporter(ctx) {
   let busy = false;
+  const measureContext = document.createElement("canvas").getContext("2d");
+
+  function measurementSize(g, s = 1) {
+    const m = ctx.measurement();
+    if (!m) return null;
+    g.font = `500 ${22 * s}px Inter, ui-sans-serif, system-ui, sans-serif`;
+    let width = g.measureText(m.value).width;
+    g.font = `400 ${12 * s}px Inter, ui-sans-serif, system-ui, sans-serif`;
+    for (const line of m.lines) width = Math.max(width, g.measureText(line).width);
+    return { width: width + 20 * s, height: (46 + m.lines.length * 16) * s };
+  }
+
+  function frameFor(turntable = false) {
+    let bounds = ctx.contentBounds(turntable);
+    const include = (rect) => {
+      if (!bounds) bounds = { ...rect };
+      else {
+        const x = Math.min(bounds.x, rect.x), y = Math.min(bounds.y, rect.y);
+        bounds = { x, y, width: Math.max(bounds.x + bounds.width, rect.x + rect.width) - x,
+          height: Math.max(bounds.y + bounds.height, rect.y + rect.height) - y };
+      }
+    };
+    measureContext.font = "400 11px Inter, ui-sans-serif, system-ui, sans-serif";
+    let labelWidth = 0;
+    for (const label of ctx.atomLabels()) {
+      const width = measureContext.measureText(label.label).width + 6;
+      include({ x: label.x - width * 0.2, y: label.y - 12, width, height: 15 });
+      labelWidth = Math.max(labelWidth, width);
+    }
+    for (const label of ctx.latticeLabels()) {
+      const width = label.rect?.w ?? measureContext.measureText(label.text).width + 11;
+      include({ x: label.rect?.x ?? (label.kind === "arrow" ? label.x + 6 : label.x - width / 2),
+        y: label.rect?.y ?? (label.kind === "arrow" ? label.y - 22 : label.y - 8), width, height: 16 });
+      if (label.leader) {
+        const l = label.leader;
+        include({ x: Math.min(l.x1, l.x2), y: Math.min(l.y1, l.y2), width: Math.abs(l.x2 - l.x1), height: Math.abs(l.y2 - l.y1) });
+      }
+      labelWidth = Math.max(labelWidth, width + 24);
+    }
+    const card = measurementSize(measureContext);
+    return exportFrame(bounds, ctx.cssSize(), {
+      // Labels can change sides while rotating. Reserve their reach around
+      // the analytic geometry envelope, once for the entire movie.
+      labelMargin: turntable && labelWidth ? { x: labelWidth + 16, y: 40 } : 0,
+      overlayWidth: card?.width,
+      overlayHeight: card?.height,
+      compass: Boolean(ctx.compass()),
+      clip: !turntable,
+    });
+  }
 
   /** Export pixel size for a CSS-size scale, bounded and even. */
-  function exportSize(scale, maxSide) {
+  function exportSize(scale, maxSide, crop = frameFor()) {
     const { width, height } = ctx.cssSize();
     const gl = ctx.renderer.getContext();
     const limit = Math.min(maxSide, gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || maxSide, gl.getParameter(gl.MAX_VIEWPORT_DIMS)?.[0] || maxSide);
-    const factor = Math.min(scale, limit / Math.max(width, height));
+    const factor = Math.min(scale, limit / Math.max(crop.width, crop.height));
     const even = (v) => Math.max(2, 2 * Math.round((v * factor) / 2));
-    return { width: even(width), height: even(height), css: { width, height }, scale: factor };
+    return { width: even(crop.width), height: even(crop.height),
+      crop, css: { width, height }, scale: factor };
   }
 
   function withRenderSize(size, run) {
@@ -214,12 +267,7 @@ export function createExporter(ctx) {
     if (!m) return;
     const pad = 10 * s,
       lineH = 16 * s;
-    g.font = `500 ${22 * s}px Inter, ui-sans-serif, system-ui, sans-serif`;
-    let width = g.measureText(m.value).width;
-    g.font = `400 ${12 * s}px Inter, ui-sans-serif, system-ui, sans-serif`;
-    for (const line of m.lines) width = Math.max(width, g.measureText(line).width);
-    const boxW = width + 2 * pad,
-      boxH = pad * 2 + 26 * s + m.lines.length * lineH;
+    const { width: boxW, height: boxH } = measurementSize(g, s);
     const x = w - boxW - 12 * s,
       y = 12 * s;
     g.fillStyle = css("--overlay-bg");
@@ -319,13 +367,16 @@ export function createExporter(ctx) {
   /** Render the current view into a 2D canvas at `size`. */
   function composeFrame(target, size, transparent) {
     const g = target.getContext("2d");
+    const s = size.scale;
+    background(g, size.width, size.height, transparent);
     withRenderSize(size, () => {
-      ctx.render(); // updates labels/compass from the live camera as well
-      background(g, size.width, size.height, transparent);
+      ctx.render({ crop: size.crop, css: size.css });
       g.drawImage(ctx.renderer.domElement, 0, 0, size.width, size.height);
     });
-    const s = size.width / size.css.width;
+    g.save();
+    g.translate(-size.crop.x * s, -size.crop.y * s);
     labels(g, s);
+    g.restore();
     measurement(g, size.width, s);
     compass(g, size.width, size.height, s);
   }
@@ -375,18 +426,19 @@ export function createExporter(ctx) {
       up: camera.up.clone(),
       target: ctx.controls().target.clone(),
     };
-    const size = exportSize(scale, MAX_VIDEO_SIDE);
-    const canvas = document.createElement("canvas");
-    canvas.width = size.width;
-    canvas.height = size.height;
     // Setup can throw synchronously (e.g. Safari rejecting captureStream or
     // the MediaRecorder options). Then stop whatever tracks exist and give
     // the app back: not busy, controls enabled, camera untouched.
-    let manual = null,
+    let size, canvas,
+      manual = null,
       stream = null,
       track = null,
       recorder = null;
     try {
+      size = exportSize(scale, MAX_VIDEO_SIDE, frameFor(true));
+      canvas = document.createElement("canvas");
+      canvas.width = size.width;
+      canvas.height = size.height;
       manual = canvas.captureStream(0);
       track = manual.getVideoTracks()[0];
       if (typeof track?.requestFrame === "function") stream = manual;
@@ -507,6 +559,7 @@ export function createExporter(ctx) {
   }
 
   return {
+    imageSize: (scale = 2) => exportSize(scale, MAX_IMAGE_SIDE),
     exportPNG,
     recordTurntable,
     videoSupport,

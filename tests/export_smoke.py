@@ -48,6 +48,7 @@ async def check(browser):
     await settle(page)
     await page.locator("#export-dpi").fill("300")
     before = await diagnostics(page)
+    viewport = await page.locator("#viewport canvas").first.bounding_box()
     async with page.expect_download() as pending:
         await page.locator("#export-png").tap()
     png = await pending.value
@@ -55,7 +56,8 @@ async def check(browser):
     assert data[:8] == b"\x89PNG\r\n\x1a\n"
     assert abs(png_dpi(data) - 300) < 0.01
     width, height = struct.unpack(">II", data[16:24])
-    assert width > 1500 and height > 1000, (width, height)
+    assert width > 600 and height > 600, (width, height)
+    assert width * height < viewport["width"] * viewport["height"] * 4 * 0.7, (width, height, viewport)
     await png.save_as("/tmp/psv-gui-assessment/export-image.png")
     assert (await diagnostics(page))["camera"] == before["camera"]
 
@@ -67,15 +69,32 @@ async def check(browser):
     transparent_data = Path(await transparent.path()).read_bytes()
     assert abs(png_dpi(transparent_data) - 600) < 0.01
     data = base64.b64encode(transparent_data).decode()
-    alpha = await page.evaluate(
+    pixels = await page.evaluate(
         """data => new Promise((resolve,reject)=>{
       const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=img.width;c.height=img.height;
-      const g=c.getContext('2d');g.drawImage(img,0,0);resolve(g.getImageData(0,0,1,1).data[3]);};img.onerror=reject;
+      const g=c.getContext('2d');g.drawImage(img,0,0);
+      const rgba=g.getImageData(0,0,c.width,c.height).data;
+      const body={x1:c.width,y1:c.height,x2:0,y2:0},compass={...body};
+      for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++){
+        if(rgba[(y*c.width+x)*4+3]<8)continue;
+        const box=x<c.width-192?body:compass;
+        box.x1=Math.min(box.x1,x);box.y1=Math.min(box.y1,y);
+        box.x2=Math.max(box.x2,x);box.y2=Math.max(box.y2,y);
+      }
+      resolve({corner:rgba[3],body,compass,width:c.width,height:c.height});};img.onerror=reject;
       img.src='data:image/png;base64,'+data;
     })""",
         data,
     )
-    assert alpha == 0, alpha
+    assert pixels["corner"] == 0, pixels
+    body, compass = pixels["body"], pixels["compass"]
+    assert 20 <= body["x1"] <= 80 and 20 <= body["y1"] <= 80, pixels
+    assert 20 <= pixels["height"] - body["y2"] <= 80, pixels
+    # The compass moves to the lower-right corner of the cropped output;
+    # its 72 CSS px circle has a 12 CSS px inset at this 2× export scale.
+    for key, expected in {"x1": width - 168, "x2": width - 25,
+                          "y1": height - 168, "y2": height - 25}.items():
+        assert abs(compass[key] - expected) <= 2, pixels
 
     if not await page.locator("#export-video").is_disabled():
         await page.locator('input[name="export-scale"][value="1"]').check()

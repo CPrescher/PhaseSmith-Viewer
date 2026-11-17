@@ -10,6 +10,7 @@ import {
   planeDisplayRanges,
   directVector,
   symmetryElements,
+  filterSymmetryElements,
   elementCategory,
   elementEquation,
   operationString,
@@ -21,12 +22,17 @@ const ARROW_COLORS = ["#ff8a5c", "#5cc8ff", "#c6a0ef", "#e7edf3"];
 export const SYMMETRY_CATEGORIES = [
   { id: "rotation", label: "Rotation" },
   { id: "screw", label: "Screw" },
-  { id: "rotoinversion", label: "Rotoinv." },
+  { id: "rotoinversion", label: "Rotoinversion" },
   { id: "inversion", label: "Inversion" },
   { id: "mirror", label: "Mirror" },
   { id: "glide", label: "Glide" },
 ];
 const AXIS_COLORS = { 2: "#6ea8ff", 3: "#8cdf9b", 4: "#efa04c", 6: "#ef6fa7" };
+const AXIS_TYPE_KEYS = [
+  ...[2, 3, 4, 6].map((n) => `rotation:${n}`),
+  ...[2, 3, 4, 6].flatMap((n) => Array.from({ length: n - 1 }, (_, p) => `screw:${n}${"₀₁₂₃₄₅₆₇₈₉"[p + 1]}`)),
+  ...[3, 4, 6].map((n) => `rotoinversion:-${n}`),
+];
 const DARK_CATEGORY_COLORS = {
   rotoinversion: "#c6a0ef",
   inversion: "#ffe08a",
@@ -62,6 +68,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   const symmetry = {
     shown: false,
     filters: new Set(SYMMETRY_CATEGORIES.map((c) => c.id)),
+    hiddenTypes: new Set(),
     opacity: 0.3,
     cacheKey: "",
     result: null,
@@ -215,7 +222,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   function renderSymmetry(structure, ranges) {
     if (!symmetry.shown) return;
     const { elements } = computeSymmetry(structure, ranges);
-    const visible = elements.filter((e) => symmetry.filters.has(elementCategory(e)));
+    const visible = filterSymmetryElements(elements, symmetry.filters, symmetry.hiddenTypes);
     const solid = { positions: [], colors: [] },
       dashed = { positions: [], colors: [] },
       planeFaces = { positions: [], colors: [] },
@@ -395,6 +402,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   const OBSTACLES = [
     ".view-directions",
     "#turn-open",
+    ".history-controls.in-view",
     "#turn-panel:not(.in-pane)",
     ".view-directions details[open] #direction-form",
     ".measure-row",
@@ -1124,6 +1132,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     const counts = {};
     for (const e of result.elements) counts[elementCategory(e)] = (counts[elementCategory(e)] || 0) + 1;
     for (const box of document.querySelectorAll("#sym-filters input")) {
+      box.checked = symmetry.filters.has(box.value);
       // Filter swatch follows the current theme's category color.
       const axisColors = isLight() ? LIGHT_AXIS_COLORS : AXIS_COLORS;
       box
@@ -1135,6 +1144,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       const count = counts[box.value] || 0;
       box.closest("label").querySelector("small").textContent = count;
     }
+    renderAxisTypes(result.elements);
     note.textContent = result.note || (symmetry.shown ? "" : "Elements from the CIF's operations, clipped to the plotting range.");
     note.hidden = !note.textContent;
     const list = structure.symmetryOperations ?? [];
@@ -1142,6 +1152,39 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     toggle.setAttribute("aria-label", `Symmetry operations list, ${list.length} operations`);
     toggle.disabled = !list.length;
     if (!ops.hidden) renderOperations(list, result.analyses);
+  }
+  function renderAxisTypes(elements) {
+    const fragment = document.createDocumentFragment();
+    for (const category of SYMMETRY_CATEGORIES.slice(0, 3)) {
+      const types = new Map();
+      for (const e of elements) {
+        if (elementCategory(e) !== category.id) continue;
+        for (const symbol of e.symbols) types.set(symbol, (types.get(symbol) ?? 0) + 1);
+      }
+      if (!types.size) continue;
+      const row = make("div", { className: "sym-type-row" });
+      row.append(make("span", { className: "sym-type-caption", textContent: category.label }));
+      const chips = make("div", { className: "chip-row" });
+      for (const [symbol, count] of [...types].sort(([a], [b]) => a.localeCompare(b))) {
+        const key = `${category.id}:${symbol}`;
+        const color = category.id === "rotoinversion" ? CATEGORY_COLORS.rotoinversion : (isLight() ? LIGHT_AXIS_COLORS : AXIS_COLORS)[Number(symbol[0])];
+        const label = make("label", { className: "chip small sym-filter" });
+        label.style.setProperty("--sym-color", color);
+        const input = make("input", { type: "checkbox", value: key, checked: !symmetry.hiddenTypes.has(key), disabled: !symmetry.filters.has(category.id) });
+        input.setAttribute("aria-label", `Show ${category.label.toLowerCase()} ${symbol} axes`);
+        input.onchange = () => {
+          if (input.checked) symmetry.hiddenTypes.delete(key);
+          else symmetry.hiddenTypes.add(key);
+          rebuild();
+        };
+        const display = symbol.startsWith("-") ? `${symbol.slice(1)}\u0305` : symbol;
+        label.append(input, make("span", { textContent: display }), make("small", { textContent: String(count) }));
+        chips.append(label);
+      }
+      row.append(chips);
+      fragment.append(row);
+    }
+    $("sym-axis-types").replaceChildren(fragment);
   }
   function renderOperations(list, analyses) {
     $("sym-ops").replaceChildren(
@@ -1214,6 +1257,18 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     $("sym-controls").hidden = !symmetry.shown;
     rebuild();
   };
+  $("sym-axes-only").onclick = () => {
+    symmetry.filters = new Set(["rotation", "screw", "rotoinversion"]);
+    rebuild();
+  };
+  $("sym-types-all").onclick = () => {
+    symmetry.hiddenTypes.clear();
+    rebuild();
+  };
+  $("sym-types-none").onclick = () => {
+    symmetry.hiddenTypes = new Set(AXIS_TYPE_KEYS);
+    rebuild();
+  };
   $("sym-opacity").oninput = () => {
     symmetry.opacity = Number($("sym-opacity").value) / 100;
     $("sym-opacity-value").value = `${$("sym-opacity").value}%`;
@@ -1261,12 +1316,12 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           visible: a.visible,
           color: a.color,
         })),
-        symmetry: { shown: symmetry.shown, filters: [...symmetry.filters], opacity: symmetry.opacity },
+        symmetry: { shown: symmetry.shown, filters: [...symmetry.filters], opacity: symmetry.opacity, hiddenTypes: [...symmetry.hiddenTypes] },
         labels: { enabled: labelsOn, includeOffsets: labelOffsets, position: labelPosition },
       };
     },
     /** Apply validated session settings; invalid entries are skipped. */
-    restoreState(state) {
+    restoreState(state, { trusted = false } = {}) {
       if (!state || typeof state !== "object") return;
       const finite = (v) => typeof v === "number" && Number.isFinite(v);
       const triple = (v) => Array.isArray(v) && v.length === 3 && v.every(finite);
@@ -1282,7 +1337,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       };
       planes = (Array.isArray(state.planes) ? state.planes : [])
         .filter((p) => p && triple(p.hkl) && p.hkl.every(Number.isInteger) && p.hkl.some((x) => x !== 0) && finite(p.m))
-        .slice(0, 50)
+        .slice(0, trusted ? undefined : 50)
         .map((p, i) => ({
           id: freshId(p.id),
           hkl: [...p.hkl],
@@ -1297,7 +1352,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         }));
       arrows = (Array.isArray(state.arrows) ? state.arrows : [])
         .filter((a) => a && triple(a.uvw) && a.uvw.some((x) => x !== 0) && triple(a.origin) && finite(a.length) && a.length !== 0)
-        .slice(0, 50)
+        .slice(0, trusted ? undefined : 50)
         .map((a, i) => ({
           id: freshId(a.id),
           uvw: [...a.uvw],
@@ -1309,6 +1364,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         }));
       const sym = state.symmetry ?? {};
       symmetry.shown = bool(sym.shown, false);
+      symmetry.hiddenTypes = new Set(Array.isArray(sym.hiddenTypes) ? sym.hiddenTypes.filter((s) => AXIS_TYPE_KEYS.includes(s)) : []);
       if (Array.isArray(sym.filters)) {
         const known = new Set(SYMMETRY_CATEGORIES.map((c) => c.id));
         symmetry.filters = new Set(sym.filters.filter((f) => known.has(f)));
@@ -1337,6 +1393,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       symmetry.cacheKey = "";
       symmetry.result = null;
       symmetry.shown = false;
+      symmetry.hiddenTypes.clear();
       $("sym-toggle").checked = false;
       $("sym-controls").hidden = true;
       $("sym-ops").hidden = true;
@@ -1404,6 +1461,8 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         })),
         symmetry: {
           shown: symmetry.shown,
+          hiddenTypes: [...symmetry.hiddenTypes],
+          visibleElements: filterSymmetryElements(result?.elements ?? [], symmetry.filters, symmetry.hiddenTypes).map((e) => ({ category: elementCategory(e), symbols: e.symbols, order: e.order, start: e.start, end: e.end })),
           filters: [...symmetry.filters],
           opacity: symmetry.opacity,
           note: result?.note ?? null,

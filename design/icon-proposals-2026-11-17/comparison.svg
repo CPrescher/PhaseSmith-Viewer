@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1220" viewBox="0 0 1600 1220"><rect width="1600" height="1220" fill="#f3f4ef"/><g font-family="Helvetica, Arial, sans-serif">
+<text x="64" y="62" font-size="16" fill="#60706f" font-weight="600">PHASESMITH VIEWER / ICON STUDIES</text>
+<text x="64" y="120" font-size="42" fill="#0b1622" font-weight="600">A crystal identity. At every size.</text>
+<text x="64" y="159" font-size="19" fill="#53656e" font-weight="400">Four directions using the current name and palette. The exact same SVG is used at every preview size.</text>
+<rect x="64" y="200" width="720" height="438" rx="22" fill="#fff" stroke="#d9dfda"/>
+<text x="92" y="239" font-size="23" fill="#0b1622" font-weight="600">A  /  Split crystal</text>
+<text x="92" y="265" font-size="15" fill="#087d6b" font-weight="600">The clearest small icon</text>
+<g transform="translate(92 293) scale(1.5)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#39c6b0" d="M48 14 82 48 67 63 33 29Z"/><path fill="#edf8f6" d="M29 33 63 67 48 82 14 48Z"/></g>
+<text x="266" y="320" font-size="11" fill="#6a7882" font-weight="600">BROWSER TAB / ACTUAL SIZES</text>
+<g transform="translate(266 348.0) scale(0.16666666666666666)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#39c6b0" d="M48 14 82 48 67 63 33 29Z"/><path fill="#edf8f6" d="M29 33 63 67 48 82 14 48Z"/></g>
+<text x="266" y="393" font-size="12" fill="#657581" font-weight="400">16 px</text>
+<g transform="translate(330 344.0) scale(0.25)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#39c6b0" d="M48 14 82 48 67 63 33 29Z"/><path fill="#edf8f6" d="M29 33 63 67 48 82 14 48Z"/></g>
+<text x="330" y="393" font-size="12" fill="#657581" font-weight="400">24 px</text>
+<g transform="translate(394 340.0) scale(0.3333333333333333)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#39c6b0" d="M48 14 82 48 67 63 33 29Z"/><path fill="#edf8f6" d="M29 33 63 67 48 82 14 48Z"/></g>
+<text x="394" y="393" font-size="12" fill="#657581" font-weight="400">32 px</text>
+<text x="266" y="424" font-size="12" fill="#657581" font-weight="400">From Claude Fable 5.2</text>
+<rect x="92" y="455" width="664" height="55" rx="10" fill="#0b1622"/>
+<g transform="translate(105 467) scale(0.3125)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#39c6b0" d="M48 14 82 48 67 63 33 29Z"/><path fill="#edf8f6" d="M29 33 63 67 48 82 14 48Z"/></g>
+<text x="147" y="490" font-size="18" fill="#e8eff4" font-weight="600">PhaseSmith</text>
+<text x="252" y="490" font-size="18" fill="#8fa6ba" font-weight="400">Viewer</text>
+<text x="606" y="489" font-size="10" fill="#8fa6ba" font-weight="600">DARK HEADER</text>
+<rect x="92" y="521" width="664" height="55" rx="10" fill="#eef2f5"/>
+<g transform="translate(105 533) scale(0.3125)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#39c6b0" d="M48 14 82 48 67 63 33 29Z"/><path fill="#edf8f6" d="M29 33 63 67 48 82 14 48Z"/></g>
+<text x="147" y="556" font-size="18" fill="#15263a" font-weight="600">PhaseSmith</text>
+<text x="252" y="556" font-size="18" fill="#53697b" font-weight="400">Viewer</text>
+<text x="606" y="555" font-size="10" fill="#53697b" font-weight="600">LIGHT HEADER</text>
+<text x="92" y="610" font-size="15" fill="#53656e" font-weight="400">A crisp split facet evolves the existing diamond mark.</text>
+<rect x="816" y="200" width="720" height="438" rx="22" fill="#fff" stroke="#d9dfda"/>
+<text x="844" y="239" font-size="23" fill="#0b1622" font-weight="600">B  /  Coordination</text>
+<text x="844" y="265" font-size="15" fill="#087d6b" font-weight="600">The strongest crystal identity</text>
+<g transform="translate(844 293) scale(1.5)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#edf8f6" d="M48 14 18.5 31 18.5 65Z"/><path fill="#168979" d="M48 14 77.5 31 77.5 65Z"/><path fill="#39c6b0" d="M48 14 77.5 65 18.5 65Z"/><path fill="#267d76" d="M18.5 65 77.5 65 48 82Z"/><path d="M48 14 18.5 65H77.5Z" fill="none" stroke="#0b1622" stroke-width="2.5" stroke-linejoin="round"/></g>
+<text x="1018" y="320" font-size="11" fill="#6a7882" font-weight="600">BROWSER TAB / ACTUAL SIZES</text>
+<g transform="translate(1018 348.0) scale(0.16666666666666666)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#edf8f6" d="M48 14 18.5 31 18.5 65Z"/><path fill="#168979" d="M48 14 77.5 31 77.5 65Z"/><path fill="#39c6b0" d="M48 14 77.5 65 18.5 65Z"/><path fill="#267d76" d="M18.5 65 77.5 65 48 82Z"/><path d="M48 14 18.5 65H77.5Z" fill="none" stroke="#0b1622" stroke-width="2.5" stroke-linejoin="round"/></g>
+<text x="1018" y="393" font-size="12" fill="#657581" font-weight="400">16 px</text>
+<g transform="translate(1082 344.0) scale(0.25)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#edf8f6" d="M48 14 18.5 31 18.5 65Z"/><path fill="#168979" d="M48 14 77.5 31 77.5 65Z"/><path fill="#39c6b0" d="M48 14 77.5 65 18.5 65Z"/><path fill="#267d76" d="M18.5 65 77.5 65 48 82Z"/><path d="M48 14 18.5 65H77.5Z" fill="none" stroke="#0b1622" stroke-width="2.5" stroke-linejoin="round"/></g>
+<text x="1082" y="393" font-size="12" fill="#657581" font-weight="400">24 px</text>
+<g transform="translate(1146 340.0) scale(0.3333333333333333)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#edf8f6" d="M48 14 18.5 31 18.5 65Z"/><path fill="#168979" d="M48 14 77.5 31 77.5 65Z"/><path fill="#39c6b0" d="M48 14 77.5 65 18.5 65Z"/><path fill="#267d76" d="M18.5 65 77.5 65 48 82Z"/><path d="M48 14 18.5 65H77.5Z" fill="none" stroke="#0b1622" stroke-width="2.5" stroke-linejoin="round"/></g>
+<text x="1146" y="393" font-size="12" fill="#657581" font-weight="400">32 px</text>
+<text x="1018" y="424" font-size="12" fill="#657581" font-weight="400">From Claude Fable 5.2, refined</text>
+<rect x="844" y="455" width="664" height="55" rx="10" fill="#0b1622"/>
+<g transform="translate(857 467) scale(0.3125)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#edf8f6" d="M48 14 18.5 31 18.5 65Z"/><path fill="#168979" d="M48 14 77.5 31 77.5 65Z"/><path fill="#39c6b0" d="M48 14 77.5 65 18.5 65Z"/><path fill="#267d76" d="M18.5 65 77.5 65 48 82Z"/><path d="M48 14 18.5 65H77.5Z" fill="none" stroke="#0b1622" stroke-width="2.5" stroke-linejoin="round"/></g>
+<text x="899" y="490" font-size="18" fill="#e8eff4" font-weight="600">PhaseSmith</text>
+<text x="1004" y="490" font-size="18" fill="#8fa6ba" font-weight="400">Viewer</text>
+<text x="1358" y="489" font-size="10" fill="#8fa6ba" font-weight="600">DARK HEADER</text>
+<rect x="844" y="521" width="664" height="55" rx="10" fill="#eef2f5"/>
+<g transform="translate(857 533) scale(0.3125)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#edf8f6" d="M48 14 18.5 31 18.5 65Z"/><path fill="#168979" d="M48 14 77.5 31 77.5 65Z"/><path fill="#39c6b0" d="M48 14 77.5 65 18.5 65Z"/><path fill="#267d76" d="M18.5 65 77.5 65 48 82Z"/><path d="M48 14 18.5 65H77.5Z" fill="none" stroke="#0b1622" stroke-width="2.5" stroke-linejoin="round"/></g>
+<text x="899" y="556" font-size="18" fill="#15263a" font-weight="600">PhaseSmith</text>
+<text x="1004" y="556" font-size="18" fill="#53697b" font-weight="400">Viewer</text>
+<text x="1358" y="555" font-size="10" fill="#53697b" font-weight="600">LIGHT HEADER</text>
+<text x="844" y="610" font-size="15" fill="#53656e" font-weight="400">An octahedral form puts coordination and facets first.</text>
+<rect x="64" y="670" width="720" height="438" rx="22" fill="#fff" stroke="#d9dfda"/>
+<text x="92" y="709" font-size="23" fill="#0b1622" font-weight="600">C  /  Unit cell</text>
+<text x="92" y="735" font-size="15" fill="#087d6b" font-weight="600">The most explicitly scientific</text>
+<g transform="translate(92 763) scale(1.5)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#143239" d="M48 15 78 32V65L48 82 18 65V32Z"/><path d="M48 15 78 32V65L48 82 18 65V32ZM18 32 48 49 78 32M48 49V82" fill="none" stroke="#edf8f6" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/><g fill="#39c6b0"><circle cx="48" cy="15" r="5.5"/><circle cx="18" cy="65" r="5.5"/><circle cx="78" cy="65" r="5.5"/><circle cx="48" cy="49" r="6.5"/></g></g>
+<text x="266" y="790" font-size="11" fill="#6a7882" font-weight="600">BROWSER TAB / ACTUAL SIZES</text>
+<g transform="translate(266 818.0) scale(0.16666666666666666)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#143239" d="M48 15 78 32V65L48 82 18 65V32Z"/><path d="M48 15 78 32V65L48 82 18 65V32ZM18 32 48 49 78 32M48 49V82" fill="none" stroke="#edf8f6" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/><g fill="#39c6b0"><circle cx="48" cy="15" r="5.5"/><circle cx="18" cy="65" r="5.5"/><circle cx="78" cy="65" r="5.5"/><circle cx="48" cy="49" r="6.5"/></g></g>
+<text x="266" y="863" font-size="12" fill="#657581" font-weight="400">16 px</text>
+<g transform="translate(330 814.0) scale(0.25)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#143239" d="M48 15 78 32V65L48 82 18 65V32Z"/><path d="M48 15 78 32V65L48 82 18 65V32ZM18 32 48 49 78 32M48 49V82" fill="none" stroke="#edf8f6" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/><g fill="#39c6b0"><circle cx="48" cy="15" r="5.5"/><circle cx="18" cy="65" r="5.5"/><circle cx="78" cy="65" r="5.5"/><circle cx="48" cy="49" r="6.5"/></g></g>
+<text x="330" y="863" font-size="12" fill="#657581" font-weight="400">24 px</text>
+<g transform="translate(394 810.0) scale(0.3333333333333333)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#143239" d="M48 15 78 32V65L48 82 18 65V32Z"/><path d="M48 15 78 32V65L48 82 18 65V32ZM18 32 48 49 78 32M48 49V82" fill="none" stroke="#edf8f6" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/><g fill="#39c6b0"><circle cx="48" cy="15" r="5.5"/><circle cx="18" cy="65" r="5.5"/><circle cx="78" cy="65" r="5.5"/><circle cx="48" cy="49" r="6.5"/></g></g>
+<text x="394" y="863" font-size="12" fill="#657581" font-weight="400">32 px</text>
+<text x="266" y="894" font-size="12" fill="#657581" font-weight="400">Alternative direction</text>
+<rect x="92" y="925" width="664" height="55" rx="10" fill="#0b1622"/>
+<g transform="translate(105 937) scale(0.3125)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#143239" d="M48 15 78 32V65L48 82 18 65V32Z"/><path d="M48 15 78 32V65L48 82 18 65V32ZM18 32 48 49 78 32M48 49V82" fill="none" stroke="#edf8f6" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/><g fill="#39c6b0"><circle cx="48" cy="15" r="5.5"/><circle cx="18" cy="65" r="5.5"/><circle cx="78" cy="65" r="5.5"/><circle cx="48" cy="49" r="6.5"/></g></g>
+<text x="147" y="960" font-size="18" fill="#e8eff4" font-weight="600">PhaseSmith</text>
+<text x="252" y="960" font-size="18" fill="#8fa6ba" font-weight="400">Viewer</text>
+<text x="606" y="959" font-size="10" fill="#8fa6ba" font-weight="600">DARK HEADER</text>
+<rect x="92" y="991" width="664" height="55" rx="10" fill="#eef2f5"/>
+<g transform="translate(105 1003) scale(0.3125)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#143239" d="M48 15 78 32V65L48 82 18 65V32Z"/><path d="M48 15 78 32V65L48 82 18 65V32ZM18 32 48 49 78 32M48 49V82" fill="none" stroke="#edf8f6" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/><g fill="#39c6b0"><circle cx="48" cy="15" r="5.5"/><circle cx="18" cy="65" r="5.5"/><circle cx="78" cy="65" r="5.5"/><circle cx="48" cy="49" r="6.5"/></g></g>
+<text x="147" y="1026" font-size="18" fill="#15263a" font-weight="600">PhaseSmith</text>
+<text x="252" y="1026" font-size="18" fill="#53697b" font-weight="400">Viewer</text>
+<text x="606" y="1025" font-size="10" fill="#53697b" font-weight="600">LIGHT HEADER</text>
+<text x="92" y="1080" font-size="15" fill="#53656e" font-weight="400">A compact cell and atomic sites echo the viewer itself.</text>
+<rect x="816" y="670" width="720" height="438" rx="22" fill="#fff" stroke="#d9dfda"/>
+<text x="844" y="709" font-size="23" fill="#0b1622" font-weight="600">D  /  Faceted P</text>
+<text x="844" y="735" font-size="15" fill="#087d6b" font-weight="600">The strongest name connection</text>
+<g transform="translate(844 763) scale(1.5)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#39c6b0" d="M24 18H57L76 34V51L57 66H39V81H24Z"/><path fill="#edf8f6" d="M24 18H57L76 34 61 41 52 32H39L24 47Z"/><path fill="#0b1622" d="M39 34H53L61 41V46L53 52H39Z"/></g>
+<text x="1018" y="790" font-size="11" fill="#6a7882" font-weight="600">BROWSER TAB / ACTUAL SIZES</text>
+<g transform="translate(1018 818.0) scale(0.16666666666666666)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#39c6b0" d="M24 18H57L76 34V51L57 66H39V81H24Z"/><path fill="#edf8f6" d="M24 18H57L76 34 61 41 52 32H39L24 47Z"/><path fill="#0b1622" d="M39 34H53L61 41V46L53 52H39Z"/></g>
+<text x="1018" y="863" font-size="12" fill="#657581" font-weight="400">16 px</text>
+<g transform="translate(1082 814.0) scale(0.25)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#39c6b0" d="M24 18H57L76 34V51L57 66H39V81H24Z"/><path fill="#edf8f6" d="M24 18H57L76 34 61 41 52 32H39L24 47Z"/><path fill="#0b1622" d="M39 34H53L61 41V46L53 52H39Z"/></g>
+<text x="1082" y="863" font-size="12" fill="#657581" font-weight="400">24 px</text>
+<g transform="translate(1146 810.0) scale(0.3333333333333333)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#39c6b0" d="M24 18H57L76 34V51L57 66H39V81H24Z"/><path fill="#edf8f6" d="M24 18H57L76 34 61 41 52 32H39L24 47Z"/><path fill="#0b1622" d="M39 34H53L61 41V46L53 52H39Z"/></g>
+<text x="1146" y="863" font-size="12" fill="#657581" font-weight="400">32 px</text>
+<text x="1018" y="894" font-size="12" fill="#657581" font-weight="400">Alternative direction</text>
+<rect x="844" y="925" width="664" height="55" rx="10" fill="#0b1622"/>
+<g transform="translate(857 937) scale(0.3125)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#39c6b0" d="M24 18H57L76 34V51L57 66H39V81H24Z"/><path fill="#edf8f6" d="M24 18H57L76 34 61 41 52 32H39L24 47Z"/><path fill="#0b1622" d="M39 34H53L61 41V46L53 52H39Z"/></g>
+<text x="899" y="960" font-size="18" fill="#e8eff4" font-weight="600">PhaseSmith</text>
+<text x="1004" y="960" font-size="18" fill="#8fa6ba" font-weight="400">Viewer</text>
+<text x="1358" y="959" font-size="10" fill="#8fa6ba" font-weight="600">DARK HEADER</text>
+<rect x="844" y="991" width="664" height="55" rx="10" fill="#eef2f5"/>
+<g transform="translate(857 1003) scale(0.3125)"><rect width="96" height="96" rx="21" fill="#0b1622"/><path fill="#39c6b0" d="M24 18H57L76 34V51L57 66H39V81H24Z"/><path fill="#edf8f6" d="M24 18H57L76 34 61 41 52 32H39L24 47Z"/><path fill="#0b1622" d="M39 34H53L61 41V46L53 52H39Z"/></g>
+<text x="899" y="1026" font-size="18" fill="#15263a" font-weight="600">PhaseSmith</text>
+<text x="1004" y="1026" font-size="18" fill="#53697b" font-weight="400">Viewer</text>
+<text x="1358" y="1025" font-size="10" fill="#53697b" font-weight="600">LIGHT HEADER</text>
+<text x="844" y="1080" font-size="15" fill="#53656e" font-weight="400">A geometric P gives PhaseSmith a compact personal mark.</text>
+<text x="64" y="1176" font-size="18" fill="#3a515a" font-weight="400">A: minimal and memorable.  B: crystal-first.  C: structural.  D: name-led.</text>
+</g></svg>

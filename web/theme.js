@@ -48,6 +48,12 @@ export function createThemeSwitch({ button, onChange }) {
   });
   apply(explicit ?? (root.dataset.theme === "light" || root.dataset.theme === "dark" ? root.dataset.theme : system()));
   return {
+    setTheme(theme) {
+      if (theme !== "light" && theme !== "dark") return;
+      explicit = theme;
+      writeChoice(explicit);
+      apply(theme);
+    },
     get theme() {
       return root.dataset.theme;
     },

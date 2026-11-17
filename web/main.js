@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { TrackballControls } from "three/addons/controls/TrackballControls.js";
+import { ViewControls } from "./view-controls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import "./style.css";
 import {
@@ -12,6 +12,8 @@ import { latticeViewDirection } from "./view-direction.js";
 // Namespace import: describeViewDirection is root's helper (readout).
 import * as viewDirection from "./view-direction.js";
 import { createSessionStore } from "./session-store.js";
+import { parseProject, serializeProject, projectFilename } from "./project-file.js";
+import { createHistory } from "./history.js";
 import { buildCoordinationEnvironments, convexHull } from "./coordination.js";
 import { elementColor as defaultColor } from "./elements.js";
 import { estimatePairCutoff } from "./pair-defaults.js";
@@ -19,7 +21,9 @@ import { angleAt, hullVolume } from "./crystal-math.js";
 import { createLatticeTools } from "./lattice-tools.js";
 import { createAxisCompass } from "./axis-compass.js";
 import { createThemeSwitch } from "./theme.js";
+import { createFullscreenSwitch } from "./fullscreen.js";
 import { createExporter, validDpi } from "./export.js";
+import { sceneExportBounds } from "./export-framing.js";
 import { createFaceSorter } from "./face-sort.js";
 import { createDepthPeeler } from "./peel.js";
 import { rotatedView } from "./view-rotation.js";
@@ -35,6 +39,14 @@ import {
 } from "./appearance.js";
 const $ = (id) => document.getElementById(id),
   viewport = $("viewport");
+createFullscreenSwitch({ button: $("fullscreen-toggle"), status: $("fullscreen-status") });
+// Safari also emits native gesture events over headers and modal dialogs.
+// Cancel browser magnification without intercepting the pointer events used
+// for crystal pinch/rotation, or one-finger scrolling in the controls.
+for (const type of ["gesturestart", "gesturechange"])
+  document.addEventListener(type, (event) => event.preventDefault(), {
+    passive: false,
+  });
 function initialize() {
   let renderer;
   try {
@@ -105,7 +117,7 @@ function initialize() {
     sceneSphere = new THREE.Sphere(),
     sceneDelta = new THREE.Vector3();
   function createControls(target = new THREE.Vector3()) {
-    const next = new TrackballControls(camera, renderer.domElement);
+    const next = new ViewControls(camera, renderer.domElement);
     next.rotateSpeed = 2.2;
     next.zoomSpeed = 1.2;
     next.panSpeed = 0.6;
@@ -114,10 +126,14 @@ function initialize() {
     next.minDistance = 0.5;
     next.maxDistance = 1000;
     next.target.copy(target);
+    // The constructor looks at its initial origin target. Restore the real
+    // pivot immediately so stopping motion after a pan cannot tilt the view.
+    next.update();
     next.addEventListener("change", invalidate);
     // Camera autosave once motion (including damping) has settled.
     next.addEventListener("change", () => scheduleSave(1200));
     next.addEventListener("start", invalidate);
+    next.addEventListener("change", () => cameraHistoryChanged());
     return next;
   }
   let controls = createControls();
@@ -171,6 +187,7 @@ function initialize() {
   let saveTimer = 0,
     saveSuspended = 1, // released after the startup document is displayed
     startupHold = true;
+  let historyReady = false, historyApplying = false;
   // Batch faces of all pairs; the peeler establishes their per-pixel order.
   const faceSorter = createFaceSorter(THREE);
   scene.add(faceSorter.mesh);
@@ -236,7 +253,7 @@ function initialize() {
     angle = null,
     measureMode = "info";
   scene.add(selectionGroup);
-  function render() {
+  function render(exportView) {
     frame = 0;
     // Trackball emits change while damping moves the camera. That event
     // schedules the next frame; once settled, no animation frames remain.
@@ -244,7 +261,26 @@ function initialize() {
     syncViewCamera();
     syncStudio();
     faceSorter.sync([...faceMeshes.values()], viewCamera);
-    peeler.render(scene, viewCamera);
+    if (exportView?.crop) {
+      // Render the cropped region directly. The movie envelope can reach
+      // beyond the live viewport at other orientations; it still fits in
+      // the export without changing the user's camera or zoom.
+      const { crop, css } = exportView;
+      const px = (viewCamera.right - viewCamera.left) / css.width;
+      const py = (viewCamera.top - viewCamera.bottom) / css.height;
+      viewCamera.left += crop.x * px;
+      viewCamera.right = viewCamera.left + crop.width * px;
+      viewCamera.top -= crop.y * py;
+      viewCamera.bottom = viewCamera.top - crop.height * py;
+      viewCamera.updateProjectionMatrix();
+      try {
+        peeler.render(scene, viewCamera);
+      } finally {
+        // Labels retain their live CSS coordinates; the exporter translates
+        // them into the cropped frame after drawing the rendered geometry.
+        syncViewCamera();
+      }
+    } else peeler.render(scene, viewCamera);
     updateViewReadout();
     if (labelsOn || shownLabels) updateLabels();
     latticeTools.updateLabels(viewCamera, renderer.domElement);
@@ -2220,6 +2256,7 @@ function initialize() {
       false,
     )[0];
     if (hit) {
+      historyLabel = "Pick atom";
       const atom = hit.object.userData.atoms[hit.instanceId];
       // Info inspects one atom (a new tap replaces it); a completed
       // distance (2) or angle (3) starts a new measurement.
@@ -2231,6 +2268,7 @@ function initialize() {
       selection.length &&
       (measureMode === "info" || selection.length === (measureMode === "angle" ? 3 : 2))
     ) {
+      historyLabel = "Clear selection";
       // Only an un-dragged empty click reaches here. Keep partial
       // measurements so an imprecise tap never discards the first picks.
       selection = [];
@@ -2685,7 +2723,16 @@ function initialize() {
     $("loading").hidden = true;
     $("open").disabled = false;
     $("block").disabled = false;
+    updateProjectButtons();
     if (data.error) {
+      if (task.project) {
+        projectStatus(`Could not open ${task.project.name}: ${data.error}`, true);
+        $("error").textContent = `Could not open this project: ${data.error}`;
+        $("error").hidden = false;
+        updateHistoryButtons();
+        if (structure) $("block").value = structure.block;
+        return;
+      }
       if (task.restore) {
         // A saved block that no longer opens: retry the saved file without
         // it; if the file itself fails, start this page's structure.
@@ -2696,24 +2743,38 @@ function initialize() {
         }
         return;
       }
+      updateHistoryButtons();
       if (structure) $("block").value = structure.block;
       $("error").textContent = `Could not open this CIF: ${data.error}`;
       $("error").hidden = false;
       if (!structure) $("name").textContent = "Open a crystal structure";
       return;
     }
+    historyReady = false;
+    clearHistoryGesture();
     currentText = task.text;
     currentFilename = task.filename;
     display(data);
     if (task.restore) {
       try {
-        restoreViewerState(task.restore);
-        sessionStatus(`Restored the session saved on this device${restoredAt ? ` at ${timeText(restoredAt)}` : ""}.`);
+        // File snapshots retain all user-created rules and lattice objects;
+        // restore still validates their individual values and references.
+        restoreViewerState(task.restore, { trusted: Boolean(task.project) });
+        if (task.project) {
+          themeSwitch.setTheme(task.project.theme);
+          currentProjectFilename = task.project.name;
+          projectStatus(`Opened ${task.project.name}.`);
+        } else {
+          sessionStatus(`Restored the session saved on this device${restoredAt ? ` at ${timeText(restoredAt)}` : ""}.`);
+        }
       } catch (error) {
         console.error(error);
-        sessionStatus("Part of the saved session could not be restored; the rest is shown.", true);
+        if (task.project) projectStatus("Part of the project could not be restored; the rest is shown.", true);
+        else sessionStatus("Part of the saved session could not be restored; the rest is shown.", true);
       }
     }
+    if (!task.project) currentProjectFilename = "";
+    const displayedGeneration = structureGeneration;
     // Save only after the final layout/resize has settled (two frames),
     // so the restored camera is captured as restored, not refitted.
     requestAnimationFrame(() =>
@@ -2722,6 +2783,11 @@ function initialize() {
           startupHold = false;
           saveSuspended--;
         }
+        if (displayedGeneration !== structureGeneration) return;
+        history.reset(exportHistoryState());
+        historyReady = true;
+        updateHistoryButtons();
+        updateProjectButtons();
         scheduleSave(task.restore ? 300 : 0);
       }),
     );
@@ -2729,24 +2795,32 @@ function initialize() {
   worker.onerror = (e) => {
     $("loading").hidden = true;
     $("open").disabled = false;
+    updateHistoryButtons();
+    updateProjectButtons();
     $("error").textContent =
       "The crystal reader could not start. Reload the viewer and try again.";
     $("error").hidden = false;
     console.error(e);
   };
-  function load(text, filename, block, restore = null) {
+  function load(text, filename, block, restore = null, project = null) {
+    flushHistory();
     $("error").hidden = true;
     $("loading").hidden = false;
     $("open").disabled = true;
     $("block").disabled = true;
-    pending.push({ id: ++request, text, filename, block, restore, intent: userIntent });
+    updateHistoryButtons();
+    updateProjectButtons();
+    pending.push({ id: ++request, text, filename, block, restore, project, intent: userIntent });
     worker.postMessage({ text, block });
   }
   async function openLibraryEntry(entry, startup = false) {
     if (exporter.busy) return;
     const intent = startup ? userIntent : ++userIntent;
+    flushHistory();
     $("error").hidden = true;
     $("loading").hidden = false;
+    updateHistoryButtons();
+    updateProjectButtons();
     try {
       const response = await fetch(`${import.meta.env.BASE_URL}${entry.file}`);
       if (!response.ok) throw new Error(`Structure unavailable (${response.status})`);
@@ -2759,30 +2833,44 @@ function initialize() {
       $("open").disabled = false;
       $("block").disabled = false;
       $("error").hidden = false;
+      updateHistoryButtons();
+      updateProjectButtons();
       $("error").textContent = `Could not open ${entry.name}: ${error.message}`;
     }
   }
   createStructureLibrary({ onSelect: openLibraryEntry, isBusy: () => exporter.busy });
   $("open").onclick = () => $("file").click();
-  $("file").onchange = async (e) => {
+  async function openFile(e, projectOnly = false) {
+    if (exporter.busy) { e.target.value = ""; return; }
     const file = e.target.files[0];
     if (file) {
       const intent = ++userIntent;
       try {
         const text = await file.text();
         if (intent !== userIntent) return;
-        load(text, file.name);
+        if (projectOnly || /\.psv$/i.test(file.name)) {
+          const project = parseProject(text);
+          projectStatus(`Opening ${file.name}…`);
+          load(project.document.text, project.document.filename, project.state.block, project.state,
+            { name: file.name, theme: project.theme });
+        } else load(text, file.name);
       } catch (err) {
         if (intent !== userIntent) return;
         $("loading").hidden = true;
         $("open").disabled = false;
         $("block").disabled = false;
+        updateProjectButtons();
+        updateHistoryButtons();
+        if (projectOnly || /\.psv$/i.test(file.name)) projectStatus(`Could not open ${file.name}: ${err.message}`, true);
         $("error").hidden = false;
         $("error").textContent = err.message;
       }
       e.target.value = "";
     }
-  };
+  }
+  $("file").onchange = openFile;
+  $("project-file").onchange = (e) => openFile(e, true);
+  $("project-open").onclick = () => { if (!exporter.busy) $("project-file").click(); };
   $("block").onchange = (e) => {
     userIntent++;
     load(currentText, currentFilename, e.target.value);
@@ -3012,6 +3100,7 @@ function initialize() {
       axisCompass: compassState,
       turn: turnControls.diagnostics(),
       viewReadout: { text: readoutText, visible: !$("view-readout").hidden },
+      history: { ...history.state, pending: Boolean(historyTimer || historyPointers.size || historyKeyHeld), ready: historyReady, snapshot: exportHistoryState() },
       session: {
         entrypoint: ENTRYPOINT,
         suspended: saveSuspended > 0,
@@ -3056,6 +3145,14 @@ function initialize() {
       const { width, height } = renderer.domElement.getBoundingClientRect();
       return { width: Math.max(1, Math.round(width)), height: Math.max(1, Math.round(height)) };
     },
+    contentBounds: (turntable) => {
+      syncViewCamera();
+      const { width, height } = renderer.domElement.getBoundingClientRect();
+      return sceneExportBounds(scene, viewCamera, {
+        width, height,
+        ...(turntable ? { target: controls.target, axis: camera.up } : {}),
+      });
+    },
     atomLabels: () => (labelsOn ? lastAtomLabels : []),
     latticeLabels: () => latticeTools.placedLabels(),
     compass: () => compassState,
@@ -3071,6 +3168,8 @@ function initialize() {
     },
     name: () => structure?.name || structure?.block || currentFilename || "structure",
     setBusy: (busy) => {
+      // Freeze the last real pose before the exporter starts moving it.
+      if (busy) flushHistory();
       // Exports peel the full layer budget in every frame.
       peeler.setExportMode(busy);
       viewport.classList.toggle("exporting", busy);
@@ -3086,6 +3185,8 @@ function initialize() {
         saveSuspended = Math.max(0, saveSuspended - 1);
         scheduleSave();
       }
+      updateHistoryButtons(busy);
+      updateProjectButtons(busy);
       for (const id of ["export-png", "export-video"]) $(id).disabled = busy || (id === "export-video" && !videoFormat.mime);
     },
   });
@@ -3094,18 +3195,13 @@ function initialize() {
   // DPI is stored in the PNG (pHYs); it does not change the pixel size.
   const exportDpi = () => validDpi($("export-dpi").value);
   function updateExportInfo() {
-    const { width, height } = renderer.domElement.getBoundingClientRect();
-    const scale = exportScale();
-    const limit = (max) => Math.min(scale, max / Math.max(width, height, 1));
-    const even = (v, f) => 2 * Math.round((v * f) / 2);
-    const png = limit(4096),
-      movie = limit(1920);
+    const { width, height } = exporter.imageSize(exportScale());
     const dpi = exportDpi();
     const cm = (pixels) => ((pixels / dpi) * 2.54).toFixed(1);
     $("export-dims").textContent =
-      `PNG ${even(width, png)} × ${even(height, png)} px` +
-      (dpi ? ` = ${cm(even(width, png))} × ${cm(even(height, png))} cm at ${dpi} dpi` : " · DPI must be 30–2400") +
-      ` · movie ${even(width, movie)} × ${even(height, movie)} px`;
+      `PNG ≈ ${width} × ${height} px` +
+      (dpi ? ` = ${cm(width)} × ${cm(height)} cm at ${dpi} dpi` : " · DPI must be 30–2400") +
+      " · cropped to the structure; movie frame fits the full turn (up to 1920 px).";
     for (const preset of document.querySelectorAll(".dpi-preset"))
       preset.setAttribute("aria-pressed", String(Number(preset.dataset.dpi) === dpi));
     $("export-dpi").setCustomValidity(dpi ? "" : "Enter a DPI between 30 and 2400.");
@@ -3199,6 +3295,40 @@ function initialize() {
   })();
   const sessionStore = createSessionStore();
   let restoredAt = 0;
+  let currentProjectFilename = "";
+  function projectStatus(text, error = false) {
+    $("project-status").textContent = text;
+    $("project-status").classList.toggle("error", error);
+  }
+  function updateProjectButtons(busy = exporter.busy) {
+    $("project-save").disabled = busy || !historyReady || !structure || !$("loading").hidden;
+    $("project-open").disabled = busy;
+  }
+  $("project-save").onclick = () => {
+    if (exporter.busy || !structure || !$("loading").hidden || saveSuspended > 0) return;
+    try {
+      flushHistory();
+      stopMotion();
+      const text = serializeProject({
+        document: { text: currentText, filename: currentFilename },
+        state: exportViewerState(),
+        theme: themeSwitch.theme,
+      });
+      const filename = projectFilename(currentProjectFilename || currentFilename || structure.name);
+      const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      currentProjectFilename = filename;
+      projectStatus(`Downloaded ${filename}. Open it to restore this project.`);
+    } catch (error) {
+      projectStatus(`Could not save the project: ${error.message}`, true);
+    }
+  };
   const timeText = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   function sessionStatus(text, error = false) {
     const el = $("session-status");
@@ -3241,6 +3371,8 @@ function initialize() {
         position: camera.position.toArray(),
         up: camera.up.toArray(),
         target: controls.target.toArray(),
+        minDistance: controls.minDistance,
+        maxDistance: controls.maxDistance,
       },
       turnAngle: turnControls.angle,
       measure: { mode: measureMode, keys: selection.map(atomKey) },
@@ -3261,7 +3393,7 @@ function initialize() {
   // Apply a saved state to the freshly displayed document. Every value is
   // validated; unknown fields are ignored and references that do not
   // exist in this structure (elements, rules, atoms, sites) are dropped.
-  function restoreViewerState(s) {
+  function restoreViewerState(s, { trusted = false } = {}) {
     if (!s || typeof s !== "object") return;
     const finite = (v) => typeof v === "number" && Number.isFinite(v);
     const triple = (v) => Array.isArray(v) && v.length === 3 && v.every(finite);
@@ -3286,9 +3418,9 @@ function initialize() {
     if (Array.isArray(s.rules)) {
       const seen = new Set();
       rules = [];
-      for (const r of s.rules.slice(0, 24)) {
+      for (const r of trusted ? s.rules : s.rules.slice(0, 24)) {
         if (!r || !elements.has(r.center) || !elements.has(r.neighbor)) continue;
-        if (!finite(r.cutoff) || r.cutoff < CUTOFF_MIN || r.cutoff > 50) continue;
+        if (!finite(r.cutoff) || r.cutoff < CUTOFF_MIN || (!trusted && r.cutoff > 50)) continue;
         if (!Number.isInteger(r.id) || r.id <= 0 || seen.has(r.id)) continue;
         seen.add(r.id);
         rules.push({
@@ -3307,6 +3439,8 @@ function initialize() {
     }
     // Appearance overrides.
     clearAppearance(appearance);
+    // Keep picked-copy metadata within this document, including an
+    // unstyled target after undo or a copy temporarily outside the extent.
     const style = (v, min, max) => {
       const o = {};
       if (hex(v.color)) o.color = v.color;
@@ -3360,13 +3494,15 @@ function initialize() {
       const atom = atoms.find((x) => atomKey(x) === centerKey);
       if (atom) targetMeta.set(`poly:${key}`, { label: atom.label, frac: fracText(atom) });
     }
-    latticeTools.restoreState(s.lattice);
+    latticeTools.restoreState(s.lattice, { trusted });
+    highlightSite(null);
     if (typeof s.highlightedSite === "string" && independentSites().some((x) => x.label === s.highlightedSite))
       highlightSite(s.highlightedSite);
     if (s.turnAngle != null) turnControls.setAngle(s.turnAngle);
     // Measurement: the mode, then the picked copies IN ORDER (the angle
     // vertex stays second). Restored only if every saved copy still exists.
     const m = s.measure && typeof s.measure === "object" ? s.measure : {};
+    selection = [];
     if (["distance", "angle", "info"].includes(m.mode)) setMeasureMode(m.mode);
     if (Array.isArray(m.keys) && m.keys.length && m.keys.every((k) => typeof k === "string")) {
       const limit = { distance: 2, angle: 3, info: 1 }[measureMode];
@@ -3404,6 +3540,12 @@ function initialize() {
       if (value != null && [...$(id).options].some((o) => o.value === String(value))) $(id).value = String(value);
     updateExportInfo();
     // Camera last: nothing after this refits the view.
+    restoreCameraState(s);
+    invalidate();
+  }
+  function restoreCameraState(s) {
+    const triple = (v) => Array.isArray(v) && v.length === 3 && v.every((x) => typeof x === "number" && Number.isFinite(x));
+    setActiveView(null);
     const c = s.camera && typeof s.camera === "object" ? s.camera : null;
     if (c && triple(c.position) && triple(c.up) && triple(c.target)) {
       const eye = new THREE.Vector3().fromArray(c.position).sub(new THREE.Vector3().fromArray(c.target));
@@ -3413,6 +3555,10 @@ function initialize() {
         controls.target.fromArray(c.target);
         camera.position.fromArray(c.position);
         camera.up.copy(up.normalize());
+        if (Number.isFinite(c.minDistance) && c.minDistance > 0 && Number.isFinite(c.maxDistance) && c.maxDistance > c.minDistance) {
+          controls.minDistance = c.minDistance;
+          controls.maxDistance = c.maxDistance;
+        }
         controls.update();
         setActiveView(null);
         // Lit view button only if the restored pose still looks along it.
@@ -3432,6 +3578,196 @@ function initialize() {
     }
     invalidate();
   }
+  // ---- Undo / redo ------------------------------------------------------
+  // Session-only preferences (panels, export options, editor target, turn
+  // angle, unsubmitted direction text) are intentionally outside history.
+  function exportHistoryState() {
+    const s = exportViewerState();
+    const keys = ["ranges", "boundary", "cell", "polyhedraOnly", "rules", "appearance", "atoms", "asymmetric", "highlightedSite", "lattice", "camera", "activeView", "measure"];
+    return Object.fromEntries(keys.map((key) => [key, s[key]]));
+  }
+  const historyEqual = (a, b) => JSON.stringify(a, (key, value) =>
+    // Ignore floating point drift from controls.update(), retaining the
+    // original numbers in the snapshots themselves.
+    typeof value === "number" ? Number(value.toPrecision(12)) : value,
+  ) === JSON.stringify(b, (key, value) => typeof value === "number" ? Number(value.toPrecision(12)) : value);
+  const history = createHistory({ limit: 100, equal: historyEqual });
+  // Phones use the free row beside Turn, leaving the pinned selection
+  // strip and the full Turn panel their existing room in the lower pane.
+  function placeHistoryControls() {
+    const row = $("history-controls");
+    row.classList.toggle("in-view", phoneLayout.matches);
+    if (phoneLayout.matches) document.querySelector(".view-directions").append(row);
+    else $("inspector-header").prepend(row);
+    invalidate();
+  }
+  placeHistoryControls();
+  phoneLayout.addEventListener("change", placeHistoryControls);
+  let historyTimer = 0, historyLabel = "Change view", pressedHistoryLabel = "Change view", cameraGesture = false, historyKeyHeld = false;
+  const historyPointers = new Set();
+  const historyAvailable = () => historyReady && !historyApplying && saveSuspended === 0 && !exporter.busy && $("loading").hidden;
+  function updateHistoryButtons(busy = exporter.busy) {
+    const s = history.state;
+    const blocked = !historyReady || busy || !$("loading").hidden;
+    for (const [action, count, label] of [["undo", s.undoCount, s.undoLabel], ["redo", s.redoCount, s.redoLabel]]) {
+      const button = $(`history-${action}`), name = action === "undo" ? "Undo" : "Redo";
+      button.disabled = blocked || !count;
+      button.title = label ? `${name}: ${label}` : name;
+      button.setAttribute("aria-label", button.title);
+    }
+  }
+  function clearHistoryGesture() {
+    clearTimeout(historyTimer);
+    historyTimer = 0;
+    cameraGesture = false;
+    historyKeyHeld = false;
+    historyPointers.clear();
+  }
+  function flushHistory() {
+    clearTimeout(historyTimer);
+    historyTimer = 0;
+    if (!historyReady || historyApplying || saveSuspended > 0) return;
+    // Stop residual trackball inertia at an action boundary. Subsequent
+    // frames cannot move a camera whose snapshot has already been stored.
+    if (cameraGesture) stopMotion();
+    if (pendingBuild) {
+      cancelScheduledBuild();
+      build(); // include the last live edit and its resulting selection
+    }
+    cameraGesture = false;
+    if (history.checkpoint(exportHistoryState(), historyLabel)) scheduleSave();
+    updateHistoryButtons();
+  }
+  function scheduleHistory(delay = 0) {
+    if (!historyAvailable()) return;
+    clearTimeout(historyTimer);
+    historyTimer = 0;
+    if (historyPointers.size || historyKeyHeld) return;
+    historyTimer = setTimeout(flushHistory, delay);
+  }
+  function cameraHistoryChanged() {
+    if (cameraGesture && historyAvailable()) scheduleHistory(220);
+  }
+  function historyActionLabel(target) {
+    if (target === renderer.domElement) return cameraGesture ? historyLabel : "Pick atom";
+    const control = target.closest("button, input, select, form, tr");
+    const id = control?.id ?? "";
+    if (id.startsWith("view-") || id === "direction-form") return "Orient view";
+    if (id === "reset") return "Reset view";
+    if (control?.dataset.turn) return "Turn crystal";
+    if (target.closest("#pair-rules") || id === "add-rule") return id === "add-rule" ? "Add pair" : control?.dataset.field === "cutoff" || target.closest(".cutoff-tuner") ? "Change pair cutoff" : "Edit pair";
+    if (target.closest("#style-editor")) return id.startsWith("style-reset") ? "Reset style" : "Change style";
+    if (target.closest("#range-form") || id === "range-reset") return "Change extent";
+    if (id.startsWith("plane-") || target.closest("#plane-list")) return "Edit plane";
+    if (id.startsWith("arrow-") || target.closest("#arrow-list")) return "Edit arrow";
+    if (id.startsWith("sym-") || target.closest("#sym-controls")) return "Change symmetry display";
+    if (target.closest("#lattice-tools")) return "Edit lattice";
+    if (id.startsWith("measure-") || id === "clear") return "Change measurement";
+    if (target.closest("#site-table, #poly-table")) return "Highlight site";
+    return "Change display";
+  }
+  const historyButton = (target) => target.closest?.("#history-undo, #history-redo");
+  // Capture before handlers that rebuild or remove their own controls. Read
+  // the resulting semantic state in a later task, after the entire event
+  // (including browser default actions and target handlers) has completed.
+  document.addEventListener("pointerdown", (event) => {
+    if (!historyAvailable() || historyButton(event.target)) return;
+    if (!historyPointers.size) flushHistory();
+    historyPointers.add(event.pointerId);
+    cameraGesture = event.target === renderer.domElement || cameraGesture;
+    historyLabel = cameraGesture ? "Move camera" : historyActionLabel(event.target);
+    pressedHistoryLabel = historyLabel;
+  }, true);
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
+    document.addEventListener(type, (event) => {
+      // Releasing one finger of a pinch must not end the whole gesture.
+      if (type === "lostpointercapture") return;
+      historyPointers.delete(event.pointerId);
+      scheduleHistory(cameraGesture ? 220 : 0);
+    }, true);
+  document.addEventListener("wheel", (event) => {
+    if (event.target !== renderer.domElement || pan || !historyAvailable()) return;
+    if (!cameraGesture) flushHistory();
+    cameraGesture = true;
+    historyLabel = "Zoom view";
+    scheduleHistory(300);
+  }, { capture: true, passive: true });
+  for (const type of ["click", "input", "change", "submit"])
+    document.addEventListener(type, (event) => {
+      if (!historyAvailable() || historyButton(event.target)) return;
+      if (!cameraGesture) historyLabel = historyActionLabel(event.target);
+      scheduleHistory(cameraGesture ? 220 : type === "input" ? 400 : 0);
+    }, true);
+  // A blur can commit a text field between the next control's pointerdown
+  // and click. Record that commit immediately after its target handler,
+  // separately from the new click/drag that is already starting.
+  document.addEventListener("change", (event) => {
+    if (!historyAvailable() || !event.target.matches("input[type=text], input[type=number]")) return;
+    const moving = cameraGesture;
+    cameraGesture = false;
+    historyLabel = historyActionLabel(event.target);
+    flushHistory();
+    cameraGesture = moving;
+    if (historyPointers.size) historyLabel = pressedHistoryLabel;
+  });
+  document.addEventListener("focusin", () => {
+    if (historyTimer && !historyPointers.size && !cameraGesture) flushHistory();
+  }, true);
+  function applyHistoryState(state) {
+    historyApplying = true;
+    saveSuspended++;
+    clearHistoryGesture();
+    endPan();
+    cancelScheduledBuild();
+    closeTuners();
+    stopMotion();
+    try {
+      const live = exportHistoryState();
+      const sceneOnly = ({ camera, activeView, ...scene }) => scene;
+      if (historyEqual(sceneOnly(live), sceneOnly(state))) restoreCameraState(state);
+      else restoreViewerState({ ...exportViewerState(), ...state }, { trusted: true });
+      if (state.activeView?.id === "uvw") $("view-direction").value = state.activeView.indices.join(" ");
+    } finally {
+      saveSuspended--;
+      historyApplying = false;
+    }
+  }
+  function travelHistory(action) {
+    if (!historyAvailable()) return;
+    flushHistory();
+    const label = history.state[`${action}Label`];
+    if (history[action](applyHistoryState)) {
+      $("history-status").textContent = `${action === "undo" ? "Undid" : "Redid"}: ${label}.`;
+      scheduleSave();
+    }
+    updateHistoryButtons();
+  }
+  $("history-undo").onclick = () => travelHistory("undo");
+  $("history-redo").onclick = () => travelHistory("redo");
+  document.addEventListener("keydown", (event) => {
+    const target = event.target;
+    const typing = target.isContentEditable || target.closest("textarea, [role='textbox']") ||
+      (target.tagName === "INPUT" && !["range", "checkbox", "radio", "button", "submit", "color", "file"].includes(target.type));
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && !typing && ["z", "y"].includes(event.key.toLowerCase())) {
+      event.preventDefault();
+      travelHistory(event.key.toLowerCase() === "y" || event.shiftKey ? "redo" : "undo");
+    } else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"].includes(event.key) && target.matches("input[type=range], input[data-field=cutoff], [role=slider]")) {
+      if (!historyKeyHeld) flushHistory();
+      historyKeyHeld = true;
+      historyLabel = historyActionLabel(target);
+    }
+  }, true);
+  document.addEventListener("keyup", () => {
+    if (!historyKeyHeld) return;
+    historyKeyHeld = false;
+    scheduleHistory();
+  });
+  window.addEventListener("blur", () => {
+    historyPointers.clear();
+    historyKeyHeld = false;
+    scheduleHistory(cameraGesture ? 220 : 0);
+  });
+
   // Debounced autosave; the CIF text is only rewritten when it changed
   // (session-store keeps it separately).
   function scheduleSave(delay = 800) {
@@ -3450,6 +3786,7 @@ function initialize() {
       sessionStatus(`Could not collect the settings to save: ${error.message}`, true);
       return Promise.resolve(false);
     }
+    sessionStatus("Saving on this device…");
     return sessionStore
       .save({ document: { text: currentText, filename: currentFilename }, state, entrypoint: ENTRYPOINT })
       .then(({ savedAt }) => {

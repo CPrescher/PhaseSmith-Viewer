@@ -13,11 +13,11 @@ npm ci
 npm run dev
 ```
 
-Open the local address printed by Vite. Pick **Open CIF** to load a file from the device. Drag to rotate and use the wheel or pinch to zoom. **Info** is active by default: click or tap an atom to inspect it. To measure, choose **Distance** (↔) and select two atoms, or **Angle** (∠) and select three. Distances are Cartesian separations in ångströms between the selected images. This distinction matters across cell faces: two periodic copies of the same crystallographic site can be a lattice translation apart.
+Open the local address printed by Vite. Pick **Open file** to load a CIF structure or a saved `.psv` project from the device. Drag to rotate and use the wheel or pinch to zoom. **Info** is active by default: click or tap an atom to inspect it. To measure, choose **Distance** (↔) and select two atoms, or **Angle** (∠) and select three. Distances are Cartesian separations in ångströms between the selected images. This distinction matters across cell faces: two periodic copies of the same crystallographic site can be a lattice translation apart.
 
 ## Built-in structure library
 
-Choose **Library** beside **Open CIF** to browse 52 bundled structures. Search by name, formula, mineral family, or structure-type alias (for example, “B1”, “zinc blende”, “biotite”, or “feldspar”), and filter to **Structure types** or **Rock-forming & common minerals**. Click a structure's name to load it. The library fits phones and supports keyboard navigation and Escape to close.
+Choose **Library** beside **Open file** to browse 52 bundled structures. Search by name, formula, mineral family, or structure-type alias (for example, “B1”, “zinc blende”, “biotite”, or “feldspar”), and filter to **Structure types** or **Rock-forming & common minerals**. Click a structure's name to load it. The library fits phones and supports keyboard navigation and Escape to close.
 
 The collection includes rock salt, CsCl, zinc blende, wurtzite, fluorite, rutile, corundum, spinel, perovskite, diamond, graphite, fcc/bcc/hcp metals, and representatives of olivines, pyroxenes, amphiboles, feldspars, micas, chlorites, clays, garnets, carbonates, sulfates, phosphates, and common accessory minerals. These are selected reference structures, not an exhaustive mineral database. Solid-solution families are represented by named members; the card formula identifies the mineral/type while the CIF retains its reported composition and occupancies. Missing H coordinates are noted on the relevant cards.
 
@@ -32,6 +32,8 @@ The catalog is maintained in `web/structure-library.json`, and new reference CIF
 Left-drag continuously in any direction to turn the model over its poles around the current view center. The wheel zooms about the cursor. Right-drag pans with the point you grab held under the cursor. A right-click zooms out one step, and a double right-click fits the displayed structure while preserving its orientation. Use the **a**, **b**, or **c** views to align the camera with a direct lattice axis. For a custom direction, enter the three indices of [uvw]. The camera looks toward the structure from the positive side of the vector u**a** + v**b** + w**c**. The parallel projection aligns rows of atoms along that direction. These are direct lattice directions. In a nonorthogonal cell a direct direction and the normal to the plane with the same indices generally differ.
 
 **Turn** opens step controls for exact rotations. Choose 90°, 60°, 45°, 30°, 10° or 5°, or type a custom angle greater than 0° and at most 360° (decimals allowed). The arrow pad turns the crystal left, right, up, down or along one of the four diagonals by exactly that angle. **⟲** and **⟳** roll it counterclockwise or clockwise in the screen plane. Directions describe how the crystal appears to move. Every turn is about the current view center and keeps the zoom, atom coordinates, selections and measurements. The crystal stops exactly at the new orientation. The controls stay open for repeated turns and close with ✕, Escape or a tap elsewhere; Escape or ✕ returns keyboard focus to **Turn**. On a phone they open in the lower panel, directly below the selection details, so the crystal stays uncovered. Turns are unavailable while an image or movie is exported.
+
+On a touchscreen, one finger rotates the crystal. Two fingers drag it by the same screen distance, and pinching zooms about the point between your fingers. Drag and pinch can be combined; the grabbed point follows the midpoint without pan inertia.
 
 ## Displaying more than one unit cell
 
@@ -73,6 +75,10 @@ The Lattice **Labels** toggle annotates added planes and directions. **Show m in
 
 **Elements** shows symmetry axes, planes and inversion centers derived from the imported CIF operations. Use the type filters to examine rotation, screw, rotoinversion, inversion, mirror or glide elements. The **Operations** list shows their fractional-coordinate equations. Generated overlays are clipped to the plotting extent. A status note identifies any generation limit.
 
+**Choose axis types** selects exact symbols independently, such as 2, 3, 4, 2₁, 3₁, 3₂ or 3̅. Counts include coincident lower-order rotations: a fourfold line also remains visible when only its twofold rotation is selected. **Axes only** hides planes and standalone inversion centers; **Clear axis types** followed by selecting **3** isolates pure threefold axes. Category switches still apply.
+
+Axis selections are saved with the session. All elements use the actual space-group locations from the CIF.
+
 ## Angles, sites and volumes
 
 Choose **Info** to inspect one atom at a time, including its CIF label, element, occupancy, displayed coordinates and configured coordination information.
@@ -95,19 +101,35 @@ To highlight one copy, enable **Pick one** and tap a sphere or a polyhedron face
 
 The **View** readout above the atom legend shows the current viewing direction as a direct-lattice vector [u v w], pointing from the crystal toward you, like the **a**, **b** and **c** buttons. Exact small-integer directions are shown as they are. Other directions are marked with ≈.
 
+## Undo and redo
+
+**Undo** and **Redo** stay above the sidebar tabs, or beside **Turn** on phones. They cover pairs and cutoffs, styles and resets, visibility, plotting extent, lattice overlays, symmetry, measurements, site highlighting, and camera changes. A slider drag, held slider key, camera drag (including its settling motion), pinch, or burst of wheel zoom is one step. Axis views, exact turns and Reset are individual steps. Hover over either button to see its next action.
+
+Use **Ctrl/Cmd+Z** to undo, **Ctrl/Cmd+Shift+Z** to redo, or **Ctrl+Y** to redo. Text fields retain their normal text undo. Switching tabs, selecting a style target, and changing export preferences do not create steps. New edits after undo discard redo. The last 100 actions are kept in memory; successfully opening another structure or data block, or reloading the page, starts a fresh history. Autosave saves the current result after undo or redo. Undo and redo pause during image/movie export.
+
+## Project files
+
+Choose **Export → Project file → Save project** to download a `.psv` file. It embeds the complete original CIF (including all data blocks) and the current viewer settings: extent, pairs, styles, atom visibility, planes, directions, symmetry, labels, camera, measurement picks, sidebar panels, export preferences, and light/dark theme. Reopen it with **Open file** in the header or **Export → Project file → Open project**. The file works in a fresh browser or on another computer without the original CIF. Saving downloads a new file; it does not overwrite an earlier download automatically. Undo/redo history starts fresh when a project is opened.
+
+The format is readable JSON with a format identifier and version, independent of the local browser session format. Unsupported versions and unreadable structures report an error and keep the current scene. Project contents stay local; nothing is uploaded.
+
 ## Saved session
 
 The viewer saves its state on this device and restores it when you open the same page again, also after restarting the browser. This covers the loaded CIF and data block, the plotting extent, pairs and their cutoffs, colors and opacities, element and individual styles, atom visibility, size and labels, the asymmetric-unit view, planes, directions, symmetry and label settings, the camera, the turn angle, the measurement with its picked atoms in order, and the open sidebar panels. Nothing is uploaded. Opening a different example address starts that example instead. **Export → Session** shows the save status; **Start fresh** discards the saved session and reloads this page's structure.
 
 ## Images, movies and themes
 
-Choose **Export** in the sidebar to save a PNG at 1×, 2× or 4× resolution, with an optional transparent background. The DPI field writes print-resolution metadata and reports the physical print size. Pixel dimensions follow the resolution setting.
+Choose **Export** in the sidebar to save a PNG at 1×, 2× or 4× resolution, with an optional transparent background. Exports crop to the drawn structure, including visible cell edges, planes, arrows and labels, with a small margin. The lattice-axis compass sits beside the structure at the lower right; selected-atom or measurement details have their own space above it. The DPI field writes print-resolution metadata and reports the approximate physical print size. Pixel dimensions follow the cropped frame and resolution setting.
 
-The movie control records a full turntable revolution at the selected duration and frame rate. The browser selects a supported MP4 or WebM encoder. Visible planes, arrows, symmetry elements, labels, measurements and the lattice-axis compass are included in exports. Cancel stops a movie recording and restores the view.
+The movie control records a full turntable revolution at the selected duration and frame rate. Its fixed frame fits the structure throughout the entire turn, including geometry that rotates beyond the live viewport, so the crop stays steady. The browser selects a supported MP4 or WebM encoder. Visible planes, arrows, symmetry elements, labels, measurements and the lattice-axis compass are included in exports. Cancel stops a movie recording and restores the view.
 
 The header theme button switches between light and dark. An explicit choice is remembered. The initial theme follows the device preference.
 
+The **Full screen** button beside the theme button expands the entire viewer, keeping its controls and structure library available. Tap it again to exit, or use the browser’s exit control (Escape on desktop). It appears only when the browser supports fullscreen; older iPad Safari’s prefixed API is supported too. The crystal resizes automatically when entering, leaving, or rotating the tablet. Fullscreen starts only from a tap or click and is not restored with saved sessions or projects.
+
 ## Try on a tablet or phone
+
+Drag with one finger to rotate around the current view center, just like a left mouse drag. Use two fingers to move the structure, pinch to zoom, or twist to rotate in the screen plane. Hold one finger still and move the other around it to rotate around that fixed finger. These gestures can be combined. Lifting one finger resumes rotation around a fixed center without changing the zoom.
 
 The crystal stays in view while you edit the structure. The controls sit beside it on a landscape tablet and below it in portrait. In portrait the crystal and the lower panel split the screen at a fixed ratio: picking atoms, switching measurement modes or tabs, adding pairs, planes or arrows, and opening editors change what the panel shows, never the size of the crystal view. Longer content scrolls inside the panel, under a tab bar that stays in place; each tab opens at its top. Picking an atom never scrolls the panel.
 
@@ -142,6 +164,12 @@ GitHub Actions runs the Rust importer tests, rebuilds its WebAssembly module fro
 To run the portable production browser check, install `tests/requirements-browser.txt` and Chromium (`python -m playwright install chromium`), serve the built app, then run `VIEWER_URL=http://localhost:4179 python tests/pages_smoke.py`. Run `tests/library_smoke.py` with the same environment for library search, filtering, loading, source links, session restoration, failed downloads and direct entry links on desktop and phone. `BROWSER_CHANNEL=chrome` uses an installed Chrome instead of Playwright's bundled Chromium.
 
 `python tests/layout_smoke.py` checks that the canvas, the control panel and its tab bar keep their bounds in every animation frame on a phone, a portrait tablet, a narrow desktop window and a desktop, in both themes. It picks atoms, measures a known distance and angle, switches modes and tabs, adds and edits pairs, planes and arrows, scrolls the panel with a real touch gesture (the wheel with a mouse), opens Style and Turn, checks Escape and outside dismissal with focus return, and rotates the window and back. CI runs it with the bundled Chromium. Use `BROWSER_CHANNEL=chrome` or `CHROMIUM_EXECUTABLE` to pick another Chromium, and set `WEBKIT_EXECUTABLE` to the path of Playwright's WebKit `pw_run.sh` to also run WebKit.
+
+`python tests/project_smoke.py` checks portable downloads and reopening in a fresh browser, multiblock CIFs, styles, lattice objects, camera and measurement restoration, invalid files, and autosave on desktop and phone.
+
+`python tests/history_smoke.py` checks undo/redo for scene edits, grouped mouse/touch camera gestures, sliders, shortcuts, saved sessions and document changes on desktop and phone.
+
+`python tests/touch_pan_smoke.py` checks native two-finger dragging and combined drag/pinch in landscape and portrait tablet and phone layouts at several pixel densities. It checks projected atom positions during movement, while held and after release, plus transitions between one and two fingers.
 
 Run the JavaScript geometry tests with `node --test tests/*.test.mjs`. The coordination browser test uses the packaged forsterite CIF (`python tests/coordination_smoke.py`). `python tests/pair_defaults_smoke.py` checks estimated cutoffs, element changes, stable pair colors and manual-cutoff restoration on desktop and phone. Run `python tests/steering_smoke.py` to check unrestricted rotation, axis views and custom directions in a triclinic cell. The plotting-range and display tests are `tests/ranges_smoke.py` and `tests/visibility_smoke.py`.
 

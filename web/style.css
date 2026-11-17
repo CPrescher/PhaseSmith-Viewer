@@ -119,6 +119,9 @@ body {
   height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
+  /* Keep pinches/double taps from magnifying the fixed app shell. Native
+     panel scrolling stays enabled; the crystal handles its own gestures. */
+  touch-action: pan-x pan-y;
 }
 button,
 input,
@@ -183,9 +186,10 @@ header {
   color: var(--muted);
 }
 .brand-mark {
-  font-size: 26px;
-  color: var(--accent);
-  line-height: 1;
+  display: block;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
 }
 .structure {
   flex: 1 1 auto;
@@ -199,6 +203,8 @@ header {
 .structure a { color: inherit; text-decoration: none; }
 .structure a:hover { text-decoration: underline; }
 #library-open { flex-shrink: 0; }
+#block-wrap { flex: 0 1 140px; min-width: 0; }
+#block { width: 100%; min-width: 0; }
 #structure-library {
   width: min(850px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
@@ -328,7 +334,7 @@ select {
     background: #ff9f8c1a;
   }
 }
-/* Header theme switch: compact, always visible (also on phones). */
+/* Header icon buttons keep a full touch target, including on tablets. */
 .theme-toggle {
   flex: none;
   width: var(--touch);
@@ -339,6 +345,29 @@ select {
   color: var(--text);
   font-size: 18px;
   line-height: 1;
+}
+.fullscreen-toggle {
+  display: grid;
+  place-items: center;
+}
+.fullscreen-toggle[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+#fullscreen-status {
+  position: fixed;
+  z-index: 20;
+  top: 64px;
+  right: 12px;
+  max-width: min(340px, calc(100vw - 24px));
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--error-line);
+  border-radius: var(--radius);
+  background: var(--error-bg);
+  color: var(--error-text);
+  font-size: 13px;
+  line-height: 1.5;
 }
 .secondary {
   background: var(--raised);
@@ -1624,6 +1653,29 @@ aside .export-panel {
 .sym-filters {
   margin: 4px 0;
 }
+.sym-axis-selection {
+  margin: 8px 0;
+  font-size: 12px;
+}
+.sym-axis-selection summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.sym-selection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 4px 0;
+}
+.sym-type-row {
+  margin: 6px 0;
+}
+.sym-type-caption {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
 .sym-filter {
   border-left: 3px solid var(--sym-color);
 }
@@ -2300,4 +2352,27 @@ aside .export-panel {
 .turn-panel.in-pane .turn-body {
   justify-content: space-evenly;
   padding-right: var(--touch);
+}
+
+/* Always available above the scrolling controls, including on phones. */
+.history-controls { display: flex; gap: 6px; margin-bottom: 6px; }
+.history-controls button { flex: 1; }
+
+@media (max-width: 640px) {
+  .history-controls.in-view {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 60px;
+    width: 148px;
+    margin: 0;
+  }
+  .history-controls.in-view button {
+    padding: 0 8px;
+    color: var(--overlay-text);
+    background: var(--overlay-bg);
+    border-color: var(--overlay-line);
+    border-radius: 10px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
 }

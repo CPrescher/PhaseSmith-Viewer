@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0b1622" />
     <meta name="color-scheme" content="dark light" />
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" sizes="any" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
     <script>
       // Apply the theme before first paint: explicit choice, else system.
       (function () {
@@ -28,7 +31,7 @@
     <div id="app">
       <header>
         <a class="brand" href="./" aria-label="PhaseSmith Viewer"
-          ><span class="brand-mark" aria-hidden="true">◇</span
+          ><img class="brand-mark" src="/icon.svg" width="28" height="28" alt="" aria-hidden="true" />
           ><span class="brand-name">PhaseSmith <b>Viewer</b></span></a
         >
         <div class="structure">
@@ -40,6 +43,21 @@
           ><span class="sr-only">Data block</span><select id="block"></select
         ></label>
         <button
+          id="fullscreen-toggle"
+          type="button"
+          class="theme-toggle fullscreen-toggle"
+          aria-label="Full screen"
+          aria-pressed="false"
+          title="Enter full screen"
+          hidden
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path data-fullscreen-enter d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" />
+            <path data-fullscreen-exit d="M3 8h5V3m13 5h-5V3M8 21v-5H3m13 5v-5h5" hidden />
+          </svg>
+        </button>
+        <p id="fullscreen-status" role="status" hidden></p>
+        <button
           id="theme-toggle"
           type="button"
           class="theme-toggle"
@@ -50,9 +68,9 @@
           <span aria-hidden="true">☀</span>
         </button>
         <button id="library-open" class="view-button" aria-haspopup="dialog" aria-controls="structure-library">Library</button>
-        <button id="open" class="primary">
-          ＋ Open CIF<span class="desktop"> file</span></button
-        ><input id="file" type="file" accept=".cif,.mcif,text/plain" hidden />
+        <button id="open" class="primary" title="Open a CIF structure or a saved .psv project">
+          ＋ Open<span class="desktop"> file</span></button
+        ><input id="file" type="file" accept=".cif,.mcif,.psv,text/plain" hidden />
       </header>
       <dialog id="structure-library" aria-labelledby="library-title" aria-describedby="library-intro">
         <div class="library-head">
@@ -287,6 +305,11 @@
         </div>
         <aside aria-label="Structure controls" data-mode="pairs">
           <div id="inspector-header" class="inspector-header">
+            <div id="history-controls" class="history-controls" role="group" aria-label="Undo and redo">
+              <button id="history-undo" class="secondary" type="button" disabled title="Undo">↶ Undo</button>
+              <button id="history-redo" class="secondary" type="button" disabled title="Redo">↷ Redo</button>
+              <span id="history-status" class="sr-only" role="status" aria-live="polite"></span>
+            </div>
             <nav class="mode-bar" aria-label="Sidebar view">
               <button id="mode-pairs" class="mode-tab" aria-pressed="true">
                 Pairs
@@ -522,6 +545,15 @@
             </div>
             <div id="sym-controls" hidden>
               <div id="sym-filters" class="chip-row sym-filters"></div>
+              <details class="sym-axis-selection" open>
+                <summary>Choose axis types</summary>
+                <div class="sym-selection-actions">
+                  <button id="sym-axes-only" class="text-button" type="button">Axes only</button>
+                  <button id="sym-types-all" class="text-button" type="button">All axis types</button>
+                  <button id="sym-types-none" class="text-button" type="button">Clear axis types</button>
+                </div>
+                <div id="sym-axis-types"></div>
+              </details>
               <label class="sym-opacity"
                 ><span>Plane opacity</span
                 ><input
@@ -757,6 +789,16 @@
             <progress id="export-progress" max="1" value="0" hidden></progress>
             <p id="export-video-note" class="note"></p>
             <p id="export-status" class="note" role="status" aria-live="polite"></p>
+            <div class="section-title session-title">
+              <h2 id="project-title">Project file</h2>
+            </div>
+            <p class="note">Save the structure and current view together in a .psv file. Open it later or on another computer.</p>
+            <div class="export-row session-actions">
+              <button id="project-save" type="button" class="primary" disabled>Save project</button>
+              <button id="project-open" type="button" class="secondary">Open project</button>
+              <input id="project-file" type="file" accept=".psv" hidden />
+            </div>
+            <p id="project-status" class="note" role="status" aria-live="polite"></p>
             <!-- Local session (IndexedDB on this device only). -->
             <div class="section-title session-title">
               <h2 id="session-title">Session</h2>

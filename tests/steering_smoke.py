@@ -234,7 +234,7 @@ async def run(browser_type, touch):
     for axis_id, indices in [("a", [1, 0, 0]), ("b", [0, 1, 0]), ("c", [0, 0, 1])]:
         await page.locator("#view-" + axis_id).click()
         await check_direction(indices)
-    await page.locator("details summary").click()
+    await page.locator(".view-directions details summary").click()
     await page.locator("#view-direction").fill("1 -2 1")
     await page.locator("#direction-form button").click()
     await check_direction([1, -2, 1])
