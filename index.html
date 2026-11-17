@@ -324,7 +324,7 @@
           aria-label="Tools"
           aria-expanded="false"
           aria-controls="tool-rail"
-          title="Tools: Pairs, Appearance, Lattice, Sites, Extent, Export"
+          title="Tools: Pairs, Sites, Lattice, Extent, Style, Export"
         >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
         </button>
@@ -332,17 +332,17 @@
             <button id="mode-pairs" type="button" class="rail-button" data-tool="pairs" aria-pressed="false" title="Pairs: bonds, polyhedra, cutoffs and face opacity">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="7" r="3"/><path d="M8.4 15.2 15.6 8.8"/></svg><span class="rail-label">Pairs</span><span class="rail-hint" aria-hidden="true">bonds, polyhedra, cutoffs and face opacity</span>
             </button>
-            <button id="style-open" type="button" class="rail-button" data-tool="style" aria-pressed="false" title="Appearance: colors and sizes of elements, pairs and single copies">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.2-.3-.4-.5-.8-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg><span class="rail-label">Style</span><span class="rail-hint" aria-hidden="true">colors and sizes of elements, pairs and single copies</span>
+            <button id="mode-sites" type="button" class="rail-button" data-tool="sites" aria-pressed="false" title="Sites: CIF sites, labels, CN and polyhedron volumes">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M4 14h16M10 9v11"/></svg><span class="rail-label">Sites</span><span class="rail-hint" aria-hidden="true">CIF sites, labels, CN and polyhedron volumes</span>
             </button>
             <button id="mode-lattice" type="button" class="rail-button" data-tool="lattice" aria-pressed="false" title="Lattice: planes (hkl), directions [uvw] and symmetry elements">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16 10 6h10l-6 10H4Z"/><path d="M7 11h10M9 16l6-10"/></svg><span class="rail-label">Lattice</span><span class="rail-hint" aria-hidden="true">planes (hkl), directions [uvw] and symmetry elements</span>
             </button>
-            <button id="mode-sites" type="button" class="rail-button" data-tool="sites" aria-pressed="false" title="Sites: CIF sites, labels, CN and polyhedron volumes">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M4 14h16M10 9v11"/></svg><span class="rail-label">Sites</span><span class="rail-hint" aria-hidden="true">CIF sites, labels, CN and polyhedron volumes</span>
-            </button>
             <button id="mode-extent" type="button" class="rail-button" data-tool="extent" aria-pressed="false" title="Extent: plotting range, cell edges and boundary atoms">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg><span class="rail-label">Extent</span><span class="rail-hint" aria-hidden="true">plotting range, cell edges and boundary atoms</span>
+            </button>
+            <button id="style-open" type="button" class="rail-button rail-group-start" data-tool="style" aria-pressed="false" title="Appearance: colors and sizes of elements, pairs and single copies">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.2-.3-.4-.5-.8-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg><span class="rail-label">Style</span><span class="rail-hint" aria-hidden="true">colors and sizes of elements, pairs and single copies</span>
             </button>
             <button id="mode-export" type="button" class="rail-button" data-tool="export" aria-pressed="false" title="Export: PNG, turntable movie and the saved session">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 19h14"/></svg><span class="rail-label">Export</span><span class="rail-hint" aria-hidden="true">PNG, turntable movie and the saved session</span>
