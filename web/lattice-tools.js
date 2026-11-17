@@ -898,6 +898,52 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     input.onchange = () => onCommit(input);
     return input;
   };
+  // Keep text inputs so signs and (for hkl) spaces remain available on iPad.
+  // A numeric inputmode can hide those keys; it does not enforce numbers.
+  const numericEdits = (input, pattern) => {
+    input.setAttribute("autocorrect", "off");
+    input.setAttribute("autocapitalize", "off");
+    const normalize = (value) => value.replace(/−/g, "-");
+    let accepted = input.value;
+    let selection = [input.selectionStart, input.selectionEnd];
+    const remember = () => {
+      accepted = input.value;
+      selection = [input.selectionStart, input.selectionEnd];
+    };
+    input.addEventListener("beforeinput", (event) => {
+      remember();
+      // Some iPad edits are noncancelable or carry no data. The input and
+      // compositionend handlers below also check the resulting value.
+      if (event.data != null && event.inputType.startsWith("insert")) {
+        const next = input.value.slice(0, input.selectionStart) + event.data + input.value.slice(input.selectionEnd);
+        if (!pattern.test(normalize(next))) event.preventDefault();
+      }
+    });
+    const check = () => {
+      const value = normalize(input.value);
+      if (!pattern.test(value)) {
+        // Reject the entire edit; stripping letters could turn 1e2 into 12.
+        input.value = accepted;
+        input.setSelectionRange(...selection);
+      } else {
+        const caret = [input.selectionStart, input.selectionEnd];
+        if (input.value !== value) {
+          input.value = value;
+          input.setSelectionRange(...caret);
+        }
+        remember();
+      }
+    };
+    input.addEventListener("input", check);
+    input.addEventListener("compositionend", check);
+    input.addEventListener("select", () => {
+      selection = [input.selectionStart, input.selectionEnd];
+    });
+    return (value) => {
+      input.value = value;
+      remember();
+    };
+  };
   // A field with an always-visible caption inside its box.
   const captioned = (input, caption) => {
     const wrap = make("label", { className: "tool-capfield" });
@@ -940,45 +986,29 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         row.dataset.tuneName = `plane (${plane.hkl.join(" ")})`;
         row.style.setProperty("--tool-color", plane.color);
         const name = () => `(${plane.hkl.join(" ")})`;
-        let acceptedHKL = plane.hkl.join(" ");
         const hkl = textField(plane.hkl.join(" "), "Miller indices (h k l), integers", "hkl", (input) =>
           commit(input, plane, (text) => {
             const v = parseMillerIndices(text);
             plane.hkl = v;
-            input.value = acceptedHKL = v.join(" ");
+            setHKL(v.join(" "));
             row.dataset.tuneName = `plane (${v.join(" ")})`;
             // Until m is edited by hand, it follows the indices so the
             // plane cuts through the middle of the displayed range.
             if (plane.autoOffset) {
               plane.m = initialPlaneOffset(v, getRanges());
-              m.value = fmt(plane.m);
+              setOffset(fmt(plane.m));
               m.setCustomValidity("");
             }
           }),
         );
         hkl.dataset.field = "hkl";
         hkl.title = "Three integer indices: 123 means 1 2 3. Separate multi-digit indices with spaces; use - for negative indices.";
-        // A number input cannot hold spaces. Reject whole edits containing
-        // other characters, including pasted text, rather than stripping them
-        // and potentially changing the intended indices (e.g. 1e2 → 12).
-        let selection = [0, 0];
-        hkl.onbeforeinput = (event) => {
-          selection = [hkl.selectionStart, hkl.selectionEnd];
-          if (event.data && /[^0-9 −-]/.test(event.data)) event.preventDefault();
-        };
-        hkl.oninput = () => {
-          const value = hkl.value.replace(/−/g, "-");
-          if (/[^0-9 -]/.test(value)) {
-            hkl.value = acceptedHKL;
-            hkl.setSelectionRange(...selection);
-          } else {
-            const caret = hkl.selectionStart;
-            hkl.value = acceptedHKL = value;
-            hkl.setSelectionRange(caret, caret);
-          }
-        };
+        const setHKL = numericEdits(hkl, /^[0-9 -]*$/);
         const m = textField(fmt(plane.m), "Offset m, fractional: plane h·x + k·y + l·z = m; with Parallel planes, planes at m + n", "offset", (input) =>
           commit(input, plane, (text) => {
+            // Empty values and unfinished signs are editing states, not zero.
+            if (!/^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(text))
+              throw Error("Enter a numeric offset m.");
             const v = Number(text.replace(",", "."));
             if (!Number.isFinite(v)) throw Error("Enter a finite offset m.");
             plane.m = v;
@@ -986,6 +1016,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           }),
         );
         m.dataset.field = "m";
+        const setOffset = numericEdits(m, /^[+-]?\d*(?:[.,]\d*)?$/);
         m.title = "h·x + k·y + l·z = m (fractional coordinates, not Å). Shifts the plane, or all parallel planes (m + n).";
         // Show is the first control: it decides whether the entry (and its
         // label) is drawn. Captions sit inside the fields to save width.

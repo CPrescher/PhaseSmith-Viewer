@@ -59,6 +59,40 @@ async def check(browser, width, height, theme):
     assert await hkl.evaluate("el => el.validity.valid")
     await change(hkl, "1−10")
     assert (await state())["planes"][0]["hkl"] == [1, -1, 0]
+    # iPad replacement/composition edits can bypass cancelable beforeinput.
+    # Exercise that fallback for both fields, as well as typing and paste.
+    for field in [hkl, offset]:
+        assert await field.get_attribute("autocorrect") == "off"
+        assert await field.get_attribute("autocapitalize") == "off"
+        previous = await field.input_value()
+        await field.press("End")
+        await field.press("a")
+        assert await field.input_value() == previous
+        await field.fill("1e2")
+        assert await field.input_value() == previous
+        await field.evaluate("""el => {
+            el.dispatchEvent(new InputEvent('beforeinput', {
+                inputType: 'insertReplacementText', data: 'hello', cancelable: false
+            }));
+            el.value = 'hello';
+            el.dispatchEvent(new InputEvent('input', {
+                inputType: 'insertReplacementText', data: 'hello', isComposing: true
+            }));
+            el.dispatchEvent(new CompositionEvent('compositionend', {data: 'hello'}));
+        }""")
+        assert await field.input_value() == previous
+    for value in ["-0.25", "−0,5", "+.75"]:
+        await change(offset, value)
+        assert (await state())["planes"][0]["m"] == float(value.replace("−", "-").replace(",", "."))
+    await offset.fill("1.2.3")
+    assert await offset.input_value() == "+.75"
+    await change(offset, "")
+    p = (await state())["planes"][0]
+    assert p["m"] == .75 and p["error"]
+    assert not await offset.evaluate("el => el.validity.valid")
+    # Start a fresh, automatically positioned plane for the remaining checks.
+    await activate(row.locator("button[aria-label^='Remove plane']"))
+    await activate(page.locator("#plane-add"))
     for indices, expected in [
         ("1 0 0", 1),
         ("-1 -1 -1", -1),
