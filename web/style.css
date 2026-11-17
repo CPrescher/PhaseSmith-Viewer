@@ -2575,10 +2575,10 @@ button.element[aria-pressed="false"] .dot {
 /* The compass stays legible above the persistent footer background. */
 .axis-compass { z-index: 3; }
 /* Persistent history controls, independent of open or parked tool windows. */
-.history-controls { position: absolute; top: calc(100% + 6px); left: 0; width: 148px; display: flex; gap: 6px; }
-.history-controls button { flex: 1; padding: 0 8px; color: var(--overlay-text); background: var(--overlay-bg); border-color: var(--overlay-line); border-radius: 10px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.history-controls { position: absolute; top: calc(100% + 6px); left: 0; width: 94px; display: flex; gap: 6px; }
+.history-controls button { flex: none; display: grid; place-items: center; width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; color: var(--overlay-text); background: var(--overlay-bg); border-color: var(--overlay-line); border-radius: 10px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.history-controls svg { display: block; }
 @media (max-width: 640px) { .history-controls { left: 60px; } }
 /* Short landscape: keep history on the toolbar row, clear of the editor. */
 #app[data-profile="side"] .history-controls { top: 0; left: calc(100% + 8px); width: 94px; }
 #app[data-profile="side"] .history-controls button { min-width: 44px; min-height: 44px; padding: 0; }
-#app[data-profile="side"] .history-label { display: none; }
