@@ -49,7 +49,7 @@ async def check(browser, width, height, theme):
     assert not await page.locator("#tool-rail").evaluate("el => el.classList.contains('menu-open')")
     assert await page.locator("#analysis-rMin").input_value() == "0"
     assert await page.locator("#analysis-rMax").input_value() == "6"
-    assert await page.locator("#analysis-table tbody tr").all_inner_texts() == ["4.00000\tCu–Cu ×3\t3", "5.65685\tCu–Cu ×6\t6"]
+    assert await page.locator("#analysis-table tbody tr").evaluate_all("rows => rows.map(row => [...row.cells].map(cell => cell.textContent.trim()))") == [["4.00000", "Cu–Cu ×3", "3"], ["5.65685", "Cu–Cu ×6", "6"]]
     after = await diagnostics(page)
     assert before["camera"] == after["camera"]
     assert after["windows"]["visible"] == ["pairs"], after["windows"]
@@ -130,9 +130,26 @@ async def check(browser, width, height, theme):
     await page.locator("#file").set_input_files(HERE.parent / "public/examples/forsterite.cif")
     await page.wait_for_function("window.viewerDiagnostics().atoms.some(a => a.element === 'Mg')")
     await ready(page)
-    await page.locator("#analysis-pair").select_option("O–Si")
+    # All pairs retain distinct matching colors in chart, legend and table.
+    color_data = await page.evaluate("""() => {
+      const lines=[...document.querySelectorAll('#analysis-chart .analysis-stick[data-pair]')];
+      return [...document.querySelectorAll('#analysis-legend [data-pair]')].map(tag => ({
+        pair:tag.dataset.pair,
+        color:getComputedStyle(tag.querySelector('.analysis-pair-swatch')).backgroundColor,
+        strokes:[...new Set(lines.filter(l => l.dataset.pair===tag.dataset.pair).map(l => getComputedStyle(l).stroke))]
+      }));
+    }""")
+    assert {r["pair"] for r in color_data} == {"Mg–Mg", "Mg–Si", "Mg–O", "Si–Si", "Si–O", "O–O"}, color_data
+    assert len({r["color"] for r in color_data}) == 6, color_data
+    assert all(r["strokes"] == [r["color"]] for r in color_data), color_data
+    assert not await page.locator('#analysis-pair option[value="O–Si"]').count()
+    assert await page.locator('#analysis-table .analysis-pair-swatch').count() > 0
+    si_color = next(r["color"] for r in color_data if r["pair"] == "Si–O")
+    await page.locator("#analysis-pair").select_option("Si–O")
     await ready(page)
-    assert all("O–Si" in text for text in await page.locator("#analysis-table tbody tr").all_inner_texts())
+    assert all("Si–O" in text for text in await page.locator("#analysis-table tbody tr").all_inner_texts())
+    assert await page.locator('#analysis-legend [data-pair="Si–O"] .analysis-pair-swatch').evaluate("el => getComputedStyle(el).backgroundColor") == si_color
+    assert await page.locator('#analysis-legend [data-pair]').count() == 1
     assert await page.locator("#analysis-table tbody tr").count() == 10
     await page.locator("#analysis-more").click()
     assert await page.locator("#analysis-table tbody tr").count() > 10

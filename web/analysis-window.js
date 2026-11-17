@@ -1,4 +1,5 @@
 import { powderProfile } from "./structure-analysis.js";
+import { pairName, normalizePair, pairColors, pairSegments } from "./pair-presentation.js";
 
 const DEFAULTS = { mode: "distances", rMin: 0, rMax: 6, tolerance: 0.001, pair: "all", wavelength: 1.5406, twoThetaMin: 5, twoThetaMax: 90, fwhm: 0.15 };
 const LIMITS = { rMin: [0, 30], rMax: [0.1, 30], tolerance: [0.00001, 0.1], wavelength: [0.1, 3], twoThetaMin: [0.1, 170], twoThetaMax: [0.1, 170], fwhm: [0, 2] };
@@ -15,10 +16,16 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
   const $ = id => document.getElementById(id);
   const win = $("analysis-window"), opener = $("mode-analysis"), form = $("analysis-form");
   const chart = $("analysis-chart"), status = $("analysis-status"), table = $("analysis-table");
+  const legend = document.createElement("div");
+  legend.id = "analysis-legend";
+  legend.className = "analysis-legend";
+  legend.setAttribute("aria-label", "Atom pair colors");
+  chart.before(legend);
   const more = $("analysis-more"), csv = $("analysis-csv"), detail = $("analysis-detail");
   const controls = Object.fromEntries(Object.keys(DEFAULTS).map(key => [key, $("analysis-" + key)]));
   let worker = null, timer = 0, result = null, resultMode = null, selected = -1, expanded = false;
   let drag = null;
+  let colors = new Map();
   const settings = () => Object.fromEntries(Object.entries(controls).map(([key, field]) => [key, key === "mode" || key === "pair" ? field.value : Number(field.value)]));
 
   function stop() {
@@ -32,6 +39,7 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
     selected = -1;
     expanded = false;
     chart.replaceChildren();
+    legend.replaceChildren();
     table.replaceChildren();
     detail.textContent = "";
     more.hidden = true;
@@ -90,6 +98,7 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
       csv.disabled = !result.rows.length;
       detail.textContent = "Select a line or table row for details.";
       $("analysis-results").hidden = !result.rows.length;
+      renderLegend();
       renderTable();
       draw();
     };
@@ -125,6 +134,24 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
     for (const el of chart.querySelectorAll("[data-index]")) el.classList.toggle("selected", Number(el.dataset.index) === index);
     for (const row of table.querySelectorAll("tbody tr")) row.classList.toggle("selected", Number(row.dataset.index) === index);
   }
+  function pairTag(pair, count) {
+    const tag = document.createElement("span");
+    tag.className = "analysis-pair-tag";
+    tag.dataset.pair = pair;
+    tag.style.setProperty("--pair-color", colors.get(pair));
+    const swatch = document.createElement("span");
+    swatch.className = "analysis-pair-swatch";
+    swatch.setAttribute("aria-hidden", "true");
+    tag.append(swatch, document.createTextNode(pair + (count == null ? "" : ` ×${count}`)));
+    return tag;
+  }
+  function renderLegend() {
+    legend.replaceChildren();
+    legend.hidden = resultMode !== "distances";
+    if (legend.hidden || !result) return;
+    const pairs = [...new Set(result.rows.flatMap(row => Object.keys(row.pairs)))].sort();
+    legend.append(...pairs.map(pair => pairTag(pair)));
+  }
   function draw() {
     chart.replaceChildren();
     if (!result?.rows.length) return;
@@ -154,10 +181,18 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
     }
     result.rows.forEach((row, index) => {
       const pos = x(isDistance ? row.distance : row.twoTheta);
-      const line = svg("line", { x1: pos, x2: pos, y1: bottom, y2: y(isDistance ? row.count : row.intensity), class: `analysis-stick${selected === index ? " selected" : ""}${!isDistance && fwhm > 0 ? " subdued" : ""}`, "data-index": index });
-      const title = document.createElementNS(ns, "title");
-      title.textContent = description(row);
-      line.append(title);
+      const segments = isDistance ? pairSegments(row) : [{ from: 0, to: row.intensity }];
+      for (const segment of segments) {
+        const line = svg("line", { x1: pos, x2: pos, y1: y(segment.from), y2: y(segment.to), class: `analysis-stick${selected === index ? " selected" : ""}${!isDistance && fwhm > 0 ? " subdued" : ""}`, "data-index": index });
+        if (isDistance) {
+          line.dataset.pair = segment.pair;
+          line.dataset.count = segment.count;
+          line.style.setProperty("--pair-color", colors.get(segment.pair));
+        }
+        const title = document.createElementNS(ns, "title");
+        title.textContent = description(row);
+        line.append(title);
+      }
     });
     chart.onclick = event => {
       const rect = chart.getBoundingClientRect();
@@ -190,7 +225,15 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
       const values = distances
         ? [entry.distance.toFixed(5), pairText(entry), entry.count]
         : [entry.twoTheta.toFixed(3), entry.d.toFixed(5), hklText(entry), entry.intensity.toFixed(2)];
-      values.forEach(value => { row.insertCell().textContent = value; });
+      values.forEach((value, column) => {
+        const cell = row.insertCell();
+        if (distances && column === 1) {
+          for (const { pair, count } of pairSegments(entry)) {
+            if (cell.childNodes.length) cell.append(" ");
+            cell.append(pairTag(pair, count));
+          }
+        } else cell.textContent = value;
+      });
       row.onclick = () => select(index);
       row.onkeydown = event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(index); } };
     });
@@ -198,7 +241,7 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
     more.textContent = expanded ? "Show first 10" : `Show all ${result.rows.length.toLocaleString()}`;
     more.setAttribute("aria-expanded", String(expanded));
     $("analysis-table-note").textContent = distances
-      ? "Distances are grouped within the tolerance; each line is at the mean distance. Counts refer to one unit cell."
+      ? "Colors identify atom pairs. Coincident pairs form colored segments of one line; its total height is the count per unit cell. Distances are grouped within the tolerance and shown at their mean."
       : "Integrated intensities, strongest line = 100. One representative hkl is shown; overlapping reflections are summed.";
   }
   more.onclick = () => { expanded = !expanded; renderTable(); };
@@ -276,11 +319,13 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
       stop();
       clear();
       const elements = [...new Set(getStructure()?.atoms.map(a => a.element))].sort();
+      const pairs = [];
       controls.pair.replaceChildren(new Option("All atom pairs", "all"));
       elements.forEach((a, i) => elements.slice(i).forEach(b => {
-        const name = `${a}–${b}`;
-        controls.pair.add(new Option(name, name));
+        pairs.push(pairName(a, b));
       }));
+      colors = pairColors(pairs);
+      [...colors.keys()].forEach(name => controls.pair.add(new Option(name, name)));
       if (win.open) calculate();
     },
     exportState: () => ({ ...settings(), open: win.open }),
@@ -290,7 +335,8 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
       for (const [key, [min, max]] of Object.entries(LIMITS))
         if (Number.isFinite(state[key]) && state[key] >= min && state[key] <= max) controls[key].value = state[key];
       if (["distances", "powder"].includes(state.mode)) controls.mode.value = state.mode;
-      if ([...controls.pair.options].some(o => o.value === state.pair)) controls.pair.value = state.pair;
+      const pair = normalizePair(state.pair);
+      if ([...controls.pair.options].some(o => o.value === pair)) controls.pair.value = pair;
       updateMode();
       if (state.open === true) { if (win.open) calculate(); else open(); }
       else { stop(); clear(); win.close(); opener.setAttribute("aria-expanded", "false"); }

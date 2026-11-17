@@ -2,8 +2,8 @@
 // symmetry-expanded unit cell is used, independently of display bounds.
 import { inverse3, det3, matVec } from "./crystal-math.js";
 import { XRAY_COEFFICIENTS } from "./xray-coefficients.js";
+import { pairName, normalizePair } from "./pair-presentation.js";
 
-const pairName = (a, b) => [a, b].sort().join("–");
 const positive = (h, k, l) => h > 0 || (h === 0 && (k > 0 || (k === 0 && l > 0)));
 const MAX_CHECKS = 8_000_000;
 const MAX_PAIRS = 500_000;
@@ -37,6 +37,7 @@ export function distanceDistribution(structure, { rMin = 0, rMax = 6, tolerance 
   inRange(rMax, 0.1, 30, "Maximum distance (Å)");
   if (rMin >= rMax) throw Error("Maximum distance must exceed minimum distance.");
   inRange(tolerance, 0.00001, 0.1, "Distance tolerance (Å)");
+  pair = normalizePair(pair);
   const { atoms, inverse, basis } = cell(structure);
   if (atoms.length * (atoms.length + 1) / 2 > MAX_CHECKS)
     throw Error("Too many sites for distance analysis in the browser.");

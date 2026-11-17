@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { distanceDistribution, powderPattern, powderProfile, xrayFormFactor } from "../web/structure-analysis.js";
+import { pairName, normalizePair, pairColors, pairSegments } from "../web/pair-presentation.js";
 
 const cubic = (a = 4, atoms = [{ element: "Cu", frac: [0, 0, 0] }]) => ({ basis: [[a, 0, 0], [0, a, 0], [0, 0, a]], atoms });
 const close = (a, b, eps = 1e-8) => assert.ok(Math.abs(a - b) < eps, `${a} ≈ ${b}`);
@@ -19,13 +20,47 @@ test("unlike pairs crossing cell faces count correctly and pair filters preserve
   const structure = cubic(4, [{ element: "Na", frac: [0, 0, 0] }, { element: "Cl", frac: [0.5, 0, 0] }]);
   const result = distanceDistribution(structure, { rMax: 4.1 });
   assert.deepEqual(result.rows.map(r => r.count), [2, 6]);
-  assert.deepEqual(result.rows[0].pairs, { "Cl–Na": 2 });
+  assert.deepEqual(result.rows[0].pairs, { "Na–Cl": 2 });
   assert.deepEqual(result.rows[1].pairs, { "Cl–Cl": 3, "Na–Na": 3 });
   assert.equal(distanceDistribution(structure, { rMax: 4.1, pair: "Cl–Na" }).count, 2);
+  assert.equal(distanceDistribution(structure, { rMax: 4.1, pair: "Na–Cl" }).count, 2);
   const translated = { ...structure, atoms: structure.atoms.map(a => ({ ...a, frac: a.frac.map(v => v + 2.3) })) };
   const shifted = distanceDistribution(translated, { rMax: 4.1 });
   assert.deepEqual(shifted.rows.map(r => r.count), result.rows.map(r => r.count));
   shifted.rows.forEach((r, i) => close(r.distance, result.rows[i].distance));
+});
+
+test("pair labels put oxygen last and favor common anion partners after cations", () => {
+  for (const [a, b, expected] of [["O", "Si", "Si–O"], ["O", "Mg", "Mg–O"], ["O", "Al", "Al–O"], ["O", "O", "O–O"], ["Cl", "Na", "Na–Cl"], ["F", "Ca", "Ca–F"], ["S", "Fe", "Fe–S"]]) {
+    assert.equal(pairName(a, b), expected);
+    assert.equal(pairName(b, a), expected);
+  }
+  assert.equal(normalizePair("O–Si"), "Si–O");
+  assert.equal(normalizePair("O-Si"), "Si–O");
+  assert.equal(normalizePair("all"), "all");
+  assert.equal(normalizePair(undefined), undefined);
+});
+
+test("color assignments are independent of pair-list order and do not repeat the palette", () => {
+  const pairs = ["Mg–O", "Si–O", "Mg–Si", "O–O", "Mg–Mg", "Si–Si"];
+  const expected = pairColors(pairs);
+  assert.equal(new Set(expected.values()).size, pairs.length);
+  assert.deepEqual(pairColors([...pairs].reverse()), expected);
+  assert.deepEqual(pairColors([...pairs, "O–Si"]), expected);
+  const many = pairColors(Array.from({ length: 20 }, (_, i) => `pair${i}`));
+  assert.equal(new Set(many.values()).size, 20);
+});
+
+test("overlapping pair contributions stack to the unchanged total line height", () => {
+  const structure = cubic(4, [{ element: "Na", frac: [0, 0, 0] }, { element: "Cl", frac: [0.5, 0, 0] }]);
+  const row = distanceDistribution(structure, { rMin: 3.9, rMax: 4.1 }).rows[0];
+  const segments = pairSegments(row);
+  assert.deepEqual(segments, [
+    { pair: "Cl–Cl", count: 3, from: 0, to: 3 },
+    { pair: "Na–Na", count: 3, from: 3, to: 6 },
+  ]);
+  assert.equal(segments.at(-1).to, row.count);
+  assert.equal(segments.reduce((n, s) => n + s.count, 0), row.count);
 });
 
 test("neighbor bounds remain complete after extreme cell shear requiring distant translations", () => {

@@ -1678,6 +1678,18 @@ button.element[aria-pressed="false"] .dot {
 /* Independent plot window: above the viewer palettes; the crystal and the
    active tool stay in place. Native dialog focus, explicit close and Escape. */
 .analysis-window {
+  --analysis-pair-0: #e6a33a;
+  --analysis-pair-1: #32b58b;
+  --analysis-pair-2: #ae8df0;
+  --analysis-pair-3: #ed7385;
+  --analysis-pair-4: #63a7ef;
+  --analysis-pair-5: #36bdce;
+  --analysis-pair-6: #dc88c8;
+  --analysis-pair-7: #bdba55;
+  --analysis-pair-8: #b79375;
+  --analysis-pair-9: #a4a7f3;
+  --analysis-pair-10: #71b5a0;
+  --analysis-pair-11: #e38857;
   position: fixed;
   inset: auto;
   z-index: 1000;
@@ -1698,6 +1710,20 @@ button.element[aria-pressed="false"] .dot {
   box-shadow: 0 18px 70px var(--shadow);
 }
 .analysis-window[open] { display: flex; flex-direction: column; }
+:root[data-theme="light"] .analysis-window {
+  --analysis-pair-0: #ab6500;
+  --analysis-pair-1: #007e5c;
+  --analysis-pair-2: #7d4cbb;
+  --analysis-pair-3: #c43e51;
+  --analysis-pair-4: #2168b5;
+  --analysis-pair-5: #007f91;
+  --analysis-pair-6: #ad488b;
+  --analysis-pair-7: #7b7800;
+  --analysis-pair-8: #876045;
+  --analysis-pair-9: #595db3;
+  --analysis-pair-10: #386e5d;
+  --analysis-pair-11: #b5511f;
+}
 .analysis-head {
   display: flex;
   flex: none;
@@ -1738,6 +1764,14 @@ button.element[aria-pressed="false"] .dot {
 .analysis-stick { stroke: var(--accent); stroke-width: 1.8; cursor: pointer; }
 .analysis-stick.subdued { opacity: 0.28; stroke-width: 1; }
 .analysis-stick.selected { stroke: var(--select-line); stroke-width: 3; opacity: 1; }
+.analysis-stick[data-pair] { stroke: var(--pair-color); }
+.analysis-stick[data-pair].selected { filter: drop-shadow(0 0 1.5px var(--pair-color)); }
+.analysis-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0 12px; font-size: 12px; }
+.analysis-legend[hidden] { display: none; }
+.analysis-pair-tag { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.analysis-table-scroll .analysis-pair-tag { margin-right: 10px; }
+.analysis-table-scroll .analysis-pair-tag:last-child { margin-right: 0; }
+.analysis-pair-swatch { display: inline-block; flex: none; width: 12px; height: 3px; border-radius: 2px; background: var(--pair-color); }
 .analysis-profile { fill: none; stroke: var(--accent); stroke-width: 1.8; }
 .analysis-detail { min-height: 18px; font-size: 12px; color: var(--muted); line-height: 1.5; margin: 6px 0; }
 .analysis-table-scroll { max-height: 180px; }
