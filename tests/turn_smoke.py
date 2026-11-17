@@ -5,7 +5,8 @@ import math
 import os
 from pathlib import Path
 from playwright.async_api import async_playwright
-from smoke import URL, diagnostics, settle
+from browser_test_config import QUICK
+from smoke import URL, HERE, diagnostics, settle
 
 OUT = Path("/tmp/psv-gui-assessment/turn-controls")
 
@@ -42,10 +43,14 @@ async def check(browser, w, h, theme):
     )
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    await page.goto(URL + "/?example=wollastonite")
+    await page.goto(URL + ("/" if QUICK else "/?example=wollastonite"))
     await page.wait_for_function(
         "window.viewerDiagnostics?.().atoms.length>0 && !window.viewerDiagnostics().session.suspended"
     )
+
+    if QUICK:
+        await page.locator("#file").set_input_files(HERE / "skew-direction.cif")
+        await page.wait_for_function("viewerDiagnostics().block === 'skew_direction' && viewerDiagnostics().history.ready")
 
     async def act(locator):
         if touch:
@@ -185,9 +190,12 @@ async def main():
         elif os.environ.get("CHROMIUM_EXECUTABLE"):
             options["executable_path"] = os.environ["CHROMIUM_EXECUTABLE"]
         b = await p.chromium.launch(**options)
-        for w, h in [(1440, 900), (1024, 768), (768, 1024), (390, 844), (844,390), (667,375)]:
-            for theme in ["light", "dark"]:
-                await check(b, w, h, theme)
+        cases = [(1200, 800, "dark"), (390, 844, "light")] if QUICK else [
+            (w, h, theme) for w, h in [(1440, 900), (1024, 768), (768, 1024), (390, 844), (844, 390), (667, 375)]
+            for theme in ["light", "dark"]
+        ]
+        for w, h, theme in cases:
+            await check(b, w, h, theme)
         await b.close()
 
 

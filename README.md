@@ -169,7 +169,17 @@ The initial NaCl example is an idealized rock-salt structure with a rounded 5.64
 
 ## Verification
 
-GitHub Actions runs the Rust importer tests, rebuilds its WebAssembly module from the pinned PhaseSmith revision, runs the JavaScript tests, and builds the application for its GitHub Pages path. Chromium smoke tests then check all three examples, WebAssembly loading, plane placement, saved-session restoration, the stable layout and the tool-window workflow. Passing changes on `main` deploy automatically to GitHub Pages; pull requests run the same checks without deploying.
+Routine releases run the JavaScript tests, build the app for its GitHub Pages path, and run a short Chromium smoke check against the production build. It opens all three examples, checks WebAssembly loading, plane placement and saved-session restoration. Rust tests and WebAssembly recompilation run when `engine/` or `scripts/copy-engine.mjs` changed; ordinary interface fixes reuse the checked-in importer. Passing changes on `main` deploy automatically; pull requests run the same release checks without deploying.
+
+The longer interaction suite is optional, not a routine release gate. Choose **Run workflow → full_browser_matrix** on GitHub for all eleven browser scripts and exhaustive screen/theme/DPI combinations, plus a fresh Rust build. Run it locally with:
+
+```sh
+VIEWER_URL=http://localhost:4179 VIEWER_TEST_PROFILE=ci python tests/run_browser_checks.py
+```
+
+The `ci` profile uses one low-DPI touch case, compact nonorthogonal crystals for touch/turn correctness, and representative desktop, tablet, portrait-phone and landscape-phone layouts across both themes. It passed locally in 144 seconds, but software rendering on GitHub is substantially slower. The default local profile is `full`, which retains all display/DPI combinations.
+
+The runner prints live progress and per-script timings, runs two independent scripts at a time, and stops timed-out scripts with their browser children. `--workers 1` runs checks serially; optional script names select a subset; `--timeout` sets the per-script limit. Routine deployment uses only `pages_smoke`, with a two-minute script limit and a three-minute browser-step limit.
 
 To run the portable production browser check, install `tests/requirements-browser.txt` and Chromium (`python -m playwright install chromium`), serve the built app, then run `VIEWER_URL=http://localhost:4179 python tests/pages_smoke.py`. Run `tests/library_smoke.py` with the same environment for library search, filtering, loading, source links, session restoration, failed downloads and direct entry links on desktop and phone. `BROWSER_CHANNEL=chrome` uses an installed Chrome instead of Playwright's bundled Chromium.
 
