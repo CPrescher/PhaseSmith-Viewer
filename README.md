@@ -171,6 +171,16 @@ The initial NaCl example is an idealized rock-salt structure with a rounded 5.64
 
 GitHub Actions runs the Rust importer tests, rebuilds its WebAssembly module from the pinned PhaseSmith revision, runs the JavaScript tests, and builds the application for its GitHub Pages path. Chromium smoke tests then check all three examples, WebAssembly loading, plane placement, saved-session restoration, the stable layout and the tool-window workflow. Passing changes on `main` deploy automatically to GitHub Pages; pull requests run the same checks without deploying.
 
+Normal pushes use `VIEWER_TEST_PROFILE=ci`: one low-DPI native touch case, compact nonorthogonal crystals for touch/turn correctness, and representative desktop, tablet, portrait-phone and landscape-phone layouts across both themes. The Rust and JavaScript tests and all eleven browser check scripts still run. Two browser checks run at a time, with live progress, per-check timings and a six-minute limit per script. A stalled browser and its child processes are stopped and the build fails rather than waiting indefinitely.
+
+The full screen/theme/DPI matrices remain the default when running scripts locally. Set `VIEWER_TEST_PROFILE=ci` to reproduce the routine CI profile, or choose **Run workflow → full_browser_matrix** on GitHub for the exhaustive matrix. To run the whole browser suite against a served production build:
+
+```sh
+VIEWER_URL=http://localhost:4179 VIEWER_TEST_PROFILE=ci python tests/run_browser_checks.py
+```
+
+`--workers 1` runs checks serially for diagnosis. Optional script names rerun a subset; `--timeout` sets the per-script limit. The full profile deliberately retains the expensive high-DPI/transparency combinations and is not the normal deployment gate.
+
 To run the portable production browser check, install `tests/requirements-browser.txt` and Chromium (`python -m playwright install chromium`), serve the built app, then run `VIEWER_URL=http://localhost:4179 python tests/pages_smoke.py`. Run `tests/library_smoke.py` with the same environment for library search, filtering, loading, source links, session restoration, failed downloads and direct entry links on desktop and phone. `BROWSER_CHANNEL=chrome` uses an installed Chrome instead of Playwright's bundled Chromium.
 
 `python tests/layout_smoke.py` checks that the canvas, the tool launcher, the open tool window's outline and the measurement buttons keep their bounds in every animation frame on a phone, a portrait tablet, a narrow desktop window and a desktop, in both themes. It picks atoms, measures a known distance and angle, switches measurement modes and tools, adds and edits pairs, planes and arrows, scrolls a tool window with a real touch gesture (the wheel with a mouse), checks that picking neither scrolls nor replaces the tool and that each tool keeps its scroll position, opens Style and Turn, checks Escape and outside dismissal with focus return, and rotates the window and back.

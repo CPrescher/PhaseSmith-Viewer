@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      full_browser_matrix:
+        description: Run the exhaustive screen, theme and DPI matrix
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -20,6 +25,7 @@ jobs:
       pages: read
     env:
       VITE_BASE_PATH: /${{ github.event.repository.name }}/
+      VIEWER_TEST_PROFILE: ${{ inputs.full_browser_matrix && 'full' || 'ci' }}
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.1.0
@@ -49,6 +55,7 @@ jobs:
           python -m pip install -r tests/requirements-browser.txt
           python -m playwright install --with-deps chromium
       - name: Test the hosted path, WebAssembly engine, stable layout and tool windows
+        timeout-minutes: ${{ inputs.full_browser_matrix && 45 || 10 }}
         shell: bash
         run: |
           set -eu
@@ -59,17 +66,7 @@ jobs:
           viewer_server_pid=$!
           trap 'kill "$viewer_server_pid"; rm -rf "$viewer_site_root"' EXIT
           curl --retry 10 --retry-connrefused --retry-delay 1 -fsS "http://127.0.0.1:4181$VITE_BASE_PATH" > /dev/null
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/pages_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/library_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/pair_defaults_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/symmetry_selection_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/history_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/touch_pan_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/project_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/layout_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/page_zoom_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/tool_windows_smoke.py
-          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/turn_smoke.py
+          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/run_browser_checks.py --timeout ${{ inputs.full_browser_matrix && '1200' || '360' }}
       - name: Configure GitHub Pages
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/configure-pages@v6.0.0

@@ -2,6 +2,7 @@
 independent global visibility, precise editing and saved settings."""
 import asyncio, math, os
 from playwright.async_api import async_playwright
+from browser_test_config import QUICK
 from smoke import URL, diagnostics, settle, choose_tool
 
 TOOLS=['#mode-pairs','#mode-lattice','#style-open','#mode-sites','#mode-extent','#mode-export']
@@ -35,7 +36,8 @@ async def pick(page,avoid=None):
  assert (await diagnostics(page))['selectedIds']
 async def matrix(browser):
  for theme in ['dark','light']:
-  for w,h in SIZES:
+  sizes=([(1200,800),(390,844)] if theme=='dark' else [(768,1024),(844,390)]) if QUICK else SIZES
+  for w,h in sizes:
    ctx=await browser.new_context(viewport={'width':w,'height':h},has_touch=w<1100,is_mobile=w<900)
    await ctx.add_init_script(f"localStorage.setItem('psv-theme','{theme}')")
    page=await ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
@@ -101,7 +103,7 @@ async def matrix(browser):
    await ctx.close()
    print(f'{w}x{h} {theme}: scene fixed, tools toggle/swap, info aligned, Atoms/Polyhedra independent',flush=True)
 async def editing(browser):
- page=await browser.new_page(viewport={'width':1440,'height':900},has_touch=True)
+ page=await browser.new_page(viewport={'width':1200 if QUICK else 1440,'height':800 if QUICK else 900},has_touch=True)
  await ready(page);await choose_tool(page,'#mode-pairs')
  assert 'Hide atoms outside polyhedra' in await page.locator('label:has(#polyhedra-only)').inner_text()
  await page.locator('#polyhedra-filter-help').wait_for(state='visible')
@@ -143,7 +145,7 @@ async def frame_check(page, selectors, action):
 async def interaction_details(browser, phone=False):
  # WebKit's desktop test build has no native mobile wheel implementation;
  # use its touch-capable narrow viewport, with native mouse slider drags.
- page=await browser.new_page(viewport={'width':390 if phone else 1440,'height':844 if phone else 900},has_touch=phone,is_mobile=phone and browser.browser_type.name=='chromium')
+ page=await browser.new_page(viewport={'width':390 if phone else (1200 if QUICK else 1440),'height':844 if phone else (800 if QUICK else 900)},has_touch=phone,is_mobile=phone and browser.browser_type.name=='chromium')
  await ready(page);await choose_tool(page,'#mode-pairs',phone)
  win=page.locator('#tool-window-pairs');body=win.locator('.tool-window-body')
  mg=page.locator('.pair-rule').filter(has=page.locator('[data-field=center] option:checked[value=Mg]'))
