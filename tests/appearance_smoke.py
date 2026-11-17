@@ -4,14 +4,14 @@ import asyncio
 import math
 from playwright.async_api import async_playwright
 
-from smoke import URL, diagnostics, settle
+from smoke import URL, choose_tool, diagnostics, settle
 
 
 async def check(browser, width, height):
     page = await browser.new_page(viewport={"width": width, "height": height}, has_touch=True)
     await page.goto(URL + "/?example=forsterite")
     await page.wait_for_function("window.viewerDiagnostics?.().coordination.polyhedronCount === 12")
-    await page.locator("#style-open").tap()
+    await choose_tool(page, "#style-open", True)
     target = page.locator("#style-target")
     size = page.locator("#style-size")
     paint = page.locator('[data-color="#668df3"]')
@@ -59,9 +59,9 @@ async def check(browser, width, height):
     material = (await diagnostics(page))["faceMaterials"][0]
     assert not material["transparent"] and material["depthWrite"]
     assert material["geometry"] == geometry
-    await page.locator("#mode-pairs").tap()
+    await choose_tool(page, "#mode-pairs", True)
     await page.locator('[data-field="opacity"]').first.fill("20")
-    await page.locator("#style-open").tap()
+    await choose_tool(page, "#style-open", True)
     assert await opacity.input_value() == "20"
     await paint.tap()
     assert not await size.is_visible()
@@ -133,7 +133,7 @@ async def check(browser, width, height):
     assert now["appearance"]["polyhedronOverrides"] == 1
     assert now["appearance"]["pickMarkerCount"] == 1
     assert not now["selectedIds"]
-    await page.locator("#mode-pairs").tap()
+    await choose_tool(page, "#mode-pairs", True)
     assert (await diagnostics(page))["appearance"]["pickMarkerCount"] == 0
     assert await page.evaluate("window.scrollY === 0")
     await page.close()

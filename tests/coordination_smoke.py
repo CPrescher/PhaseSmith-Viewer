@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 import tempfile
 from playwright.async_api import async_playwright
-from smoke import URL, HERE, diagnostics, settle
+from smoke import URL, HERE, diagnostics, settle, choose_tool
 
 
 async def click_control(page, control, touch):
@@ -57,6 +57,7 @@ async def run(browser_type, touch):
     await page.wait_for_function(
         'window.viewerDiagnostics().atoms.some(a => a.element === "Mg")'
     )
+    await choose_tool(page, "#mode-pairs")
     while await page.locator("#pair-rules .pair-rule").count():
         await click_control(
             page, page.locator('#pair-rules button[aria-label^="Delete "]').first, touch

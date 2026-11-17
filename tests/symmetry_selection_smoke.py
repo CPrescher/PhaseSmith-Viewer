@@ -3,7 +3,7 @@
 import asyncio
 from pathlib import Path
 from playwright.async_api import async_playwright
-from smoke import URL, diagnostics
+from smoke import URL, diagnostics, choose_tool
 
 
 async def check(browser, width, height):
@@ -13,7 +13,7 @@ async def check(browser, width, height):
     page.on("pageerror", lambda error: errors.append(str(error)))
     await page.goto(URL + "/?structure=almandine")
     await page.wait_for_function("window.viewerDiagnostics?.().atoms.length > 0")
-    await page.locator("#mode-lattice").click()
+    await choose_tool(page, "#mode-lattice")
     await page.locator("#sym-toggle").check()
     await page.locator("#sym-axes-only").click()
     await page.locator("#sym-types-none").click()
@@ -25,7 +25,7 @@ async def check(browser, width, height):
     assert all(e["symbols"] == ["3"] for e in space["visibleElements"])
     assert await page.locator("#sym-view, #sym-view-note, .sym-help").count() == 0
     # Save through the normal export panel, then restore from IndexedDB.
-    await page.locator("#mode-export").click()
+    await choose_tool(page, "#mode-export")
     await page.locator("#session-save").click()
     # The status may still show an earlier save from the same minute.
     # Wait for this selection's transaction rather than its unchanged text.
@@ -50,7 +50,7 @@ async def check(browser, width, height):
     restored = (await diagnostics(page))["lattice"]["symmetry"]
     assert len(restored["visibleElements"]) == 7
     assert restored["hiddenTypes"] == space["hiddenTypes"]
-    await page.locator("#mode-lattice").click()
+    await choose_tool(page, "#mode-lattice")
     assert len((await diagnostics(page))["lattice"]["symmetry"]["visibleElements"]) == 7
     await page.locator("#sym-types-all").click()
     assert len((await diagnostics(page))["lattice"]["symmetry"]["visibleElements"]) > 7

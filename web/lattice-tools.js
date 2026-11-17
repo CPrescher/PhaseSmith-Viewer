@@ -2,6 +2,7 @@
 // elements. Owns its sidebar UI, its Three.js groups and its state; the
 // viewer supplies coordinate conversion and structure access.
 import {
+  parseMillerIndices,
   parseTriple,
   dSpacing,
   clipPlaneToBox,
@@ -397,13 +398,16 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   // after a selection (which grows the measurement/Info card) may be the
   // last one; it must see the card's new size. A handful of DOM reads.
   // Includes the Turn button (floats under the toolbar on phones), the
-  // open Turn popover and the [uvw] form; hidden or in-pane ones have no
-  // box over the canvas and drop out by themselves.
+  // open Turn popover (or the phone Turn dock), the [uvw] form, the tool
+  // rail or phone Tools menu and the open tool windows; hidden ones have
+  // no box over the canvas and drop out by themselves.
   const OBSTACLES = [
     ".view-directions",
     "#turn-open",
-    ".history-controls.in-view",
-    "#turn-panel:not(.in-pane)",
+    "#turn-panel",
+    "#tool-rail",
+    ".tool-window:not([hidden])",
+    "#history-controls",
     ".view-directions details[open] #direction-form",
     ".measure-row",
     ".measure-details",
@@ -411,9 +415,13 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     ".axis-compass",
     "#atom-summary",
   ];
-  let obstacles = [];
+  let obstacles = [], exportMode = false, exportObstacles = [], savedPlacement = null;
   function refreshObstacles(canvasRect) {
     obstacles = [];
+    if (exportMode) {
+      obstacles = exportObstacles;
+      return;
+    } // Application windows/toolbars are absent from image output.
     for (const selector of OBSTACLES)
       for (const el of document.querySelectorAll(selector)) {
         const r = el.getBoundingClientRect();
@@ -928,13 +936,17 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       ...planes.map((plane) => {
         const row = make("div", { className: "tool-row" });
         row.dataset.planeId = plane.id;
+        row.dataset.tuneItem = `plane:${plane.id}`;
+        row.dataset.tuneName = `plane (${plane.hkl.join(" ")})`;
         row.style.setProperty("--tool-color", plane.color);
         const name = () => `(${plane.hkl.join(" ")})`;
+        let acceptedHKL = plane.hkl.join(" ");
         const hkl = textField(plane.hkl.join(" "), "Miller indices (h k l), integers", "hkl", (input) =>
           commit(input, plane, (text) => {
-            const v = parseTriple(text, { integer: true, label: "indices" });
-            if (v.every((x) => x === 0)) throw Error("Miller indices must not all be zero.");
+            const v = parseMillerIndices(text);
             plane.hkl = v;
+            input.value = acceptedHKL = v.join(" ");
+            row.dataset.tuneName = `plane (${v.join(" ")})`;
             // Until m is edited by hand, it follows the indices so the
             // plane cuts through the middle of the displayed range.
             if (plane.autoOffset) {
@@ -945,6 +957,26 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           }),
         );
         hkl.dataset.field = "hkl";
+        hkl.title = "Three integer indices: 123 means 1 2 3. Separate multi-digit indices with spaces; use - for negative indices.";
+        // A number input cannot hold spaces. Reject whole edits containing
+        // other characters, including pasted text, rather than stripping them
+        // and potentially changing the intended indices (e.g. 1e2 → 12).
+        let selection = [0, 0];
+        hkl.onbeforeinput = (event) => {
+          selection = [hkl.selectionStart, hkl.selectionEnd];
+          if (event.data && /[^0-9 −-]/.test(event.data)) event.preventDefault();
+        };
+        hkl.oninput = () => {
+          const value = hkl.value.replace(/−/g, "-");
+          if (/[^0-9 -]/.test(value)) {
+            hkl.value = acceptedHKL;
+            hkl.setSelectionRange(...selection);
+          } else {
+            const caret = hkl.selectionStart;
+            hkl.value = acceptedHKL = value;
+            hkl.setSelectionRange(caret, caret);
+          }
+        };
         const m = textField(fmt(plane.m), "Offset m, fractional: plane h·x + k·y + l·z = m; with Family, planes at m + n", "offset", (input) =>
           commit(input, plane, (text) => {
             const v = Number(text.replace(",", "."));
@@ -1051,12 +1083,15 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       ...arrows.map((arrow) => {
         const row = make("div", { className: "tool-row" });
         row.dataset.arrowId = arrow.id;
+        row.dataset.tuneItem = `arrow:${arrow.id}`;
+        row.dataset.tuneName = `arrow [${arrow.uvw.join(" ")}]`;
         row.style.setProperty("--tool-color", arrow.color);
         const uvw = textField(arrow.uvw.join(" "), "Direct lattice direction [u v w]", "uvw", (input) =>
           commit(input, arrow, (text) => {
             const v = parseTriple(text, { label: "components" });
             if (v.every((x) => x === 0)) throw Error("Direction [uvw] must not be zero.");
             arrow.uvw = v;
+            row.dataset.tuneName = `arrow [${v.join(" ")}]`;
           }),
         );
         uvw.dataset.field = "uvw";
@@ -1113,12 +1148,15 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         : missed
           ? `No plane with integer m crosses this extent. Enter m, widen the extent or raise Size. d = ${plane.d.toFixed(4)} Å`
           : `${plane.family ? "m + n · " : ""}d = ${plane.d.toFixed(4)} Å · ${plane.render.polygons.length} in range${plane.render.truncated ? ` (first ${plane.render.offsets.length})` : ""}`;
+      // The readout keeps a fixed two-line box; the full text is its title.
+      el.title = el.textContent;
     }
     for (const arrow of arrows) {
       const el = document.querySelector(`[data-arrow-id="${arrow.id}"] [data-readout]`);
       if (!el) continue;
       el.classList.toggle("error", Boolean(arrow.error));
       el.textContent = arrow.error ? arrow.error : `${arrow.render.length.toFixed(4)} Å`;
+      el.title = el.textContent;
     }
     // Symmetry readouts.
     const note = $("sym-note");
@@ -1288,6 +1326,24 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   return {
     rebuild,
     updateLabels,
+    // Export frames use their own placement history and full canvas. Restore
+    // the live history afterward so a movie never changes on-screen labels.
+    setExportObstacles(rects) { exportObstacles = rects; },
+    setExportMode(on) {
+      if (exportMode === on) return;
+      exportMode = on;
+      if (on) {
+        savedPlacement = { cache: new Map(placementCache), nextRank, frameNo, cachedPosition, shownLabels, lastPlaced, lastCulled, obstacles };
+        placementCache.clear();
+        nextRank = frameNo = 0;
+        exportObstacles = obstacles = [];
+      } else if (savedPlacement) {
+        placementCache.clear();
+        for (const [key, entry] of savedPlacement.cache) placementCache.set(key, entry);
+        ({ nextRank, frameNo, cachedPosition, shownLabels, lastPlaced, lastCulled, obstacles } = savedPlacement);
+        savedPlacement = null;
+      }
+    },
     /** Scene bounds of drawn planes, arrows and symmetry elements (cached
      *  at each rebuild; cheap enough to read every frame). */
     bounds: () => cachedBounds.clone(),
@@ -1408,6 +1464,8 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       for (const e of result?.elements ?? []) counts[elementCategory(e)] = (counts[elementCategory(e)] || 0) + 1;
       return {
         labels: {
+          exporting: exportMode,
+          obstacleCount: obstacles.length,
           enabled: labelsOn,
           includeOffsets: labelOffsets,
           position: labelPosition,

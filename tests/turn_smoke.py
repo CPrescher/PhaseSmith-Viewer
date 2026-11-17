@@ -2,6 +2,7 @@
 
 import asyncio
 import math
+import os
 from pathlib import Path
 from playwright.async_api import async_playwright
 from smoke import URL, diagnostics, settle
@@ -72,10 +73,23 @@ async def check(browser, w, h, theme):
     assert len(original["selectedIds"]) == 1
     await act(page.locator("#turn-open"))
     assert await page.locator("#turn-panel").is_visible()
+    # Every original Turn control remains reachable, including short
+    # landscape phones. The panel must clear the persistent footer.
+    panel = await page.locator("#turn-panel").bounding_box()
+    footer = await page.locator(".view-bottom").bounding_box()
+    assert panel["y"] + panel["height"] <= footer["y"] - 4, (panel, footer)
+    for button in await page.locator('#turn-panel button').all():
+        assert await button.evaluate("el=>{const r=el.getBoundingClientRect();const h=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return el===h||el.contains(h)}"), await button.get_attribute('id')
     if w <= 640:
+        # Phones: the pad opens above the persistent bottom control row.
         panel = await page.locator("#turn-panel").bounding_box()
         canvas = await page.locator("#viewport canvas").bounding_box()
-        assert panel["y"] >= canvas["y"] + canvas["height"] - 1, (panel, canvas)
+        assert panel["y"] + panel["height"] <= canvas["y"] + canvas["height"] + 1, (panel, canvas)
+        # The pad is an overlay: opening it must preserve the camera and
+        # projected atom positions, rather than auto-framing around it.
+        current = await diagnostics(page)
+        assert current["camera"] == original["camera"]
+        assert [(a["x"], a["y"]) for a in current["atoms"]] == [(a["x"], a["y"]) for a in original["atoms"]]
     for degrees in [90, 60, 45, 30, 10, 5]:
         await act(page.locator(f"#turn-preset-{degrees}"))
         before = await diagnostics(page)
@@ -163,8 +177,15 @@ async def check(browser, w, h, theme):
 
 async def main():
     async with async_playwright() as p:
-        b = await p.chromium.launch(channel="chrome")
-        for w, h in [(1440, 900), (1024, 768), (768, 1024), (390, 844)]:
+        options = {"args": ["--enable-unsafe-swiftshader"]}
+        if os.environ.get("CI"):
+            options["args"] += ["--use-gl=angle", "--use-angle=swiftshader-webgl"]
+        if os.environ.get("BROWSER_CHANNEL"):
+            options["channel"] = os.environ["BROWSER_CHANNEL"]
+        elif os.environ.get("CHROMIUM_EXECUTABLE"):
+            options["executable_path"] = os.environ["CHROMIUM_EXECUTABLE"]
+        b = await p.chromium.launch(**options)
+        for w, h in [(1440, 900), (1024, 768), (768, 1024), (390, 844), (844,390), (667,375)]:
             for theme in ["light", "dark"]:
                 await check(b, w, h, theme)
         await b.close()

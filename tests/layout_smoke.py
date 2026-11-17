@@ -1,8 +1,11 @@
-"""Stable layout: the crystal canvas, the lower/side panel, its tab bar and
-the mouse-action buttons keep their exact bounds in every frame while atoms
-are picked, measurement modes and tabs change, pairs/planes/arrows are added and edited, the panel is
-scrolled by a real touch gesture (wheel with a mouse), Turn and editors open
-and close, and after a resize/orientation round trip.
+"""Stable layout: the crystal canvas, the tool launcher (rail, or the header
+Tools button on phones), the open tool window's outline and the mouse-action
+buttons keep their exact bounds in every animation frame while atoms are
+picked, measurement modes and tools change, pairs/planes/arrows are added and
+edited, a tool window is scrolled by a real touch gesture (wheel with a
+mouse), Turn and editors open and close, and after a resize/orientation round
+trip. Each tool keeps its own scroll position; picking never scrolls or
+replaces the open tool.
 
 Portable: Playwright's bundled Chromium by default. BROWSER_CHANNEL=chrome uses
 an installed Chrome and CHROMIUM_EXECUTABLE another Chromium build;
@@ -18,10 +21,7 @@ from phone_measure_smoke import CIF
 
 URL = os.environ.get("VIEWER_URL", "http://127.0.0.1:4179").rstrip("/")
 SIZES = [(390, 844, True), (768, 1024, True), (700, 900, False), (1440, 900, False)]
-TRACKED = [
-    "#viewport", "canvas", "aside", ".mode-bar",
-    "#measure-info", "#measure-distance", "#measure-angle", "#clear",
-]
+WINDOW = "#tool-layer .tool-window:not([hidden])"
 RECTS = """(sels) => Object.fromEntries(sels.map((s) => {
   const r = document.querySelector(s).getBoundingClientRect();
   return [s, [r.x, r.y, r.width, r.height]];
@@ -75,18 +75,27 @@ async def check(browser, engine, width, height, touch, theme):
     await page.wait_for_function("window.viewerDiagnostics().block==='angle'")
     phone = width <= 640
     where = f"{engine} {width}×{height} {theme}"
+    launcher = "#tools-menu" if phone else "#tool-rail"
+    tracked = ["#viewport", "canvas", launcher, WINDOW, "#measure-info", "#measure-distance", "#measure-angle", "#clear"]
 
     baseline = None
 
     async def settle(action=""):
         await page.evaluate("new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))")
         if baseline:  # fail at the action that moved something
-            now = await page.evaluate(RECTS, TRACKED)
-            for selector in TRACKED:
+            now = await page.evaluate(RECTS, tracked)
+            for selector in tracked:
                 assert same(now[selector], baseline[selector]), (where, action, selector, now[selector], baseline[selector])
 
     async def press(selector):
         locator = page.locator(selector).first
+        launcher_button = selector.startswith("#mode-") or selector == "#style-open"
+        if launcher_button and await locator.get_attribute("aria-pressed") == "true":
+            return
+        if launcher_button and not await locator.is_visible():  # phone: Tools menu
+            menu = page.locator("#tools-menu")
+            await (menu.tap() if touch else menu.click())
+            await locator.wait_for(state="visible")
         await (locator.tap() if touch else locator.click())
         await settle(selector)
         assert await page.evaluate(NO_PAGE_SCROLL), (where, "page scrolled", selector)
@@ -102,8 +111,8 @@ async def check(browser, engine, width, height, touch, theme):
             await page.mouse.click(atom["x"], atom["y"])
         await settle("pick " + label)
 
-    async def scroll_panel(dy):
-        box = await page.locator("aside").bounding_box()
+    async def scroll_window(dy):
+        box = await page.locator(WINDOW + " .tool-window-body").bounding_box()
         x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] - 30
         if touch and engine == "chromium":
             # A real compositor touch gesture, not element.scrollTop.
@@ -116,20 +125,40 @@ async def check(browser, engine, width, height, touch, theme):
             await page.mouse.move(x, y)
             await page.mouse.wheel(0, dy)
         await page.wait_for_timeout(300)
-        await settle("panel scroll")
+        await settle("window scroll")
 
-    async def pane_scroll():
-        return await page.locator("aside").evaluate("el => el.scrollTop")
+    async def window_scroll():
+        return await page.locator(WINDOW + " .tool-window-body").evaluate("el => el.scrollTop")
 
+    async def shown_tool():
+        return await page.locator(WINDOW).get_attribute("data-tool")
+
+    await press("#mode-pairs")
     await press("#view-c")
-    baseline = await page.evaluate(RECTS, TRACKED)
-    await page.evaluate(RECORD, TRACKED)
+    assert await shown_tool() == "pairs", (where, "Pairs opens first")
+    if (await page.evaluate("viewerDiagnostics().windows.profile")) == "sheet":
+        window = await page.locator(WINDOW).bounding_box()
+        atom = next(a for a in (await page.evaluate("viewerDiagnostics()"))["atoms"] if a["label"] == "B")
+        await page.locator(WINDOW + ' [data-action=close]').click()
+        dy = window["y"] - 80 - atom["y"]
+        await page.mouse.move(120, atom["y"])
+        await page.mouse.down(button="right")
+        await page.mouse.move(120, atom["y"] + dy, steps=8)
+        await page.mouse.up(button="right")
+        await press("#mode-pairs")
+    baseline = await page.evaluate(RECTS, tracked)
+    await page.evaluate(RECORD, tracked)
 
-    # Picks and measurement modes.
+    # Picks and measurement modes; the open tool stays as it is.
     await pick("A")
     if phone:
-        text = await page.locator("#atom-info").inner_text()
+        await press("#measure-more")
+        text = await page.locator("#selection").inner_text()
         assert "occupancy" in text and "frac" in text, (where, text)
+        await press("#measure-more")
+        assert await page.locator("#selection").is_hidden(), (where, "details stayed open")
+    else:
+        assert "occupancy" in await page.locator("#selection").inner_text(), where
     await press("#measure-distance")
     await pick("A")
     await pick("B")
@@ -140,17 +169,22 @@ async def check(browser, engine, width, height, touch, theme):
     assert "90.00" in await page.locator("#distance").inner_text(), where
     await press("#clear")
     await press("#measure-info")
+    assert await shown_tool() == "pairs", (where, "picking replaced the tool")
 
-    # Every tab; additions and edits.
+    # Every tool opens in the same window outline (tracked); additions and edits.
     for mode in ["extent", "sites", "lattice", "export", "pairs"]:
         await press("#mode-" + mode)
-        assert await pane_scroll() == 0, (where, "tab did not open at its top", mode)
+        assert await shown_tool() == mode, (where, mode)
     await press("#add-rule")
-    cutoff = page.locator("[data-field=cutoff]").first
+    cutoff = page.locator("[data-field=cutoff]").last
+    sub = await page.locator(".pair-rule:last-child .pair-sub").bounding_box()
     await cutoff.click()
     await expect_attr(cutoff, "aria-expanded", "true", where)
+    # The tuner covers the row under the field instead of pushing it down.
+    assert same(list((await page.locator(".pair-rule:last-child .pair-sub").bounding_box()).values()), list(sub.values())), where
     await page.keyboard.press("Escape")
     await expect_attr(cutoff, "aria-expanded", "false", where)
+    assert await shown_tool() == "pairs", (where, "Escape in the cutoff closed the window")
     await cutoff.fill("2.1")
     await cutoff.press("Tab")
     assert float(await cutoff.input_value()) == 2.1, where
@@ -168,30 +202,22 @@ async def check(browser, engine, width, height, touch, theme):
     await uvw.fill("1 1 0")
     await uvw.press("Tab")
 
-    # Genuine scrolling of the panel; the tab bar (and phone pick strip) stay.
-    strip = await page.locator("#atom-info").bounding_box() if phone else None
-    await scroll_panel(400)
-    scrolled = await pane_scroll()
-    room = await page.locator("aside").evaluate("el => el.scrollHeight - el.clientHeight")
-    assert scrolled > 0 and (scrolled > 50 or scrolled >= room - 1), (where, "panel did not scroll", scrolled, room)
-    if phone:
-        assert same(list((await page.locator("#atom-info").bounding_box()).values()), list(strip.values())), where
-        assert await page.evaluate("""() => {
-          const nav = document.querySelector('.mode-bar').getBoundingClientRect();
-          const strip = document.querySelector('#atom-info').getBoundingClientRect();
-          return [nav.bottom + 4, strip.bottom + 4].every(y =>
-            [strip.left + 1, strip.right - 1].every(x =>
-              { const hit = document.elementFromPoint(x, y);
-                return hit?.closest('#inspector-header') || hit?.matches('aside'); }));
-        }"""), (where, "sticky gaps expose scrolled controls")
+    # Genuine scrolling inside the tool window; the window outline stays.
+    await scroll_window(400)
+    scrolled = await window_scroll()
+    room = await page.locator(WINDOW + " .tool-window-body").evaluate("el => el.scrollHeight - el.clientHeight")
+    assert scrolled > 0 and (scrolled > 50 or scrolled >= room - 1), (where, "window did not scroll", scrolled, room)
     await pick("A")
-    assert abs(await pane_scroll() - scrolled) < 1, (where, "pick scrolled the panel")
-    if phone:
-        assert "A" in await page.locator("#atom-info").inner_text(), where
+    assert abs(await window_scroll() - scrolled) < 1, (where, "pick scrolled the tool window")
+    assert await shown_tool() == "lattice", (where, "pick replaced the tool")
+    # Each tool returns with its own scroll position.
+    await press("#mode-pairs")
+    await press("#mode-lattice")
+    assert abs(await window_scroll() - scrolled) < 1, (where, "Lattice lost its scroll position")
 
-    # Style opens at its header, which is not hidden under pinned bars.
+    # Style opens at its header, which is not hidden.
     await press("#style-open")
-    assert await page.evaluate(HITS, ["#style-title", None]), (where, "Style header hidden")
+    assert await page.evaluate(HITS, ["#style-pick", None]), (where, "Style controls hidden")
 
     # Turn: fully usable, Escape restores focus, a press outside closes it.
     await press("#turn-open")
@@ -212,26 +238,29 @@ async def check(browser, engine, width, height, touch, theme):
     frames = await page.evaluate("() => { window.__recording = false; return window.__frames; }")
     assert len(frames) > 20, (where, len(frames))
     for i, frame in enumerate(frames):
-        for selector in TRACKED:
+        for selector in tracked:
             assert same(frame[selector], baseline[selector]), (where, "frame", i, selector, frame[selector], baseline[selector])
 
-    # Resize / orientation round trip: fills the new window, then returns.
+    # Resize / orientation round trip: fills the new window, keeps the tool
+    # and its window, then returns to exactly the same layout.
     await page.set_viewport_size({"width": height, "height": width})
     await page.wait_for_timeout(300)
-    turned = await page.evaluate(RECTS, TRACKED)
+    turned = await page.evaluate(RECTS, ["canvas", WINDOW])
     assert await page.evaluate(NO_PAGE_SCROLL), (where, "page scrolled after rotation")
     canvas = turned["canvas"]
     assert canvas[0] >= 0 and canvas[1] >= 0 and canvas[0] + canvas[2] <= height + 1 and canvas[1] + canvas[3] <= width + 1, (where, canvas)
-    assert await page.evaluate(HITS, [".mode-bar", None]), (where, "tabs hidden after rotation")
+    win = turned[WINDOW]
+    assert win[0] >= -1 and win[1] >= -1 and win[0] + win[2] <= height + 1 and win[1] + win[3] <= width + 1, (where, "window off screen", win)
+    assert await shown_tool() == "style", (where, "rotation changed the tool")
     await page.set_viewport_size({"width": width, "height": height})
     await page.wait_for_timeout(300)
-    back = await page.evaluate(RECTS, TRACKED)
-    for selector in TRACKED:
+    back = await page.evaluate(RECTS, tracked)
+    for selector in tracked:
         assert same(back[selector], baseline[selector]), (where, "after rotation", selector, back[selector], baseline[selector])
 
     assert not errors, (where, errors)
     await context.close()
-    print(f"{where}: {len(frames)} frames, canvas {baseline['canvas'][2]:.0f}×{baseline['canvas'][3]:.0f} fixed")
+    print(f"{where}: {len(frames)} frames, canvas {baseline['canvas'][2]:.0f}×{baseline['canvas'][3]:.0f} and tool window fixed")
 
 
 async def expect_attr(locator, name, value, where):
@@ -243,7 +272,8 @@ async def expect_attr(locator, name, value, where):
 
 
 async def check_landscape_legend(browser, engine, theme):
-    """A three-element legend stays usable beside Size on a landscape phone."""
+    """A three-element legend stays usable beside Size on a landscape phone,
+    with the side sheet open."""
     page = await browser.new_page(
         viewport={"width": 844, "height": 390}, has_touch=True, is_mobile=True
     )
@@ -254,12 +284,17 @@ async def check_landscape_legend(browser, engine, theme):
         timeout=45000,
     )
     await page.evaluate("new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))")
+    from smoke import choose_tool
+    await choose_tool(page, "#mode-pairs", True)
     toolbar = await page.locator(".view-directions").bounding_box()
     reset = await page.locator("#reset").bounding_box()
     assert reset["x"] >= toolbar["x"] and reset["x"] + reset["width"] <= toolbar["x"] + toolbar["width"] + 1
     assert toolbar["height"] <= 56, (engine, theme, "toolbar wrapped", toolbar)
-    before = await page.evaluate(RECTS, TRACKED)
+    sheet = await page.locator(WINDOW).bounding_box()
+    tracked = ["#viewport", "canvas", "#tools-menu", WINDOW, "#measure-info", "#clear"]
+    before = await page.evaluate(RECTS, tracked)
     size_box = await page.locator(".size-control").bounding_box()
+    assert size_box["y"] >= sheet["y"] + sheet["height"], (engine, theme, "Size under the side sheet")
     for element in ["Mg", "Si", "O"]:
         chip = page.locator(f'[data-element="{element}"]')
         await chip.scroll_into_view_if_needed()
@@ -271,11 +306,11 @@ async def check_landscape_legend(browser, engine, theme):
         assert same(list(current_size.values()), list(size_box.values())), (engine, theme, "Size moved after element toggle")
         await chip.tap()
         await expect_attr(chip, "aria-pressed", "true", (engine, theme, element))
-    after = await page.evaluate(RECTS, TRACKED)
-    assert all(same(before[s], after[s]) for s in TRACKED), (engine, theme, "legend changed bounds")
+    after = await page.evaluate(RECTS, tracked)
+    assert all(same(before[s], after[s]) for s in tracked), (engine, theme, "legend changed bounds")
     assert await page.evaluate(NO_PAGE_SCROLL), (engine, theme, "legend scrolled page")
     await page.close()
-    print(f"{engine} 844×390 {theme}: wrapped toolbar and all element toggles usable")
+    print(f"{engine} 844×390 {theme}: toolbar on one row, legend usable beside the side sheet")
 
 
 async def main():

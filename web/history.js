@@ -21,6 +21,14 @@ export function createHistory({ limit = 100, equal = (a, b) => JSON.stringify(a)
       future = [];
       return true;
     },
+    // Non-edit UI layout may refit the camera. Keep the present state in
+    // sync without creating a step or discarding a pending redo branch.
+    amend(fields) {
+      if (current === null) return;
+      current = { ...current, ...clone(fields) };
+      if (past.length) past.at(-1).after = current;
+      if (future.length) future.at(-1).before = current;
+    },
     // Apply first: a failed restoration must not advance the history cursor.
     undo(apply) {
       const entry = past.at(-1);

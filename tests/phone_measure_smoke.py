@@ -1,10 +1,11 @@
 """Phone (390×844, touch): a completed distance/angle measurement keeps the
-selected atoms unobscured and its result visible, while a long sidebar
-(Lattice with a plane and an arrow, Sites, Export, Style) is open."""
+selected atoms unobscured and its result visible, while a tool sheet
+(Lattice with a plane and an arrow, Sites, Export, Style) is open; the full
+lines open with Details."""
 
 import asyncio
 from playwright.async_api import async_playwright
-from smoke import URL, diagnostics, settle
+from smoke import URL, choose_tool, diagnostics, settle
 
 CIF = """data_angle
 _cell_length_a 4
@@ -48,14 +49,24 @@ async def check(browser, theme, mode):
         {"name": "angle.cif", "mimeType": "text/plain", "buffer": CIF.encode()}
     )
     await page.wait_for_function("window.viewerDiagnostics().block==='angle'")
+    await page.locator("#view-c").tap()
+    await choose_tool(page, "#mode-pairs", True)
+    box = await page.locator("#tool-window-pairs").bounding_box()
+    await page.locator('#tool-window-pairs [data-action=close]').tap()
+    atom = next(a for a in (await diagnostics(page))["atoms"] if a["label"] == "B")
+    await page.mouse.move(120, atom["y"])
+    await page.mouse.down(button="right")
+    await page.mouse.move(120, box["y"] - 80, steps=8)
+    await page.mouse.up(button="right")
+    await settle(page)
     if mode == "lattice":
-        await page.locator("#mode-lattice").tap()
+        await choose_tool(page, "#mode-lattice", True)
         await page.locator("#plane-add").tap()
         await page.locator("#arrow-add").tap()
     elif mode == "style":
-        await page.locator("#style-open").tap()
+        await choose_tool(page, "#style-open", True)
     else:
-        await page.locator(f"#mode-{mode}").tap()
+        await choose_tool(page, f"#mode-{mode}", True)
     for measure, labels, value in (
         ("angle", "ABC", "90.00"),
         ("distance", "AB", "1.4000"),
@@ -88,15 +99,20 @@ async def check(browser, theme, mode):
             and box["x"] + box["width"] <= 390
             and 0 <= box["y"] < 844 * 0.5
         ), box
-        # Details in the panel below.
-        details = page.locator("#atom-info")
+        # Full lines on demand (Details), bounded and closed again.
+        await page.locator("#measure-more").tap()
+        details = page.locator("#selection")
         assert await details.is_visible()
-        assert value in await details.inner_text()
-        # No overlay covers a selected atom.
+        text = await details.inner_text()
+        assert all(label in text for label in labels), text
+        await page.locator("#measure-more").tap()
+        assert await details.is_hidden()
+        # No overlay or tool sheet covers a selected atom.
         overlay = await page.locator("#measure-overlay").bounding_box()
         toolbar = await page.locator(".view-directions").bounding_box()
+        sheet = await page.locator("#tool-layer .tool-window:not([hidden])").bounding_box()
         for atom in (a for a in d["atoms"] if a["label"] in labels):
-            for name, rect in (("measurement", overlay), ("toolbar", toolbar)):
+            for name, rect in (("measurement", overlay), ("toolbar", toolbar), ("sheet", sheet)):
                 assert not inside(rect, atom["x"], atom["y"], MARGIN), (
                     mode,
                     measure,

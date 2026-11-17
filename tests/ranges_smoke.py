@@ -7,7 +7,7 @@ import math
 import os
 from pathlib import Path
 from playwright.async_api import async_playwright
-from smoke import URL, HERE, diagnostics, settle
+from smoke import URL, HERE, diagnostics, settle, choose_tool
 from coordination_smoke import click_control
 
 
@@ -46,6 +46,7 @@ async def run(browser_type, touch):
     # The public example is a real teaching CIF, not a synthetic chain.
     assert "wollaston" in (await diagnostics(page))["block"].lower()
     await click_control(page, page.locator("#measure-distance"), touch)
+    await choose_tool(page, "#mode-pairs")
     rows = page.locator("#pair-rules .pair-rule")
     while await rows.count():
         await click_control(page, rows.first.locator('button[aria-label^="Delete "]'), touch)
@@ -54,7 +55,9 @@ async def run(browser_type, touch):
     await row.locator('[data-field="center"]').select_option("Si")
     await row.locator('[data-field="neighbor"]').select_option("O")
     await row.locator('[data-field="cutoff"]').fill("1.8")
-    await row.locator('[data-field="cutoff"]').dispatch_event("change")
+    # Enter commits the typed cutoff and closes its tuner (which covers the
+    # Bonds/Polyhedra row while open).
+    await row.locator('[data-field="cutoff"]').press("Enter")
     if not await row.locator('[data-field="polyhedra"]').is_checked():
         await click_control(page, row.locator('[data-field="polyhedra"]'), touch)
     if not await page.locator("#polyhedra-only").is_checked():

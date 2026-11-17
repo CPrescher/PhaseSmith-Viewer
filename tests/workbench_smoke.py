@@ -2,7 +2,7 @@
 
 import asyncio
 from playwright.async_api import async_playwright, expect
-from smoke import HERE, URL, diagnostics, pair, settle
+from smoke import HERE, URL, choose_tool, diagnostics, pair, settle
 
 
 async def on_screen(control):
@@ -16,7 +16,7 @@ async def on_screen(control):
 
 async def check_panel_widths(page):
     clipped = await page.evaluate("""() => [...document.querySelectorAll(
-      'aside, .pair-rule, .view-top, .view-bottom'
+      '.tool-window-body, .pair-rule, .view-top, .view-bottom'
     )].filter(el => el.scrollWidth > el.clientWidth + 1).map(el => el.className || el.tagName)""")
     assert not clipped, f"Controls overflow horizontally: {clipped}"
 
@@ -38,6 +38,7 @@ async def check(browser, width, height):
     assert dimensions["width"] <= width + 1 and dimensions["height"] <= height + 1, (
         dimensions
     )
+    await choose_tool(page, "#mode-pairs")
     await check_panel_widths(page)
     canvas = dimensions["canvas"]
     assert canvas["height"] >= height * 0.42 and canvas["width"] >= width * 0.49, canvas
@@ -53,16 +54,17 @@ async def check(browser, width, height):
     sliders = page.locator('[data-field="opacity"]')
     assert await sliders.count() == 2
     for i in range(2):
+        await sliders.nth(i).scroll_into_view_if_needed()
         assert await on_screen(sliders.nth(i)), (width, height, "opacity", i)
-    # A portrait dock grows upward when the tuner opens. Its new buttons
-    # must not receive the compatibility click from the opening touch.
+    # Opening a tuner by touch must not let the compatibility click land on
+    # one of its buttons (it opens in place of the row under the field).
     fields = page.locator('[data-field="cutoff"]')
     for index in [0, 1]:
         await fields.nth(index).tap()
         await expect(fields.nth(index)).to_have_attribute("aria-expanded", "true", timeout=1500)
         assert [float(await fields.nth(i).input_value()) for i in (0, 1)] == [1.8, 2.3]
     await page.locator(".cutoff-tuner:visible .done-button").tap()
-    await page.locator("#mode-extent").tap()
+    await choose_tool(page, "#mode-extent", True)
     for selector in ["#range-b-max", "#range-c-max", '#range-form button[type="submit"]']:
         assert await on_screen(page.locator(selector)), (width, height, selector)
     await page.locator("#range-b-max").fill("2")
@@ -89,10 +91,13 @@ async def check_phone(browser):
     assert await page.evaluate("document.scrollingElement.scrollWidth === innerWidth")
     assert await page.evaluate("document.scrollingElement.scrollHeight === innerHeight")
     # The forsterite example starts with boundary copies hidden.
-    await page.locator("#mode-extent").tap()
+    await choose_tool(page, "#mode-extent", True)
     if not await page.locator("#boundary").is_checked():
         await page.locator("#boundary").tap()
         await settle(page)
+    # Close the sheet: the crystal takes the whole view again for picking.
+    await page.locator("#tool-window-extent [data-action=close]").tap()
+    await settle(page)
     await page.locator("#measure-distance").tap()
     await settle(page)
     for atom in await pair(page):

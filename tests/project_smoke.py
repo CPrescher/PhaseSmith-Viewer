@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 from playwright.async_api import async_playwright
-from smoke import URL, HERE, diagnostics
+from smoke import URL, HERE, diagnostics, choose_tool
 from history_smoke import idle, equivalent
 
 
@@ -32,29 +32,31 @@ async def check(browser, phone):
     await page.locator("#block").select_option("second")
     await page.wait_for_function("viewerDiagnostics().block === 'second' && viewerDiagnostics().history.ready")
     await idle(page)
+    await choose_tool(page, "#mode-pairs")
     await page.locator("#add-rule").click()
     cutoff = page.locator('#pair-rules input[data-field="cutoff"]').first
     await cutoff.fill("5.2")
     await cutoff.dispatch_event("change")
-    await page.locator("#mode-lattice").click()
+    await choose_tool(page, "#mode-lattice")
     await page.locator("#plane-add").click()
     await page.locator("#arrow-add").click()
     await page.locator("#lattice-label-offsets").uncheck()
-    await page.locator("#style-open").click()
+    await choose_tool(page, "#style-open")
     await page.locator("#style-target").select_option("element:Na")
     await page.locator("#style-swatches button:last-child").click()
-    await page.locator("#mode-sites").click()
+    await choose_tool(page, "#mode-sites")
     await page.locator("#labels-toggle").check()
     await page.locator("#measure-distance").click()
     await idle(page)
-    atom = next(a for a in (await diagnostics(page))["atoms"]
-                if 70 < a["x"] < (300 if phone else 1000) and 170 < a["y"] < (350 if phone else 650))
+    await page.locator("#tool-window-sites [data-action=close]").click()
+    atom = await page.evaluate("viewerDiagnostics().atoms.find(a => a.visible && document.elementFromPoint(a.x, a.y)?.tagName === 'CANVAS')")
+    assert atom, "No exposed atom available for the measurement"
     await page.mouse.click(atom["x"], atom["y"])
     await idle(page)
     assert (await diagnostics(page))["history"]["snapshot"]["measure"]["keys"]
     await page.locator("#view-a").click()
     await page.locator("#theme-toggle").click()
-    await page.locator("#mode-export").click()
+    await choose_tool(page, "#mode-export")
     await page.locator("#export-dpi").fill("450")
     await page.locator("#export-transparent").check()
     await idle(page)
@@ -76,7 +78,7 @@ async def check(browser, phone):
     page.on("pageerror", lambda e: errors.append(str(e)))
     await page.goto(URL + "/?example=forsterite")
     await page.wait_for_function("window.viewerDiagnostics?.().history.ready")
-    await page.locator("#mode-export").click()
+    await choose_tool(page, "#mode-export")
     async with page.expect_file_chooser() as chooser:
         await page.locator("#project-open").click()
     await (await chooser.value).set_files({"name": "shared.PSV", "mimeType": "application/json", "buffer": data})

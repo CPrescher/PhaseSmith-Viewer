@@ -41,6 +41,24 @@ const IDENTITY = [
 export const toCartesian = (basis, frac) => matVec(basis, frac);
 
 // ---- Index parsing ----------------------------------------------------------
+/** Miller indices accept signed decimal integers, with spaces required for
+ *  multi-digit indices. Three compact single-digit indices are unambiguous. */
+export function parseMillerIndices(text) {
+  const t = String(text).replace(/−/g, "-").trim();
+  if (!/^[0-9 -]+$/.test(t))
+    throw Error("Use digits, spaces and minus signs for h k l.");
+  if (!t.includes(" ") && (t.match(/\d/g)?.length ?? 0) > 3)
+    throw Error("Separate multi-digit indices with spaces, e.g. 12 3 4.");
+  if (!/^-?\d-?\d-?\d$/.test(t) && !/^-?\d+ +-?\d+ +-?\d+$/.test(t))
+    throw Error("Enter three indices, e.g. 1 1 0 or 1 -1 0.");
+  const values = parseTriple(t, { integer: true });
+  if (!values.every(Number.isSafeInteger))
+    throw Error("Miller indices are too large.");
+  if (values.every((v) => v === 0))
+    throw Error("Miller indices must not all be zero.");
+  return values;
+}
+
 /** "1 -1 0", "1,-1,0", "[1-10]", "(110)" → three numbers; compact form only
  *  for three single digits. */
 export function parseTriple(text, { integer = false, label = "indices" } = {}) {

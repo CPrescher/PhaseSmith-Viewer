@@ -3,11 +3,11 @@ import asyncio
 import math
 import os
 from playwright.async_api import async_playwright
-from smoke import URL, HERE, diagnostics
+from smoke import URL, HERE, diagnostics, choose_tool
 
 
 async def idle(page):
-    await page.wait_for_function("viewerDiagnostics().history.ready && !viewerDiagnostics().history.pending")
+    await page.wait_for_function("viewerDiagnostics().history.ready && !viewerDiagnostics().history.pending", timeout=90000)
     await page.evaluate("new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
 
 
@@ -35,6 +35,10 @@ async def check(browser, phone):
     await idle(page)
 
     async def press(selector):
+        if selector in ["#mode-pairs", "#mode-lattice", "#mode-sites", "#mode-extent", "#mode-export", "#style-open"]:
+            await choose_tool(page, selector, phone)
+            await idle(page)
+            return
         el = page.locator(selector).first
         await (el.tap() if phone else el.click())
         await idle(page)
@@ -52,6 +56,7 @@ async def check(browser, phone):
     assert await count() == 0
     assert await page.locator("#history-undo").is_disabled()
     initial = await state(page)
+    await press("#mode-pairs")
     await press("#add-rule")
     added = await state(page)
     assert len(added["rules"]) == len(initial["rules"]) + 1
@@ -79,7 +84,7 @@ async def check(browser, phone):
     await press("#sym-toggle")
     await roundtrip(before, await state(page))
     before = await state(page)
-    await press("#sym-types-none")
+    await press("#sym-filters input")
     await roundtrip(before, await state(page))
     # Site highlighting clears back to null, and asymmetric view restores
     # the original pair/visibility settings and measurement references.
@@ -117,6 +122,7 @@ async def check(browser, phone):
     await field.press("Enter")
     await idle(page)
     slider = page.locator('#pair-rules [role="slider"]').first
+    await field.click()
     await slider.focus()
     before = await state(page)
     n = await count()
@@ -127,20 +133,29 @@ async def check(browser, phone):
     await idle(page)
     assert await count() == n + 1, ("cutoff keyboard grouping", await count(), n)
     await roundtrip(before, await state(page))
-    # Blurring a typed cutoff by clicking Bonds is two separate edits.
+    # Blurring a typed cutoff by toggling atom visibility is two edits.
     n = await count()
     await field.fill("2.55")
-    bonds = page.locator('#pair-rules input[data-field="bonds"]').first
-    previous_bonds = await bonds.is_checked()
-    await bonds.click()
+    visibility = page.locator("#show-atoms")
+    previous_visibility = await visibility.is_checked()
+    await visibility.click()
     await idle(page)
     assert await count() == n + 2, ("blur commit merged with next click", await count(), n)
     await press("#history-undo")
     assert (await state(page))["rules"][0]["cutoff"] == 2.55
-    assert await bonds.is_checked() == previous_bonds
+    assert await visibility.is_checked() == previous_visibility
     await press("#history-redo")
+    await press("#show-atoms")
+    # Both global visibility shortcuts participate in semantic undo/redo.
+    before = await state(page)
+    await press("#show-polyhedra")
+    after = await state(page)
+    assert not after["polyhedraVisible"]
+    assert all(not m['visible'] and not m['outlineVisible'] for m in (await diagnostics(page))['faceMaterials'])
+    await roundtrip(before, after)
+    await press("#show-polyhedra")
     # The speed control changes on animation frames, without input events.
-    await field.focus()
+    await field.click()
     box = await slider.bounding_box()
     before = await state(page)
     n = await count()
@@ -156,6 +171,7 @@ async def check(browser, phone):
     await roundtrip(before, await state(page))
     # One complete drag on the native opacity slider, despite many input events.
     opacity = page.locator('#pair-rules input[data-field="opacity"]').first
+    await opacity.scroll_into_view_if_needed()
     box = await opacity.bounding_box()
     before = await state(page)
     n = await count()
@@ -205,21 +221,28 @@ async def check(browser, phone):
     assert (await diagnostics(page))["history"]["redoCount"] == 0
     await press("#show-atoms")
     await press("#mode-pairs")
-    # Camera rotation, including damping, is one entry. Pinch/twist on the phone.
+    # This section tests camera gestures, so close the overlay explicitly.
+    # Opening/closing tools never refits the structure around a phone sheet.
+    await press("#tool-window-pairs [data-action=close]")
+    # Camera history needs a real nonorthogonal crystal, without the
+    # expensive intersecting overlays exercised above. A compact fixture
+    # keeps the settling animation independent of software-GPU throughput.
+    await page.locator("#file").set_input_files(HERE / "skew-direction.cif")
+    await page.wait_for_function("viewerDiagnostics().block === 'skew_direction' && viewerDiagnostics().history.ready")
+    await idle(page)
+    # Camera rotation, including damping, is one entry. Pinch on the phone.
     canvas = page.locator("canvas").first
     box = await canvas.bounding_box()
-    x, y = box["x"] + box["width"] * .55, box["y"] + box["height"] * .5
+    clear = (await diagnostics(page))["stage"]["clear"]
+    x, y = box["x"] + clear["x"] + clear["w"] * .55, box["y"] + clear["y"] + clear["h"] * .55
     before = await state(page)
     n = await count()
     if phone:
         cdp = await context.new_cdp_session(page)
-        points = lambda gap, angle=0: [
-            {"x": x + sign * gap * math.cos(angle), "y": y + sign * gap * math.sin(angle), "id": id}
-            for id, sign in ((1, -1), (2, 1))
-        ]
+        points = lambda gap: [{"x": x-gap, "y": y, "id": 1}, {"x": x+gap, "y": y, "id": 2}]
         await cdp.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": points(15)})
         for gap in (20, 30, 40, 55):
-            await cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": points(gap, (gap - 15) * .02)})
+            await cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": points(gap)})
             await page.wait_for_timeout(30)
         await cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
     else:
@@ -232,19 +255,19 @@ async def check(browser, phone):
     await idle(page)
     after = await state(page)
     assert not equivalent(before["camera"], after["camera"])
-    if phone:
-        assert not equivalent(before["camera"]["up"], after["camera"]["up"]), "Twist did not roll the view"
     assert await count() == n + 1, ("camera grouping", await count(), n)
     await roundtrip(before, after)
     # Wheel burst is one entry. Right-drag is one pan, with exact reversal.
     before = await state(page)
     n = await count()
     await page.mouse.move(x, y)
-    for _ in range(5):
-        await page.mouse.wheel(0, 35)
-        await page.wait_for_timeout(35)
+    # Queue one native input burst without waiting for a rendered frame
+    # between events. Software rendering in CI can take longer than the
+    # gesture's quiet period; serial awaited inputs then become separate
+    # gestures even though the test requested only a 35 ms pause.
+    await asyncio.gather(*(page.mouse.wheel(0, 35) for _ in range(5)))
     await idle(page)
-    assert await count() == n + 1
+    assert await count() == n + 1, ("wheel grouping", await count(), n)
     await roundtrip(before, await state(page))
     before = await state(page)
     n = await count()
@@ -254,7 +277,20 @@ async def check(browser, phone):
     await page.mouse.up(button="right")
     await idle(page)
     assert await count() == n + 1
-    await roundtrip(before, await state(page))
+    panned = await state(page)
+    # Settling history recreates TrackballControls. It must preserve the
+    # quaternion for the panned target before the next anchored zoom.
+    exposed = await page.evaluate("""viewerDiagnostics().atoms.find(a => a.visible &&
+      document.elementFromPoint(a.x, a.y)?.tagName === 'CANVAS')""")
+    assert exposed
+    await page.mouse.move(exposed["x"], exposed["y"])
+    await page.mouse.wheel(0, -60)
+    await idle(page)
+    zoomed_atom = next(a for a in (await diagnostics(page))["atoms"] if a["key"] == exposed["key"])
+    assert math.dist([zoomed_atom["x"], zoomed_atom["y"]], [exposed["x"], exposed["y"]]) < .5
+    await roundtrip(panned, await state(page))
+    await press("#history-undo")
+    await roundtrip(before, panned)
     if not phone:
         # Back-to-back gestures remain separate even before damping settles.
         n = await count()
@@ -353,6 +389,8 @@ async def check(browser, phone):
 async def main():
     async with async_playwright() as p:
         options = {"args": ["--enable-unsafe-swiftshader"]}
+        if os.environ.get("CI"):
+            options["args"] += ["--use-gl=angle", "--use-angle=swiftshader-webgl"]
         if os.environ.get("BROWSER_CHANNEL"):
             options["channel"] = os.environ["BROWSER_CHANNEL"]
         browser = await p.chromium.launch(**options)

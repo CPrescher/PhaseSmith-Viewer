@@ -4,7 +4,7 @@ import asyncio
 import os
 from pathlib import Path
 from playwright.async_api import async_playwright
-from smoke import URL, diagnostics, settle
+from smoke import URL, choose_tool, diagnostics, settle
 
 
 async def main():
@@ -22,6 +22,7 @@ async def main():
             page.on("pageerror", lambda error: errors.append(str(error)))
             await page.goto(URL + "/?example=forsterite")
             await page.wait_for_function("window.viewerDiagnostics?.().coordination.polyhedronCount === 12")
+            await choose_tool(page, "#mode-pairs")
             await page.locator("#add-rule").click()
             row = page.locator(".pair-rule").last
             center = row.locator("[data-field=center]")
@@ -52,7 +53,7 @@ async def main():
             await page.locator(".pair-rule").first.locator(".pair-main .icon-button").click()
             state = await diagnostics(page)
             assert next(f for f in state["faceMaterials"] if f["id"] == last_id)["color"] == si_color
-            await page.locator("#mode-export").click()
+            await choose_tool(page, "#mode-export", False)
             await page.locator("#session-save").click()
             await page.wait_for_timeout(200)
             await page.reload()

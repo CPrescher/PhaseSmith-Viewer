@@ -29,6 +29,7 @@ import { createDepthPeeler } from "./peel.js";
 import { rotatedView } from "./view-rotation.js";
 import { createTurnControls } from "./turn-controls.js";
 import { createStructureLibrary, libraryEntry, libraryFilename, entryForFilename } from "./structure-library.js";
+import { createToolWindows, TOOL_IDS } from "./tool-windows.js";
 import {
   createAppearance,
   clearAppearance,
@@ -76,6 +77,9 @@ function initialize() {
   // A perspective control camera supplies intuitive distance-based zoom;
   // the synchronized parallel camera renders and picks the crystal.
   const viewCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10000);
+  // Tool windows overlay the view. Opening, switching, moving or closing
+  // a tool never changes the camera or the projected atom positions.
+  const stage = { x: 0, y: 0, clear: null };
   function syncViewCamera() {
     const halfHeight =
       camera.position.distanceTo(controls.target) *
@@ -140,8 +144,13 @@ function initialize() {
   function stopMotion() {
     const { minDistance, maxDistance } = controls;
     const target = controls.target.clone();
+    const orientation = camera.quaternion.clone();
     controls.dispose();
     controls = createControls(target);
+    // Trackball's constructor temporarily looks at the origin. Preserve
+    // the real pose so a rapid pick after panning uses the same camera,
+    // even before the next animation frame updates the new controls.
+    camera.quaternion.copy(orientation);
     controls.minDistance = minDistance;
     controls.maxDistance = maxDistance;
   }
@@ -439,8 +448,7 @@ function initialize() {
   const scenePalette = () =>
     SCENE_PALETTES[document.documentElement.dataset.theme === "light" ? "light" : "dark"];
   const appearance = createAppearance();
-  let styleEditor = null,
-    sidebarMode = "pairs";
+  let styleEditor = null;
   // Element-wide colour (used by the element chips and as the inherited
   // value for individual atoms).
   const colorFor = (e) => appearance.elements.get(e)?.color ?? defaultColor(e);
@@ -918,8 +926,8 @@ function initialize() {
         cutoff.append(cutoffCaption, inputs.cutoff);
         const main = make("div", { className: "pair-main" });
         main.append(inputs.center, dash, inputs.neighbor, cutoff, remove);
-        // Cutoff tuner: opens directly below the field with a spring-loaded
-        // speed track and exact ±0.1 Å buttons. A first touch opens it
+        // Cutoff tuner: opens over the row below the field with a
+        // spring-loaded speed track and exact ±0.1 Å buttons. A first touch opens it
         // without raising the software keyboard; a second tap focuses the
         // field for exact typing.
         const field = inputs.cutoff;
@@ -933,7 +941,7 @@ function initialize() {
         track.dataset.field = "cutoff-speed";
         track.setAttribute("role", "slider");
         const hint = make("p", {
-          className: "tuner-hint",
+          className: "tuner-hint sr-only",
           id: `pair-cutoff-hint-${rule.id}`,
           textContent: "Hold & drag · farther = faster · ←/→ ±0.01 Å",
         });
@@ -950,7 +958,10 @@ function initialize() {
         }
         knob.setAttribute("aria-hidden", "true");
         fill.setAttribute("aria-hidden", "true");
-        track.append(fill, knob);
+        const trackHint = make("span", { className: "speed-caption", textContent: "hold & drag" });
+        trackHint.setAttribute("aria-hidden", "true");
+        track.title = hint.textContent;
+        track.append(trackHint, fill, knob);
         const stepButton = (sign) => {
           const button = make("button", {
             type: "button",
@@ -1101,10 +1112,10 @@ function initialize() {
         // when the field already has focus (e.g. after Done).
         //
         // Touch/pen: the tuner opens only once this tap's click has been
-        // delivered to the field. Opening at pointerdown grew the portrait
-        // dock under the finger, so the compatibility click landed on the
-        // newly exposed "+" and changed the cutoff. Long holds without a
-        // click open after a clean release; pans and cancels never open.
+        // delivered to the field, so the compatibility click can never land
+        // on a control the opening tuner put under the finger. Long holds
+        // without a click open after a clean release; pans and cancels
+        // never open.
         let touchOpen = null;
         const openFromTouch = () => {
           if (!touchOpen) return;
@@ -1142,7 +1153,14 @@ function initialize() {
             const typed = parseCutoff(field.value) ?? rule.cutoff;
             openTuner();
             setCutoff(stepCutoff(typed, e.key === "ArrowUp" ? 1 : -1), true);
-          } else if (e.key === "Escape") tuner.close();
+          } else if (e.key === "Escape" && !tuner.hidden) {
+            e.preventDefault(); // the tuner, not the Pairs window
+            tuner.close();
+          } else if (e.key === "Enter" && !tuner.hidden) {
+            // Typed value committed (change follows): the row under the
+            // field returns, so Bonds/Polyhedra/Opacity are one tap away.
+            tuner.close();
+          }
         });
         // Returning focus to the field after Done/Escape must not reopen it.
         const closeAndRefocus = () => {
@@ -1153,7 +1171,10 @@ function initialize() {
         };
         done.onclick = closeAndRefocus;
         tuner.addEventListener("keydown", (e) => {
-          if (e.key === "Escape") closeAndRefocus();
+          if (e.key === "Escape") {
+            e.preventDefault();
+            closeAndRefocus();
+          }
         });
         // Keyboard focus leaving the pair closes the tuner. Pointer presses
         // are handled by the deferred outside-press logic instead, so the
@@ -1236,6 +1257,7 @@ function initialize() {
         function label() {
           const name = pairName(rule);
           card.setAttribute("aria-label", `${name} pair`);
+          card.dataset.tuneName = `${name} pair`;
           inputs.center.setAttribute("aria-label", `${name} center element`);
           inputs.neighbor.setAttribute("aria-label", `${name} neighbor element`);
           inputs.cutoff.setAttribute(
@@ -1260,7 +1282,13 @@ function initialize() {
         }
         label();
         card.classList.toggle("no-faces", !rule.polyhedra);
-        card.append(main, tuner, sub, counts);
+        // The tuner opens in place of the Bonds/Polyhedra/Opacity row, in
+        // one shared grid cell: the card keeps its height, nothing below
+        // moves and the counts stay visible while the cutoff changes.
+        const slot = make("div", { className: "pair-slot" });
+        slot.append(sub, tuner);
+        card.dataset.tuneItem = `rule:${rule.id}`;
+        card.append(main, slot, counts);
         return card;
       }),
     );
@@ -1305,7 +1333,7 @@ function initialize() {
     invalidate();
   }
   function setFaceOpacity(mesh, opacity) {
-    mesh.visible = opacity > 0;
+    mesh.visible = $("show-polyhedra").checked && opacity > 0;
     mesh.material.opacity = opacity;
     const transparencyChanged = mesh.material.transparent !== opacity < 1;
     mesh.material.transparent = opacity < 1;
@@ -1337,6 +1365,14 @@ function initialize() {
     invalidate();
   }
   $("show-atoms").onchange = updateAtomVisibility;
+  $("show-polyhedra").onchange = () => {
+    for (const mesh of faceMeshes.values()) {
+      mesh.visible = $("show-polyhedra").checked && mesh.material.opacity > 0;
+      if (mesh.userData.outline) mesh.userData.outline.visible = $("show-polyhedra").checked;
+    }
+    updatePickMarker();
+    invalidate();
+  };
   // Central atom key → [{ pair, coordination, volume }] for inspection.
   const polyInfo = new Map();
   function buildCoordination() {
@@ -1574,6 +1610,7 @@ function initialize() {
             opacity: 0.9,
           }),
         );
+        outline.visible = $("show-polyhedra").checked;
         faces.userData.outline = outline;
         model.add(outline);
       }
@@ -1770,16 +1807,24 @@ function initialize() {
     }
     orient(fields.map(Number));
   };
-  // Fit room: only the view toolbar (top) and the atom bar (bottom) span the
-  // crystal's column; the measurement card and compass sit beside it.
+  // Fit uses the full canvas and fixed-size view controls, independently
+  // of which overlay is open. Only explicit view actions refit the model.
   function overlayReserve() {
     const view = viewport.getBoundingClientRect();
     const top = document.querySelector(".view-directions").getBoundingClientRect();
     const bottom = document.querySelector(".atoms-bar").getBoundingClientRect();
-    // The [uvw] readout sits above the legend; keep the fit clear of it.
     const readout = $("view-readout").getBoundingClientRect();
-    const bottomTop = readout.height ? Math.min(bottom.top, readout.top) : bottom.top;
-    return Math.max(top.bottom - view.top, view.bottom - bottomTop, 0) + 4;
+    const bottomTop = Math.min(bottom.top, readout.height ? readout.top : bottom.top);
+    return Math.max(top.bottom - view.top, view.bottom - bottomTop) + 4;
+  }
+  let fitPose = null;
+  function isAtFit() {
+    if (!fitPose) return false;
+    const tolerance = 1e-5 * fitPose.distance;
+    return (
+      Math.abs(camera.position.distanceTo(controls.target) - fitPose.distance) <= tolerance &&
+      controls.target.distanceTo(fitPose.target) <= tolerance
+    );
   }
   const boxCorners = (box) =>
     [0, 1, 2, 3, 4, 5, 6, 7].map(
@@ -1831,10 +1876,12 @@ function initialize() {
     halfRight = Math.max(halfRight, 0.5);
     halfUp = Math.max(halfUp, 0.5);
     // Canvas toolbars sit along the top and bottom edges; fit the crystal
-    // between them so no control covers it after a reset.
+    // between them. Settings overlays never influence this fit.
     const height = viewport.clientHeight || 1;
-    const usable = Math.max(height - 2 * overlayReserve(), height * 0.7);
-    const halfHeight = Math.max(halfUp * (height / usable), halfRight / camera.aspect) * 1.06;
+    const clear = { x: 0, y: 0, w: viewport.clientWidth || 1, h: height };
+    const usable = Math.max(clear.h - 2 * overlayReserve(), clear.h * 0.7);
+    const halfHeight =
+      Math.max(halfUp * (height / usable), halfRight * (height / Math.max(clear.w, 1))) * 1.06;
     fitDistance = halfHeight / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     stopMotion();
     if (!keepOrientation) camera.up.set(0, 1, 0);
@@ -1846,6 +1893,7 @@ function initialize() {
     camera.far = fitDistance * 100;
     camera.updateProjectionMatrix();
     controls.update();
+    fitPose = { distance: fitDistance, target: target.clone() };
     invalidate();
   }
   function updateSelection() {
@@ -1971,45 +2019,62 @@ function initialize() {
       .map((a) => `${a.label} [${a.frac.map((v) => v.toFixed(4)).join(", ")}]`)
       .join("\n");
     if (measureMode === "info" && !picking) showAtomInfo();
-    else if (selection.length && !picking) showMeasureDetails(value, angleMode, lines, selection.length < needed);
-    else showPaneHint($("selection").textContent);
+    if (!selection.length || picking) setDetailsOpen(false);
+    else boundDetails();
+    const card = $("measure-overlay").querySelector(".measure-details");
+    card.classList.toggle("overflowing", card.scrollHeight > card.clientHeight + 1);
     invalidate();
   }
-  // Phones show the pick details in a fixed-height strip pinned under the
-  // lower pane's tabs (CSS hides it elsewhere; the card over the crystal
-  // stays a narrow column). The strip is always there, with a hint when
-  // nothing is picked, so picking never resizes or scrolls the pane.
-  function showPaneHint(text) {
-    const panel = $("atom-info");
-    panel.dataset.kind = "hint";
-    panel.setAttribute("aria-label", "Selection");
-    panel.replaceChildren(Object.assign(document.createElement("span"), { className: "atom-info-hint", textContent: text }));
+  // Phones: the measurement column shows only the value (or the atom's
+  // label) under the fixed action buttons. "Details" opens the full lines
+  // as a bounded popover beside it, inside the area tool sheets leave
+  // clear; it scrolls locally and never moves another control.
+  let detailsOpen = false;
+  function setDetailsOpen(open) {
+    if (open === detailsOpen) return;
+    detailsOpen = open;
+    $("measure-more").setAttribute("aria-expanded", String(open));
+    $("measure-more").textContent = open ? "Hide" : "Details";
+    $("measure-overlay").classList.toggle("details-open", open);
+    boundDetails();
+    invalidate(); // plane labels avoid the popover
   }
-  function showMeasureDetails(value, angleMode, lines, incomplete) {
-    const unit = angleMode ? "°" : " Å";
-    const name = angleMode ? "Angle" : "Distance";
-    const panel = $("atom-info");
-    panel.dataset.kind = "measure";
-    panel.setAttribute("aria-label", `${name} measurement`);
-    panel.replaceChildren(
-      Object.assign(document.createElement("strong"), {
-        textContent: value === null ? name : `${name} ${value.toFixed(angleMode ? 2 : 4)}${unit}`,
-      }),
-      ...lines.map((line) => Object.assign(document.createElement("span"), { textContent: line })),
-      ...(incomplete
-        ? [
-            Object.assign(document.createElement("span"), {
-              className: "atom-info-hint",
-              textContent: angleMode ? (lines.length === 1 ? "Tap the vertex atom" : "Tap a third atom") : "Tap a second atom",
-            }),
-          ]
-        : []),
-    );
+  function boundDetails() {
+    const details = $("selection");
+    if (!detailsOpen || !$("measure-more").getClientRects().length) {
+      details.style.maxHeight = details.style.top = "";
+      return;
+    }
+    const view = viewport.getBoundingClientRect();
+    const clear = stage.clear ?? { y: 0, h: view.height };
+    const footer = document.querySelector(".view-bottom").getBoundingClientRect();
+    const bottom = Math.min(view.top + clear.y + clear.h, footer.height ? footer.top : view.bottom) - 8;
+    const cardTop = $("measure-overlay").querySelector(".measure-details").getBoundingClientRect().top;
+    let top = cardTop;
+    if (bottom - top < 72) {
+      // Beside the action column, above the legend on short phones. The
+      // Details/Hide button and every scientific editor remain reachable.
+      const toolbarBottom = Math.max(document.querySelector(".view-directions").getBoundingClientRect().bottom, $("turn-open").getBoundingClientRect().bottom);
+      top = Math.max(toolbarBottom + 8, bottom - 120);
+    }
+    details.style.top = `${top - cardTop}px`;
+    details.style.maxHeight = `${Math.max(36, bottom - top)}px`;
   }
+  $("measure-more").onclick = () => setDetailsOpen(!detailsOpen);
+  document.addEventListener("pointerdown", (event) => {
+    if (detailsOpen && event.target !== renderer.domElement && !$("measure-overlay").contains(event.target)) setDetailsOpen(false);
+  });
+  $("measure-overlay").addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && detailsOpen) {
+      event.preventDefault();
+      setDetailsOpen(false);
+      $("measure-more").focus({ preventScroll: true });
+    }
+  });
   // Info: one atom at a time — label, element, occupancy, fractional and
   // Cartesian position, and the CN/volume of configured polyhedra around
-  // it. No distance is implied. On phones the details also appear in the
-  // strip at the top of the lower pane so the card stays small.
+  // it. No distance is implied. On phones the label shows under the action
+  // buttons and the lines open with Details.
   function atomInfoLines(a) {
     const lines = [
       `${a.element} · occupancy ${a.occupancy != null ? Number(a.occupancy).toFixed(3) : "—"}`,
@@ -2025,14 +2090,6 @@ function initialize() {
     $("distance").replaceChildren(document.createTextNode(a ? a.label : "—"));
     const lines = a ? atomInfoLines(a) : [];
     $("selection").textContent = a ? lines.join("\n") : $("show-atoms").checked ? "Tap an atom for its details." : "Show atoms to inspect.";
-    if (!a) return showPaneHint($("selection").textContent);
-    const panel = $("atom-info");
-    panel.dataset.kind = "info";
-    panel.setAttribute("aria-label", "Selected atom");
-    panel.replaceChildren(
-      Object.assign(document.createElement("strong"), { textContent: a.label }),
-      ...lines.map((line) => Object.assign(document.createElement("span"), { textContent: line, title: line })),
-    );
   }
   // Distance (2 atoms) · Angle (3) · Info (1). Each mode starts a fresh selection.
   function setMeasureMode(mode) {
@@ -2184,6 +2241,7 @@ function initialize() {
       );
       factor = distanceNext / distanceNow;
       if (Math.abs(factor - 1) < 1e-9) return;
+      // Relative to the projected pivot, which sits at the stage centre.
       const nx = ((clientX - rect.left) / rect.width) * 2 - 1,
         ny = 1 - ((clientY - rect.top) / rect.height) * 2;
       const halfHeight = distanceNow * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
@@ -2475,75 +2533,11 @@ function initialize() {
     // Marker follows editor visibility: cleared on close, restored on open.
     onOpen(open) {
       updatePickMarker(open ? styleEditor?.target : null);
-      // Style is opened by its tab and can also be closed with Escape.
-      if (open && !openModes.includes("style")) pinMode("style");
-      else if (!open && openModes.includes("style")) unpinMode("style");
-      applyMode();
-      if (open) document.querySelector("aside").scrollTop = 0; // tabs open at their top
     },
     onTarget(value) {
       updatePickMarker(value);
     },
   });
-  // ---- Sidebar modes: Pairs · Style · Lattice · Sites ---------------------
-  // One mode at a time (Extent always stays), so tablets keep one screen.
-  // Tablets and phones show one pane. Wide desktops pin up to two panes
-  // side by side: a tab toggles its pane; opening a third replaces the
-  // oldest. Extent is never pinned by default.
-  const wideInspector = window.matchMedia("(min-width: 1500px) and (min-height: 760px)");
-  const MAX_PINNED = 2;
-  let openModes = wideInspector.matches ? ["pairs", "lattice"] : ["pairs"];
-  function pinMode(mode) {
-    if (!wideInspector.matches) openModes = [mode];
-    else if (!openModes.includes(mode)) {
-      openModes.push(mode);
-      if (openModes.length > MAX_PINNED) openModes.shift();
-    }
-    sidebarMode = mode;
-  }
-  function unpinMode(mode) {
-    openModes = openModes.filter((m) => m !== mode);
-    if (!openModes.length) openModes = ["pairs"];
-    sidebarMode = openModes.at(-1);
-  }
-  function setMode(mode) {
-    if (wideInspector.matches && openModes.includes(mode) && openModes.length > 1) unpinMode(mode);
-    else pinMode(mode);
-    const styleWanted = openModes.includes("style");
-    if (styleWanted !== styleEditor.open) styleEditor.setOpen(styleWanted);
-    applyMode();
-    // Every tab opens at its top (the tab bar itself never moves).
-    document.querySelector("aside").scrollTop = 0;
-  }
-  function applyMode() {
-    const aside = document.querySelector("aside");
-    aside.dataset.mode = sidebarMode;
-    aside.dataset.modes = openModes.join(" ");
-    document.querySelector("main").classList.toggle("two-panels", openModes.length > 1);
-    for (const [id, mode] of [
-      ["mode-pairs", "pairs"],
-      ["style-open", "style"],
-      ["mode-lattice", "lattice"],
-      ["mode-sites", "sites"],
-      ["mode-extent", "extent"],
-      ["mode-export", "export"],
-    ])
-      $(id).setAttribute("aria-pressed", String(openModes.includes(mode)));
-    if (openModes.includes("export")) updateExportInfo();
-  }
-  wideInspector.addEventListener?.("change", () => {
-    if (!wideInspector.matches) openModes = [sidebarMode];
-    if (styleEditor.open !== openModes.includes("style")) styleEditor.setOpen(openModes.includes("style"));
-    applyMode();
-  });
-  $("mode-pairs").onclick = () => setMode("pairs");
-  $("mode-lattice").onclick = () => setMode("lattice");
-  $("mode-sites").onclick = () => setMode("sites");
-  $("mode-extent").onclick = () => setMode("extent");
-  $("mode-export").onclick = () => {
-    setMode("export");
-    updateExportInfo();
-  };
   function updateAsymmetricNote() {
     const note = $("asym-note");
     note.textContent = asymmetric
@@ -2639,6 +2633,7 @@ function initialize() {
     latticeTools.reset();
     hiddenElements.clear();
     $("show-atoms").checked = true;
+    $("show-polyhedra").checked = true;
     $("name").textContent = data.name || data.block || "Crystal structure";
     const reference = entryForFilename(currentFilename);
     $("source").replaceChildren();
@@ -2906,7 +2901,7 @@ function initialize() {
     onTurn: turnView,
     isBusy: () => exporter.busy,
     phoneLayout,
-    paneAnchor: $("inspector-header"),
+    paneAnchor: $("phone-turn-dock"),
     onOpenChange: invalidate, // plane labels re-place around the popover
   });
   // The [uvw] form is a label obstacle too while open.
@@ -3034,6 +3029,7 @@ function initialize() {
         };
       }),
       atomsVisible: $("show-atoms").checked,
+      polyhedraVisible: $("show-polyhedra").checked,
       visibleAtomCount: atoms.filter(atomVisible).length,
       renderedAtomCount: meshes
         .filter((mesh) => mesh.visible)
@@ -3055,7 +3051,7 @@ function initialize() {
         // Per-polyhedron display styles: centre atom key, colour, scale.
         styles: mesh.userData.styles.map((s) => ({ ...s })),
         // Translucent pairs render from the shared sorted batch instead.
-        drawnBy: mesh.visible ? (mesh.material.opacity < 1 ? "sorted-batch" : "own-mesh") : "outline-only",
+        drawnBy: mesh.visible ? (mesh.material.opacity < 1 ? "sorted-batch" : "own-mesh") : mesh.userData.outline?.visible ? "outline-only" : "hidden",
       })),
       translucentFaces: faceSorter.diagnostics(),
       transparency: peeler.diagnostics(),
@@ -3082,8 +3078,12 @@ function initialize() {
       asymmetric,
       independentSiteCount: structure ? independentSites().length : 0,
       labels: { enabled: labelsOn, shown: shownLabels, limit: LABEL_LIMIT },
-      sidebarMode,
-      openPanels: [...openModes],
+      // Open tool windows back to front (front-most last), their layout and
+      // the stage (projection offset into the clear area).
+      sidebarMode: toolWindows.openTools().at(-1) ?? null,
+      openPanels: toolWindows.openTools(),
+      windows: toolWindows.diagnostics(),
+      stage: { x: stage.x, y: stage.y, clear: stage.clear && { ...stage.clear }, atFit: isAtFit() },
       highlightedSite,
       polyhedra: coordinationStats.flatMap((s) =>
         s.environments.map((e) => ({
@@ -3155,6 +3155,7 @@ function initialize() {
     },
     atomLabels: () => (labelsOn ? lastAtomLabels : []),
     latticeLabels: () => latticeTools.placedLabels(),
+    exportObstacles: (rects) => latticeTools.setExportObstacles(rects),
     compass: () => compassState,
     // The measurement card, only while atoms are picked for it.
     measurement: () => {
@@ -3172,6 +3173,7 @@ function initialize() {
       if (busy) flushHistory();
       // Exports peel the full layer budget in every frame.
       peeler.setExportMode(busy);
+      latticeTools.setExportMode(busy);
       viewport.classList.toggle("exporting", busy);
       controls.enabled = !busy;
       // Step turns are blocked while exporting (buttons and handler).
@@ -3266,7 +3268,46 @@ function initialize() {
     }
   };
   $("export-cancel").onclick = () => recording?.cancel();
-  applyMode(); // initial pane(s): one on tablets/phones, two on wide desktops
+  // ---- Tool windows: overlays never reposition or refit the structure. ----
+  function applyStageLayout(info) {
+    stage.clear = { ...info.clear };
+    invalidate();
+    boundDetails();
+  }
+  const toolWindows = createToolWindows({
+    viewport,
+    app: $("app"),
+    rail: $("tool-rail"),
+    menuButton: $("tools-menu"),
+    metrics() {
+      // Palette below the measurement card's reserved height; the rail and
+      // compass keep the right edge; sheets stay below the rail.
+      const view = viewport.getBoundingClientRect();
+      const row = document.querySelector(".measure-row").getBoundingClientRect();
+      const rail = $("tool-rail").getBoundingClientRect();
+      const bottomControls = [".view-bottom", "#view-readout", ".axis-compass", "#tools-menu"]
+        .map(selector => document.querySelector(selector).getBoundingClientRect()).filter(rect => rect.width && rect.height);
+      const bottomGap = Math.ceil(Math.max(0, ...bottomControls.map(rect => view.bottom - rect.top)) + 8);
+      viewport.style.setProperty("--bottom-controls-gap", `${bottomGap}px`);
+      const cardMax = parseFloat(getComputedStyle(viewport).getPropertyValue("--card-max")) || 168;
+      return {
+        paletteTop: row.bottom - view.top + 6 + cardMax + 10,
+        railColumn: 92,
+        railBottom: $("app").dataset.launcher === "rail" && rail.height ? rail.bottom - view.top : 0,
+        sheetTop: row.bottom - view.top + 6 + 88 + 8,
+        sideTop: row.bottom - view.top + 6,
+        bottomGap: 40,
+        sheetBottomGap: bottomGap,
+        sideBottomGap: bottomGap,
+      };
+    },
+    onLayout: applyStageLayout,
+    onVisibility(tool, visible) {
+      if (tool === "style") styleEditor.setOpen(visible);
+      if (tool === "export" && visible) updateExportInfo();
+    },
+    onChange: () => scheduleSave(),
+  });
 
   // Light/dark theme: CSS follows data-theme; scene overlays that carry
   // their own colors are rebuilt with the new palette.
@@ -3335,7 +3376,6 @@ function initialize() {
     el.textContent = text;
     el.classList.toggle("error", error);
   }
-  const SIDEBAR_MODES = ["pairs", "style", "lattice", "sites", "extent", "export"];
   function exportViewerState() {
     return {
       block: structure?.block ?? null,
@@ -3343,6 +3383,7 @@ function initialize() {
       boundary: $("boundary").checked,
       cell: $("cell").checked,
       polyhedraOnly: $("polyhedra-only").checked,
+      polyhedraVisible: $("show-polyhedra").checked,
       rules: rules.map((r) => ({
         id: r.id,
         center: r.center,
@@ -3376,7 +3417,9 @@ function initialize() {
       },
       turnAngle: turnControls.angle,
       measure: { mode: measureMode, keys: selection.map(atomKey) },
-      panels: [...openModes],
+      // Open tools back to front (front-most last) and the window layout.
+      panels: toolWindows.openTools(),
+      windows: toolWindows.exportState(),
       // Added later in version 1 (optional on restore).
       uvwText: $("view-direction").value,
       activeView: activeView && lastOrientIndices ? { id: activeView.id, indices: [...lastOrientIndices] } : null,
@@ -3412,6 +3455,7 @@ function initialize() {
       ["boundary", "boundary"],
       ["cell", "cell"],
       ["polyhedra-only", "polyhedraOnly"],
+      ["show-polyhedra", "polyhedraVisible"],
     ])
       if (typeof s[key] === "boolean") $(id).checked = s[key];
     // Pair rules.
@@ -3510,16 +3554,11 @@ function initialize() {
       if (found.every(Boolean)) selection = found;
     }
     updateSelection();
-    // Sidebar panes (no transient popovers).
-    if (Array.isArray(s.panels)) {
-      const valid = [...new Set(s.panels.filter((p) => SIDEBAR_MODES.includes(p)))];
-      if (valid.length) {
-        openModes = wideInspector.matches ? valid.slice(-MAX_PINNED) : [valid.at(-1)];
-        sidebarMode = openModes.at(-1);
-        if (styleEditor.open !== openModes.includes("style"))
-          styleEditor.setOpen(openModes.includes("style"));
-        applyMode();
-      }
+    // Tool windows (no transient popovers). Sessions from before the
+    // windows only list panels: the last one opens as the main palette.
+    if (!toolWindows.restore(s.windows) && Array.isArray(s.panels)) {
+      const valid = s.panels.filter((p) => TOOL_IDS.includes(p));
+      if (valid.length) toolWindows.choose(valid.at(-1));
     }
     styleEditor.refresh();
     // Typed [uvw] text (not submitted; the camera below is the real pose).
@@ -3583,7 +3622,7 @@ function initialize() {
   // angle, unsubmitted direction text) are intentionally outside history.
   function exportHistoryState() {
     const s = exportViewerState();
-    const keys = ["ranges", "boundary", "cell", "polyhedraOnly", "rules", "appearance", "atoms", "asymmetric", "highlightedSite", "lattice", "camera", "activeView", "measure"];
+    const keys = ["ranges", "boundary", "cell", "polyhedraOnly", "polyhedraVisible", "rules", "appearance", "atoms", "asymmetric", "highlightedSite", "lattice", "camera", "activeView", "measure"];
     return Object.fromEntries(keys.map((key) => [key, s[key]]));
   }
   const historyEqual = (a, b) => JSON.stringify(a, (key, value) =>
@@ -3592,17 +3631,6 @@ function initialize() {
     typeof value === "number" ? Number(value.toPrecision(12)) : value,
   ) === JSON.stringify(b, (key, value) => typeof value === "number" ? Number(value.toPrecision(12)) : value);
   const history = createHistory({ limit: 100, equal: historyEqual });
-  // Phones use the free row beside Turn, leaving the pinned selection
-  // strip and the full Turn panel their existing room in the lower pane.
-  function placeHistoryControls() {
-    const row = $("history-controls");
-    row.classList.toggle("in-view", phoneLayout.matches);
-    if (phoneLayout.matches) document.querySelector(".view-directions").append(row);
-    else $("inspector-header").prepend(row);
-    invalidate();
-  }
-  placeHistoryControls();
-  phoneLayout.addEventListener("change", placeHistoryControls);
   let historyTimer = 0, historyLabel = "Change view", pressedHistoryLabel = "Change view", cameraGesture = false, historyKeyHeld = false;
   const historyPointers = new Set();
   const historyAvailable = () => historyReady && !historyApplying && saveSuspended === 0 && !exporter.busy && $("loading").hidden;
@@ -3629,7 +3657,9 @@ function initialize() {
     if (!historyReady || historyApplying || saveSuspended > 0) return;
     // Stop residual trackball inertia at an action boundary. Subsequent
     // frames cannot move a camera whose snapshot has already been stored.
-    if (cameraGesture) stopMotion();
+    const moving = cameraGesture;
+    cameraGesture = false;
+    if (moving) stopMotion();
     if (pendingBuild) {
       cancelScheduledBuild();
       build(); // include the last live edit and its resulting selection
@@ -3646,7 +3676,8 @@ function initialize() {
     historyTimer = setTimeout(flushHistory, delay);
   }
   function cameraHistoryChanged() {
-    if (cameraGesture && historyAvailable()) scheduleHistory(220);
+    if (cameraGesture && historyAvailable())
+      scheduleHistory(historyLabel === "Zoom view" ? 300 : 220);
   }
   function historyActionLabel(target) {
     if (target === renderer.domElement) return cameraGesture ? historyLabel : "Pick atom";

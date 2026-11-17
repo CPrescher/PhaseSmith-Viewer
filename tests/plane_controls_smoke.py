@@ -4,7 +4,7 @@ import asyncio
 import math
 from pathlib import Path
 from playwright.async_api import async_playwright
-from smoke import URL, diagnostics, settle
+from smoke import URL, choose_tool, diagnostics, settle
 from science_smoke import change
 
 OUT = Path("/tmp/psv-gui-assessment/plane-controls")
@@ -34,10 +34,31 @@ async def check(browser, width, height, theme):
     async def state():
         return (await diagnostics(page))["lattice"]
 
-    await activate(page.locator("#mode-lattice"))
+    await choose_tool(page, "#mode-lattice", touch)
     await activate(page.locator("#plane-add"))
     row = page.locator("[data-plane-id]").first
     hkl, offset = row.locator("[data-field=hkl]"), row.locator("[data-field=m]")
+    # Compact indices are expanded visibly; letters are rejected as whole edits,
+    # including paste/fill paths where beforeinput may not contain the text.
+    await change(hkl, "123")
+    assert (await state())["planes"][0]["hkl"] == [1, 2, 3]
+    assert await hkl.input_value() == "1 2 3"
+    await hkl.press("End")
+    await hkl.press("a")
+    assert await hkl.input_value() == "1 2 3"
+    await hkl.fill("1e2 0 0")
+    assert await hkl.input_value() == "1 2 3"
+    await change(hkl, "1234")
+    p = (await state())["planes"][0]
+    assert p["hkl"] == [1, 2, 3] and p["error"]
+    assert "spaces" in await row.locator("[data-readout]").inner_text()
+    assert not await hkl.evaluate("el => el.validity.valid")
+    await change(hkl, "12 -3 4")
+    p = (await state())["planes"][0]
+    assert p["hkl"] == [12, -3, 4] and not p["error"], p
+    assert await hkl.evaluate("el => el.validity.valid")
+    await change(hkl, "1−10")
+    assert (await state())["planes"][0]["hkl"] == [1, -1, 0]
     for indices, expected in [
         ("1 0 0", 1),
         ("-1 -1 -1", -1),

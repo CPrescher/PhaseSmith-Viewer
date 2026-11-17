@@ -42,3 +42,20 @@ test("bounded history, reset, no-ops and failed restoration", () => {
   assert.equal(history.checkpoint({ n: 50 }, "No-op"), false);
   assert.equal(history.state.undoCount, 0);
 });
+
+
+test("layout camera updates preserve the current undo and redo branches", () => {
+  const history = createHistory();
+  history.reset({ value: 0, camera: [1, 2, 3] });
+  history.checkpoint({ value: 1, camera: [1, 2, 3] }, "Edit");
+  history.amend({ camera: [4, 5, 6] });
+  let restored;
+  history.undo(s => { restored = s; });
+  assert.equal(restored.value, 0);
+  history.amend({ camera: [7, 8, 9] });
+  assert.equal(history.state.redoCount, 1);
+  history.redo(s => { restored = s; });
+  assert.deepEqual(restored, { value: 1, camera: [4, 5, 6] });
+  history.undo(s => { restored = s; });
+  assert.deepEqual(restored, { value: 0, camera: [7, 8, 9] });
+});

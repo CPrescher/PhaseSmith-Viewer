@@ -3,7 +3,7 @@
 import asyncio
 import math
 from playwright.async_api import async_playwright
-from smoke import URL, diagnostics, settle
+from smoke import URL, choose_tool, diagnostics, settle
 
 
 async def change(locator, value):
@@ -22,7 +22,7 @@ async def check(browser, w, h):
     await page.wait_for_function(
         "window.viewerDiagnostics?.().coordination.polyhedronCount===12"
     )
-    await page.locator("#mode-sites").tap()
+    await choose_tool(page, "#mode-sites", True)
     assert await page.locator("#site-table tbody tr").count() == 6
     volumes = await page.locator("#poly-table tbody tr").all_inner_texts()
     assert any("Mg1" in r and "11.787" in r for r in volumes), volumes
@@ -38,7 +38,7 @@ async def check(browser, w, h):
     await page.locator("#asym-toggle").uncheck()
     assert (await diagnostics(page))["coordination"]["polyhedronCount"] == 12
 
-    await page.locator("#mode-lattice").tap()
+    await choose_tool(page, "#mode-lattice", True)
     await page.locator("#plane-add").tap()
     plane = page.locator("[data-plane-id]").first
     assert await plane.locator('[data-field="m"]').input_value() == "1"
@@ -115,6 +115,10 @@ C Cl .5 .85 .5
         and reset["arrows"] == []
         and not reset["symmetry"]["shown"]
     )
+    # Close the settings overlay explicitly before picking the new fixture;
+    # menus deliberately no longer move the structure out of their way.
+    active = page.locator('.tool-window:not([hidden]) [data-action=close]')
+    if await active.count(): await active.click()
     await page.locator("#measure-angle").tap()
     await page.locator("#view-c").tap()
     await settle(page)

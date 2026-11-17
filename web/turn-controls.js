@@ -3,11 +3,11 @@
 // UI only — the viewer supplies onTurn(action, degrees) and isBusy().
 //
 // Placement: a popover under the view toolbar on larger screens; on phones
-// (phoneLayout matches) the panel moves into the lower pane right after the
-// pinned pick-details strip, so an open pad never covers the crystal. It
-// stays open for repeated turns and closes with ✕, Escape (wherever focus
-// is: Safari does not focus tapped buttons), the Turn button again, or a
-// press outside both the panel and the Turn button.
+// (phoneLayout matches) the panel moves into `paneAnchor`, a dock along the
+// bottom edge above any tool sheet, so an open pad never covers the
+// crystal's centre. It stays open for repeated turns and closes with ✕,
+// Escape (wherever focus is: Safari does not focus tapped buttons), the
+// Turn button again, or a press outside both the panel and the Turn button.
 
 const LABELS = {
   left: "Turn the crystal left",
@@ -89,7 +89,7 @@ export function createTurnControls({ onTurn, isBusy, phoneLayout, paneAnchor, on
     const inPane = phoneLayout.matches;
     panel.classList.toggle("in-pane", inPane);
     if (inPane) {
-      if (panel.previousElementSibling !== paneAnchor) paneAnchor.after(panel);
+      if (panel.parentElement !== paneAnchor) paneAnchor.append(panel);
     } else if (panel.parentElement !== home.parent) home.parent.insertBefore(panel, home.next);
   }
   function setOpen(show, { focus = false } = {}) {
@@ -104,12 +104,6 @@ export function createTurnControls({ onTurn, isBusy, phoneLayout, paneAnchor, on
     open.setAttribute("aria-expanded", String(show));
     // Plane labels avoid the open popover: re-place them now.
     onOpenChange(show);
-    // In the lower pane: scroll the pane (never the page) so the panel
-    // starts right below the pinned tab bar and pick-details strip.
-    if (show && phoneLayout.matches) {
-      const pane = panel.parentElement;
-      pane.scrollTop = panel.offsetTop - parseFloat(getComputedStyle(panel).scrollMarginTop || 0);
-    }
     if (focus) (show ? panel.querySelector(".turn-preset[aria-pressed='true']") ?? close : open).focus({ preventScroll: true });
   }
   open.onclick = () => setOpen(panel.hidden);
@@ -149,7 +143,7 @@ export function createTurnControls({ onTurn, isBusy, phoneLayout, paneAnchor, on
     diagnostics: () => ({
       open: !panel.hidden,
       angle,
-      placement: panel.classList.contains("in-pane") ? "lower-pane" : "popover",
+      placement: panel.classList.contains("in-pane") ? "bottom-dock" : "popover",
       inputValid: input.validity ? input.validity.valid : true,
     }),
     get angle() {

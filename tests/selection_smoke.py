@@ -38,7 +38,9 @@ async def check(browser, w, h, touch):
 
     async def blank():
         r = await page.locator("#viewport canvas").bounding_box()
-        x, y = r["x"] + 16, r["y"] + r["height"] * 0.55
+        # Empty canvas inside the stage (not under an open tool sheet).
+        clear = (await diagnostics(page))["stage"]["clear"]
+        x, y = r["x"] + clear["x"] + 16, r["y"] + clear["y"] + clear["h"] * 0.55
         if touch:
             await page.touchscreen.tap(x, y)
         else:

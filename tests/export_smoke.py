@@ -47,6 +47,11 @@ async def check(browser):
     await page.locator("#mode-export").tap()
     await settle(page)
     await page.locator("#export-dpi").fill("300")
+    # A manual view must survive moving an editor. Export should be identical
+    # wherever the floating editor sits (including plane/arrow label placement).
+    await page.mouse.move(400, 400)
+    await page.mouse.wheel(0, -80)
+    await settle(page)
     before = await diagnostics(page)
     viewport = await page.locator("#viewport canvas").first.bounding_box()
     async with page.expect_download() as pending:
@@ -60,6 +65,17 @@ async def check(browser):
     assert width * height < viewport["width"] * viewport["height"] * 4 * 0.7, (width, height, viewport)
     await png.save_as("/tmp/psv-gui-assessment/export-image.png")
     assert (await diagnostics(page))["camera"] == before["camera"]
+    head = await page.locator("#tool-title-export").bounding_box()
+    await page.mouse.move(head["x"] + 40, head["y"] + head["height"] / 2)
+    await page.mouse.down()
+    await page.mouse.move(head["x"] - 360, head["y"] - 100, steps=8)
+    await page.mouse.up()
+    await settle(page)
+    assert (await diagnostics(page))["camera"] == before["camera"]
+    async with page.expect_download() as pending:
+        await page.locator("#export-png").tap()
+    moved = await pending.value
+    assert Path(await moved.path()).read_bytes() == data, "Editor position changed the exported crystal/labels"
 
     await page.locator("#export-dpi").fill("600")
     await page.locator("#export-transparent").check()

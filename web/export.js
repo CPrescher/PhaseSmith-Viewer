@@ -262,14 +262,20 @@ export function createExporter(ctx) {
     }
   }
 
-  function measurement(g, w, s) {
+  function measurementLayout(g, w, s) {
     const m = ctx.measurement();
-    if (!m) return;
+    if (!m) return null;
     const pad = 10 * s,
       lineH = 16 * s;
     const { width: boxW, height: boxH } = measurementSize(g, s);
     const x = w - boxW - 12 * s,
       y = 12 * s;
+    return { m, pad, lineH, boxW, boxH, x, y };
+  }
+  function measurement(g, w, s) {
+    const layout = measurementLayout(g, w, s);
+    if (!layout) return;
+    const { m, pad, lineH, boxW, boxH, x, y } = layout;
     g.fillStyle = css("--overlay-bg");
     roundRect(g, x, y, boxW, boxH, 10 * s);
     g.fill();
@@ -387,6 +393,9 @@ export function createExporter(ctx) {
     busy = true;
     ctx.setBusy(true);
     try {
+      // Recompute labels without application windows before measuring the
+      // crop, so moving an editor cannot change the exported frame.
+      ctx.render();
       const size = exportSize(scale, MAX_IMAGE_SIDE);
       const canvas = document.createElement("canvas");
       canvas.width = size.width;
@@ -435,6 +444,7 @@ export function createExporter(ctx) {
       track = null,
       recorder = null;
     try {
+      ctx.render();
       size = exportSize(scale, MAX_VIDEO_SIDE, frameFor(true));
       canvas = document.createElement("canvas");
       canvas.width = size.width;
