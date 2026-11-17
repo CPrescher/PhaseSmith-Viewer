@@ -1426,6 +1426,22 @@ button.element[aria-pressed="false"] .dot {
 .tool-field.offset {
   width: 60px;
 }
+.numeric-keys {
+  display: none;
+}
+@media (any-pointer: coarse) {
+  .numeric-keys:not([hidden]) {
+    display: flex;
+  }
+  .numeric-keys button {
+    min-width: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+  .numeric-keys [data-key="done"] {
+    margin-left: auto;
+  }
+}
 /* Plane and direction labels on the canvas, edged in the entry's color. */
 .lattice-label {
   position: absolute;
