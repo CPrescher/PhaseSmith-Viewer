@@ -19,6 +19,7 @@ import { elementColor as defaultColor } from "./elements.js";
 import { estimatePairCutoff } from "./pair-defaults.js";
 import { angleAt, hullVolume } from "./crystal-math.js";
 import { createLatticeTools } from "./lattice-tools.js";
+import { numericKeys } from "./numeric-input.js";
 import { createAxisCompass } from "./axis-compass.js";
 import { createThemeSwitch } from "./theme.js";
 import { createFullscreenSwitch } from "./fullscreen.js";
@@ -1809,6 +1810,13 @@ function initialize() {
     }
     orient(fields.map(Number));
   };
+  $("direction-form").insertBefore(
+    numericKeys($("view-direction"), "[uvw]", true, {
+      inputMode: "decimal",
+      onDone: () => $("direction-form").requestSubmit(),
+    }),
+    $("direction-error"),
+  );
   // Fit uses the full canvas and fixed-size view controls, independently
   // of which overlay is open. Only explicit view actions refit the model.
   function overlayReserve() {

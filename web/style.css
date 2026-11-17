@@ -975,6 +975,10 @@ h2 {
 .view-directions details {
   position: relative;
 }
+.view-directions:has(details[open]) {
+  position: relative;
+  z-index: 1;
+}
 .view-directions summary {
   list-style: none;
   display: flex;
@@ -1426,11 +1430,19 @@ button.element[aria-pressed="false"] .dot {
 .tool-field.offset {
   width: 60px;
 }
-.numeric-keys {
+.numeric-keys,
+#direction-form > .numeric-keys {
+  display: none;
+}
+#direction-form > .numeric-keys {
+  margin-top: 6px;
+}
+#direction-form .numeric-keys .micro {
   display: none;
 }
 @media (any-pointer: coarse) {
-  .numeric-keys:not([hidden]) {
+  .numeric-keys:not([hidden]),
+  #direction-form > .numeric-keys:not([hidden]) {
     display: flex;
   }
   .numeric-keys button {
