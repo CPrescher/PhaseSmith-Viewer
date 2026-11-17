@@ -15,7 +15,7 @@ CHECKS = [
     "history_smoke", "tool_windows_smoke", "layout_smoke",
     "symmetry_selection_smoke", "pair_defaults_smoke", "project_smoke",
     "pages_smoke", "library_smoke", "touch_pan_smoke", "page_zoom_smoke",
-    "turn_smoke",
+    "turn_smoke", "analysis_smoke",
 ]
 
 

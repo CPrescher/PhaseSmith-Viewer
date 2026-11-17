@@ -324,7 +324,7 @@
           aria-label="Tools"
           aria-expanded="false"
           aria-controls="tool-rail"
-          title="Tools: Pairs, Sites, Lattice, Extent, Style, Export"
+          title="Tools: Pairs, Sites, Lattice, Extent, Plots, Style, Export"
         >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
         </button>
@@ -340,6 +340,9 @@
             </button>
             <button id="mode-extent" type="button" class="rail-button" data-tool="extent" aria-pressed="false" title="Extent: plotting range, cell edges and boundary atoms">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg><span class="rail-label">Extent</span><span class="rail-hint" aria-hidden="true">plotting range, cell edges and boundary atoms</span>
+            </button>
+            <button id="mode-analysis" type="button" class="rail-button" aria-expanded="false" aria-controls="analysis-window" aria-haspopup="dialog" title="Plots: pair distances and theoretical powder diffraction in a floating window">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M7 17v-5M12 17V6M17 17v-8"/></svg><span class="rail-label">Plots</span><span class="rail-hint" aria-hidden="true">pair distances and theoretical powder diffraction</span>
             </button>
             <button id="style-open" type="button" class="rail-button rail-group-start" data-tool="style" aria-pressed="false" title="Appearance: colors and sizes of elements, pairs and single copies">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.2-.3-.4-.5-.8-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg><span class="rail-label">Style</span><span class="rail-hint" aria-hidden="true">colors and sizes of elements, pairs and single copies</span>
@@ -840,6 +843,47 @@
         </div>
       </main>
     </div>
+    <dialog id="analysis-window" class="analysis-window" aria-labelledby="analysis-title">
+      <header id="analysis-head" class="analysis-head">
+        <h2 id="analysis-title">Structure plots</h2>
+        <button id="analysis-close" type="button" class="window-button" aria-label="Close structure plots" title="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+      <div class="analysis-body">
+        <form id="analysis-form">
+          <label class="analysis-view">Plot
+            <select id="analysis-mode"><option value="distances">Pair distances</option><option value="powder">Powder diffraction (X-ray)</option></select>
+          </label>
+          <div id="analysis-distance-fields" class="analysis-fields">
+            <label>From (Å)<input id="analysis-rMin" type="number" min="0" max="30" step="any" value="0" required /></label>
+            <label>To (Å)<input id="analysis-rMax" type="number" min="0.1" max="30" step="any" value="6" required /></label>
+            <label>Group within (Å)<input id="analysis-tolerance" type="number" min="0.00001" max="0.1" step="any" value="0.001" required /></label>
+            <label class="analysis-pair-field">Atom pairs<select id="analysis-pair"><option value="all">All atom pairs</option></select></label>
+          </div>
+          <div id="analysis-powder-fields" class="analysis-fields" hidden>
+            <label>Wavelength (Å)<input id="analysis-wavelength" type="number" min="0.1" max="3" step="any" value="1.5406" required /></label>
+            <label>From 2θ (°)<input id="analysis-twoThetaMin" type="number" min="0.1" max="170" step="any" value="5" required /></label>
+            <label>To 2θ (°)<input id="analysis-twoThetaMax" type="number" min="0.1" max="170" step="any" value="90" required /></label>
+            <label class="analysis-pair-field">Peak FWHM (° 2θ; 0 = sticks)<input id="analysis-fwhm" type="number" min="0" max="2" step="any" value="0.15" required /></label>
+          </div>
+        </form>
+        <p id="analysis-note" class="hint"></p>
+        <p id="analysis-status" class="hint" role="status" aria-live="polite"></p>
+        <div id="analysis-results" hidden>
+          <svg id="analysis-chart" class="analysis-chart" role="img" aria-label="Structure plot; values are listed in the table below"></svg>
+          <p id="analysis-detail" class="analysis-detail">Select a line or table row for details.</p>
+          <div class="table-scroll analysis-table-scroll" tabindex="0" aria-label="Calculated distances or diffraction lines">
+            <table id="analysis-table" class="data-table"></table>
+          </div>
+          <div class="analysis-actions">
+            <button id="analysis-more" type="button" aria-expanded="false" aria-controls="analysis-table" hidden>Show all</button>
+            <button id="analysis-csv" type="button" disabled>Save CSV</button>
+          </div>
+          <p id="analysis-table-note" class="hint"></p>
+        </div>
+      </div>
+    </dialog>
     <script type="module" src="/web/main.js"></script>
   </body>
 </html>

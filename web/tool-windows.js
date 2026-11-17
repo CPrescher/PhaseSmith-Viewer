@@ -320,6 +320,10 @@ export function createToolWindows(options) {
   function closeMenu() {
     if (rail.classList.contains("menu-open")) setMenu(false);
   }
+  // Independent dialog launchers (e.g. Plots) also dismiss the phone list.
+  rail.addEventListener("click", (event) => {
+    if (event.target.closest("button")) closeMenu();
+  });
   menuButton?.addEventListener("click", () => setMenu(!rail.classList.contains("menu-open")));
   document.addEventListener(
     "pointerdown",

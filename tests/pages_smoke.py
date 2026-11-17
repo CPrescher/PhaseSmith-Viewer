@@ -37,6 +37,15 @@ async def main():
             state = await page.evaluate("window.viewerDiagnostics()")
             assert state["measureMode"] == "info", state["measureMode"]
             assert state["viewReadout"]["visible"]
+            if not example:
+                # Exercise both plot workers on the deployed base path as part
+                # of the short release check; full interactions have their own suite.
+                await page.locator("#mode-analysis").click()
+                await page.wait_for_function("document.querySelector('#analysis-table tbody tr')")
+                assert await page.locator("#analysis-chart .analysis-stick").count() > 0
+                await page.locator("#analysis-mode").select_option("powder")
+                await page.wait_for_function("document.querySelector('#analysis-table th')?.textContent === '2θ (°)'")
+                await page.locator("#analysis-close").click()
             if example == "forsterite":
                 assert state["coordination"]["polyhedronCount"] == 12
                 await page.locator("#mode-lattice").click()

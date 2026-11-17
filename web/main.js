@@ -30,6 +30,7 @@ import { rotatedView } from "./view-rotation.js";
 import { createTurnControls } from "./turn-controls.js";
 import { createStructureLibrary, libraryEntry, libraryFilename, entryForFilename } from "./structure-library.js";
 import { createToolWindows, TOOL_IDS } from "./tool-windows.js";
+import { createAnalysisWindow } from "./analysis-window.js";
 import {
   createAppearance,
   clearAppearance,
@@ -634,6 +635,7 @@ function initialize() {
     highlightSite(highlightedSite);
     invalidate();
   }
+  const structureAnalysis = createAnalysisWindow({ getStructure: () => structure, onChange: () => scheduleSave() });
   const latticeTools = createLatticeTools({
     THREE,
     scene,
@@ -2706,6 +2708,7 @@ function initialize() {
     styleEditor.clear();
     renderSiteTable();
     updateAsymmetricNote();
+    structureAnalysis.setStructure();
   }
   const worker = new Worker(new URL("./import-worker.js", import.meta.url), {
     type: "module",
@@ -3408,6 +3411,7 @@ function initialize() {
       asymmetric,
       highlightedSite,
       lattice: latticeTools.exportState(),
+      analysis: structureAnalysis.exportState(),
       camera: {
         position: camera.position.toArray(),
         up: camera.up.toArray(),
@@ -3539,6 +3543,7 @@ function initialize() {
       if (atom) targetMeta.set(`poly:${key}`, { label: atom.label, frac: fracText(atom) });
     }
     latticeTools.restoreState(s.lattice, { trusted });
+    structureAnalysis.restoreState(s.analysis);
     highlightSite(null);
     if (typeof s.highlightedSite === "string" && independentSites().some((x) => x.label === s.highlightedSite))
       highlightSite(s.highlightedSite);
