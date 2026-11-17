@@ -70,6 +70,7 @@ async def check(browser, native_touch):
             "y": box["y"] + box["height"] * 0.75,
             "yDistance": -250, "gestureSourceType": "touch", "speed": 600,
         })
+        await page.wait_for_function("document.getElementById('structure-library').scrollTop > 0", timeout=5000)
         assert await dialog.evaluate("el => el.scrollTop") > 0, "Dialog cannot scroll"
     assert not errors, errors
     print(f"{browser.browser_type.name}: page scale stays at 1; gesture guard works", flush=True)
