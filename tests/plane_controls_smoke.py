@@ -38,6 +38,41 @@ async def check(browser, width, height, theme):
     await activate(page.locator("#plane-add"))
     row = page.locator("[data-plane-id]").first
     hkl, offset = row.locator("[data-field=hkl]"), row.locator("[data-field=m]")
+    assert await hkl.get_attribute("inputmode") == "numeric"
+    assert await offset.get_attribute("inputmode") == "decimal"
+    if touch:
+        # The native number pad may omit signs/spaces. Accessory buttons edit
+        # at the caret without dismissing it; Done commits through history.
+        hkl_keys = row.locator('.numeric-keys[data-for="hkl"]')
+        offset_keys = row.locator('.numeric-keys[data-for="m"]')
+        await hkl.fill("12")
+        await hkl.press("End")
+        await hkl_keys.locator('[data-key="space"]').tap()
+        assert await hkl.evaluate("el => el === document.activeElement")
+        await hkl_keys.locator('[data-key="minus"]').tap()
+        await hkl.press("3")
+        await hkl_keys.locator('[data-key="space"]').tap()
+        await hkl.press("4")
+        assert await hkl.input_value() == "12 -3 4"
+        await hkl_keys.locator('[data-key="done"]').tap()
+        assert (await state())["planes"][0]["hkl"] == [12, -3, 4]
+        assert not await hkl_keys.is_visible()
+        await offset.fill("0.25")
+        await offset_keys.locator('[data-key="sign"]').tap()
+        assert await offset.input_value() == "-0.25"
+        assert await offset.evaluate("el => el === document.activeElement")
+        await offset_keys.locator('[data-key="done"]').tap()
+        assert (await state())["planes"][0]["m"] == -.25
+        # Exercise an accessory-only edit, without typing any numeric keys.
+        await offset.tap()
+        await offset_keys.locator('[data-key="sign"]').tap()
+        await offset_keys.locator('[data-key="done"]').tap()
+        assert (await state())["planes"][0]["m"] == .25
+        await activate(row.locator("button[aria-label^='Remove plane']"))
+        await activate(page.locator("#plane-add"))
+    else:
+        await hkl.focus()
+        assert not await row.locator('.numeric-keys[data-for="hkl"]').is_visible()
     # Compact indices are expanded visibly; letters are rejected as whole edits,
     # including paste/fill paths where beforeinput may not contain the text.
     await change(hkl, "123")

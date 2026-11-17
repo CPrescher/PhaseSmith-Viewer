@@ -898,8 +898,8 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     input.onchange = () => onCommit(input);
     return input;
   };
-  // Keep text inputs so signs and (for hkl) spaces remain available on iPad.
-  // A numeric inputmode can hide those keys; it does not enforce numbers.
+  // Text inputs retain selection support and accept signed, spaced indices;
+  // numericEdits enforces the allowed characters independently of the keyboard.
   const numericEdits = (input, pattern) => {
     input.setAttribute("autocorrect", "off");
     input.setAttribute("autocapitalize", "off");
@@ -951,6 +951,63 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     text.setAttribute("aria-hidden", "true");
     wrap.append(text, input);
     return wrap;
+  };
+  const numericKeys = (input, caption, withSpace = false) => {
+    input.inputMode = withSpace ? "numeric" : "decimal";
+    input.enterKeyHint = "done";
+    const keys = make("div", { className: "tool-line numeric-keys", hidden: true });
+    keys.dataset.for = input.dataset.field;
+    keys.setAttribute("role", "group");
+    keys.setAttribute("aria-label", `Extra keys for ${caption}`);
+    keys.append(make("span", { className: "micro", textContent: caption }));
+    let edited = false;
+    input.addEventListener("focus", () => { keys.hidden = false; });
+    input.addEventListener("change", () => { edited = false; });
+    input.addEventListener("blur", (event) => {
+      // An accessory-only edit also needs the usual change/undo/save path.
+      if (edited) input.dispatchEvent(new Event("change", { bubbles: true }));
+      if (!keys.contains(event.relatedTarget)) keys.hidden = true;
+    });
+    keys.addEventListener("focusout", (event) => {
+      if (event.relatedTarget !== input && !keys.contains(event.relatedTarget)) keys.hidden = true;
+    });
+    const edit = (apply) => {
+      input.focus({ preventScroll: true });
+      const previous = input.value;
+      apply();
+      input.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
+      edited ||= input.value !== previous;
+    };
+    const key = (text, label, action, name) => {
+      const button = make("button", { type: "button", className: "secondary", textContent: text });
+      button.setAttribute("aria-label", label);
+      button.dataset.key = name;
+      // Keep the input focused, with its caret and native keyboard, on touch.
+      button.addEventListener("pointerdown", (event) => event.preventDefault());
+      button.addEventListener("click", action);
+      keys.append(button);
+    };
+    if (withSpace) {
+      key("−", "Insert minus sign", () => edit(() => input.setRangeText("-", input.selectionStart, input.selectionEnd, "end")), "minus");
+      key("Space", "Insert space between indices", () => edit(() => input.setRangeText(" ", input.selectionStart, input.selectionEnd, "end")), "space");
+    } else {
+      key("±", "Toggle offset sign", () => edit(() => {
+        const start = input.selectionStart, end = input.selectionEnd;
+        const negative = input.value.startsWith("-");
+        const signed = /^[+-]/.test(input.value);
+        input.value = negative ? input.value.slice(1) : `-${input.value.replace(/^\+/, "")}`;
+        const shift = negative ? -1 : signed ? 0 : 1;
+        input.setSelectionRange(Math.max(0, start + shift), Math.max(0, end + shift));
+      }), "sign");
+    }
+    key("Done", `Finish editing ${caption}`, () => {
+      input.blur();
+      keys.hidden = true;
+    }, "done");
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") input.blur();
+    });
+    return keys;
   };
   const removeButton = (label, onClick) => {
     const b = make("button", { type: "button", className: "icon-button", textContent: "✕", title: label });
@@ -1103,7 +1160,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         sliders.append(size, opacity);
         const bottom = make("div", { className: "tool-line" });
         bottom.append(family.label, readout);
-        row.append(top, sliders, bottom);
+        row.append(top, numericKeys(hkl, "(hkl)", true), numericKeys(m, "offset m"), sliders, bottom);
         return row;
       }),
     );
