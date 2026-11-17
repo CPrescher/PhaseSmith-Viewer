@@ -977,7 +977,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
             hkl.setSelectionRange(caret, caret);
           }
         };
-        const m = textField(fmt(plane.m), "Offset m, fractional: plane h·x + k·y + l·z = m; with Family, planes at m + n", "offset", (input) =>
+        const m = textField(fmt(plane.m), "Offset m, fractional: plane h·x + k·y + l·z = m; with Parallel planes, planes at m + n", "offset", (input) =>
           commit(input, plane, (text) => {
             const v = Number(text.replace(",", "."));
             if (!Number.isFinite(v)) throw Error("Enter a finite offset m.");
@@ -986,7 +986,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           }),
         );
         m.dataset.field = "m";
-        m.title = "h·x + k·y + l·z = m (fractional coordinates, not Å). Shifts the plane, or the whole family (m + n).";
+        m.title = "h·x + k·y + l·z = m (fractional coordinates, not Å). Shifts the plane, or all parallel planes (m + n).";
         // Show is the first control: it decides whether the entry (and its
         // label) is drawn. Captions sit inside the fields to save width.
         const show = chip("Show", plane.visible, (v) => ((plane.visible = v), rebuild()));
@@ -1008,7 +1008,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           }),
         );
         const family = chip(
-          "Family",
+          "Parallel planes",
           plane.family,
           (v) => ((plane.family = v), rebuild()),
           "Planes at m + n (integer n) through the plotting range, spaced d",
