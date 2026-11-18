@@ -20,3 +20,25 @@
   .vp-doc { color: #111; }
   .vp-doc img, .vp-doc table, .custom-block { break-inside: avoid; }
 }
+
+/* Both images are real captures of the same scene. Match the explicit site
+   theme rather than the OS preference, including after toggling the switch. */
+.viewer-figure { margin: 24px 0; width: 100%; }
+.viewer-figure-image { display: block; width: 100%; height: auto; border: 1px solid var(--vp-c-divider); border-radius: 8px; background: var(--vp-c-bg-soft); }
+.figure-dark, .dark .figure-light { display: none; }
+.dark .figure-dark { display: inline; }
+.figure-annotation { stroke: var(--vp-c-brand-1); fill: var(--vp-c-brand-1); }
+.figure-annotation text { stroke: none; }
+.figure-region rect { stroke: #d85613; }
+.figure-region circle { fill: #b13e06; stroke: white; stroke-width: 1; }
+.figure-region text { fill: white; }
+.vp-doc .viewer-figure figcaption { color: var(--vp-c-text-2); font-size: 14px; line-height: 1.6; }
+.vp-doc .viewer-figure figcaption p { margin: 8px 0; }
+.vp-doc .figure-key { margin: 8px 0; padding-left: 24px; }
+.vp-doc .figure-key li + li { margin-top: 2px; }
+@media print {
+  .viewer-figure { break-inside: avoid; }
+  .figure-dark, .dark .figure-dark { display: none !important; }
+  .figure-light, .dark .figure-light { display: inline !important; }
+  .figure-annotation { stroke: #227a73; fill: #227a73; }
+}

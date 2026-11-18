@@ -1,5 +1,9 @@
 # Bonds and coordination polyhedra
 
+Open **Pairs**, the top button on the right-hand tool rail. On a phone, tap **Tools** at the lower right, then **Pairs**. The window contains a row for each central-element / neighbor-element pair.
+
+<ViewerFigure name="pairs" alt="Pairs window showing cutoff fields, Bonds and Polyhedra switches and opacity sliders." />
+
 ## Define a pair
 
 Choose the central element, its neighboring element, and their maximum distance in ångströms. Bonds and polyhedra can be switched independently for each pair. A center inside the displayed cell can have neighbors in adjacent cells. The viewer includes these periodic images and measures distances to the actual image selected.

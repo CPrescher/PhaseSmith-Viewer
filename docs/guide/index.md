@@ -8,13 +8,14 @@ Explore a crystal structure from its atoms to its coordination polyhedra, lattic
 
 **[Open the viewer ↗](https://cprescher.github.io/PhaseSmith-Viewer/)** · **[Start the five-minute guide](./getting-started.md)**
 
-![Forsterite in PhaseSmith Viewer, showing Si–O tetrahedra and Mg–O octahedra with the Pairs controls.](/images/forsterite.png)
+<ViewerFigure name="forsterite" alt="Forsterite in PhaseSmith Viewer, showing Si–O tetrahedra and Mg–O octahedra with the Pairs controls." />
 <p class="caption">Forsterite: use pair cutoffs to explore the coordination around silicon and magnesium.</p>
 
 ## What would you like to do?
 
 | Task | Where to start |
 | --- | --- |
+| Find a button or tool on desktop or phone | [Find the controls](./interface.md) |
 | Open a CIF or find a reference mineral | [Files and structure library](./structures.md) |
 | Rotate, orient, or repeat the crystal | [Navigation and display](./navigation.md) |
 | Measure a distance, angle, or polyhedron volume | [Measurements and sites](./measurements.md) |

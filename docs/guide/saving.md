@@ -1,6 +1,14 @@
 # Saving and exporting
 
+Choose **Export**, near the bottom of the right-hand tool rail. On a phone, choose **Tools → Export**. The window opens at the image controls; scroll down inside it to reach movies, **Project file**, and **Session**.
+
+<ViewerFigure name="export" alt="Top of the Export window with image resolution, transparency and Save PNG controls." />
+
 ## Portable project files
+
+Scroll inside Export until **Project file** is visible.
+
+<ViewerFigure name="project" alt="Export window scrolled to Project file, showing the Save project and Open project buttons." />
 
 Choose **Export → Project file → Save project** to download a `.psv` file. It embeds the complete original CIF (including all data blocks) and the current viewer settings: extent, pairs, styles, atom visibility, planes, directions, symmetry, labels, camera, measurement picks, tool windows, export preferences, and light/dark theme. Reopen it with **Open file** in the header or **Export → Project file → Open project**. The file works in a fresh browser or on another computer without the original CIF. Saving downloads a new file; it does not overwrite an earlier download automatically. Undo/redo history starts fresh when a project is opened.
 

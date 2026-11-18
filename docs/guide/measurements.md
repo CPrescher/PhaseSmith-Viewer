@@ -1,20 +1,26 @@
 # Measurements and sites
 
+Look at the **upper right of the crystal area, below the header**. The measurement toolbar is separate from the right-hand tool rail. On a phone, these buttons form a vertical column in the same corner; you do not need to open Tools.
+
+<ViewerFigure name="measurements" alt="Actual measurement buttons with leader lines labeling Info, Distance, Angle and Clear." />
+
 ## Inspect one atom
 
-Choose **Info** to inspect one atom at a time, including its CIF label, element, occupancy, displayed coordinates and configured coordination information.
+Click **Info**, the **i** button at the start of the measurement toolbar, to inspect one atom at a time, including its CIF label, element, occupancy, displayed coordinates and configured coordination information.
 
 The left-click action buttons stay fixed at the top right of the crystal view. Switching between **Info**, **Distance**, and **Angle** clears the current selection so the new mode starts fresh. Atom details and measurement results appear in a separate card below them, beside the tool rail; long details scroll inside the card. **Clear** keeps its place and is dimmed until an atom is selected. On phones, the buttons stay in a vertical column with the value (or the atom's label) below them; **Details** opens the full lines in a small panel that closes again with **Hide**.
 
 ## Measure a distance or angle
 
-Choose **Distance** (↔) and pick two atoms. The result is the Cartesian separation between those selected images in Å, including any lattice translation between them. It is not automatically the shortest periodic separation.
+Click **Distance**, the **↔** button beside Info, and then pick two atoms in the crystal. The result is the Cartesian separation between those selected images in Å, including any lattice translation between them. It is not automatically the shortest periodic separation.
 
-Use **∠** in the measurement control and pick three atoms in A–B–C order. The second atom is the angle vertex. Select **↔** (Distance) to return to two-atom distance measurements.
+Click **Angle**, the **∠** button beside Distance, and pick three atoms in A–B–C order. The second atom is the angle vertex. Select **↔** (Distance) to return to two-atom distance measurements.
 
 ## Site labels and polyhedron volumes
 
-Choose **Sites** from the tools to see the original CIF site labels, fractional coordinates and occupancies. **Labels** annotates visible spheres. Tap a table row to highlight visible copies of that site. The polyhedron table reports coordination numbers and convex-hull volumes in Å³ by central site. These volumes use the physical atomic coordinates.
+<ViewerFigure name="sites" alt="Sites and volumes window showing original CIF sites and the coordination table." />
+
+Choose **Sites**, the second button on the right-hand tool rail (or **Tools → Sites** on a phone), to see the original CIF site labels, fractional coordinates and occupancies. **Labels** annotates visible spheres. Tap a table row to highlight visible copies of that site. The polyhedron table reports coordination numbers and convex-hull volumes in Å³ by central site. These volumes use the physical atomic coordinates.
 
 ## Asymmetric unit
 

@@ -1,5 +1,7 @@
 # Worked examples
 
+If you are not sure where a button is, keep [Find the controls](./interface.md) open beside the viewer. It shows the desktop tool rail and the phone Tools menu, with labeled close-ups of the measurement buttons.
+
 Each example uses a bundled structure. Save a project before opening an example link if you want to keep your current scene.
 
 ## Coordination in forsterite
@@ -15,7 +17,7 @@ Each example uses a bundled structure. Save a project before opening an example 
 
 **What this shows:** different independent sites can have different distance distributions. A small cutoff change can exclude part of a distorted shell. The atoms have not moved, and the displayed coordination is conditional on the cutoff.
 
-![Forsterite with silicon and magnesium coordination polyhedra and their pair controls.](/images/forsterite.png)
+<ViewerFigure name="forsterite" alt="Forsterite with silicon and magnesium coordination polyhedra and their pair controls." />
 
 ## Follow a silicate chain in wollastonite
 

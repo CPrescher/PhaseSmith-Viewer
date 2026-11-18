@@ -1,0 +1,203 @@
+{
+  "interface": {
+    "width": 1280,
+    "height": 800,
+    "display": 740,
+    "regions": [
+      {
+        "x": 1039,
+        "y": 6,
+        "width": 228,
+        "height": 43,
+        "number": 1,
+        "text": "Library and Open file"
+      },
+      {
+        "x": 9,
+        "y": 65,
+        "width": 334,
+        "height": 52,
+        "number": 2,
+        "text": "View directions and Turn"
+      },
+      {
+        "x": 1023,
+        "y": 65,
+        "width": 168,
+        "height": 52,
+        "number": 3,
+        "text": "Info, Distance, Angle and Clear"
+      },
+      {
+        "x": 1199,
+        "y": 117,
+        "width": 64,
+        "height": 398,
+        "number": 4,
+        "text": "Tool rail"
+      },
+      {
+        "x": 9,
+        "y": 729,
+        "width": 475,
+        "height": 62,
+        "number": 5,
+        "text": "Visibility, elements and sphere size"
+      }
+    ]
+  },
+  "measurements": {
+    "width": 178,
+    "height": 62,
+    "display": 520,
+    "labels": [
+      {
+        "x": 31.0,
+        "y": 49,
+        "text": "Info"
+      },
+      {
+        "x": 69.0,
+        "y": 49,
+        "text": "Distance"
+      },
+      {
+        "x": 107.0,
+        "y": 49,
+        "text": "Angle"
+      },
+      {
+        "x": 147.0,
+        "y": 49,
+        "text": "Clear"
+      }
+    ]
+  },
+  "view-controls": {
+    "width": 344,
+    "height": 62,
+    "display": 600
+  },
+  "file-controls": {
+    "width": 238,
+    "height": 53,
+    "display": 420,
+    "labels": [
+      {
+        "x": 53.8828125,
+        "y": 44.5,
+        "text": "Library"
+      },
+      {
+        "x": 173.6953125,
+        "y": 44.5,
+        "text": "Open file"
+      }
+    ]
+  },
+  "visibility": {
+    "width": 485,
+    "height": 72,
+    "display": 620,
+    "labels": [
+      {
+        "x": 36.0,
+        "y": 59,
+        "text": "Atoms"
+      },
+      {
+        "x": 86.0,
+        "y": 59,
+        "text": "Polyhedra"
+      },
+      {
+        "x": 224.109375,
+        "y": 54,
+        "text": "Elements"
+      },
+      {
+        "x": 421.984375,
+        "y": 54,
+        "text": "Size"
+      }
+    ]
+  },
+  "forsterite": {
+    "width": 1280,
+    "height": 800,
+    "display": 740
+  },
+  "pairs": {
+    "width": 336,
+    "height": 478,
+    "display": 420
+  },
+  "sites": {
+    "width": 336,
+    "height": 478,
+    "display": 420
+  },
+  "extent": {
+    "width": 336,
+    "height": 478,
+    "display": 420
+  },
+  "appearance": {
+    "width": 336,
+    "height": 478,
+    "display": 420
+  },
+  "lattice": {
+    "width": 336,
+    "height": 478,
+    "display": 420
+  },
+  "export": {
+    "width": 336,
+    "height": 478,
+    "display": 420
+  },
+  "project": {
+    "width": 336,
+    "height": 478,
+    "display": 420
+  },
+  "pair-distances": {
+    "width": 776,
+    "height": 784,
+    "display": 680
+  },
+  "powder": {
+    "width": 776,
+    "height": 784,
+    "display": 680
+  },
+  "phone": {
+    "width": 390,
+    "height": 844,
+    "display": 320,
+    "regions": [
+      {
+        "x": 327,
+        "y": 62,
+        "width": 58,
+        "height": 196,
+        "number": 1,
+        "text": "Measurement buttons at the upper right"
+      },
+      {
+        "x": 335,
+        "y": 789,
+        "width": 50,
+        "height": 50,
+        "number": 2,
+        "text": "Tools button at the lower right"
+      }
+    ]
+  },
+  "phone-tools": {
+    "width": 336,
+    "height": 543,
+    "display": 360
+  }
+}

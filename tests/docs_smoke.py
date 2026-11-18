@@ -21,8 +21,10 @@ class PageLinks(HTMLParser):
             self.ids.add(attrs['id'])
         if tag == 'a' and attrs.get('href'):
             self.links.append(attrs['href'])
-        if tag == 'img' and attrs.get('src'):
-            self.images.append(attrs['src'])
+        if tag in ('img', 'image'):
+            source = attrs.get('src') or attrs.get('href') or attrs.get('xlink:href')
+            if source:
+                self.images.append(source)
 
 
 async def main():
@@ -59,7 +61,7 @@ async def main():
                 target = urljoin(address, href).split('#')[0]
                 if target.startswith(DOCS) and (target.endswith('.html') or target.endswith('/')):
                     pending.append(target)
-        assert len(parsed) >= 13, len(parsed)
+        assert len(parsed) >= 14, len(parsed)
         for address, doc in parsed.items():
             for href in doc.links:
                 target = urljoin(address, href)
@@ -76,8 +78,19 @@ async def main():
         await expect(page).to_have_url(DOCS + 'science.html#diffraction')
         await page.reload()
         await expect(page.locator('h1')).to_contain_text('Scientific conventions')
+        await page.goto(DOCS + 'getting-started.html')
+        await page.wait_for_load_state('networkidle')
+        toolbar = page.get_by_role('img', name='The measurement toolbar, with leader lines labeling the actual Info i, Distance double arrow, Angle angle symbol, and Clear cross buttons.', exact=True)
+        await expect(toolbar.locator('text')).to_have_text(['Info', 'Distance', 'Angle', 'Clear'])
+        await expect(toolbar.locator('[data-theme=light]')).to_be_visible()
+        await expect(toolbar.locator('[data-theme=dark]')).to_be_hidden()
         await page.get_by_role('switch').click()
-        assert await page.evaluate("document.documentElement.classList.contains('dark')")
+        await expect(toolbar.locator('[data-theme=dark]')).to_be_visible()
+        await expect(toolbar.locator('[data-theme=light]')).to_be_hidden()
+        await page.emulate_media(media='print')
+        await expect(toolbar.locator('[data-theme=light]')).to_be_visible()
+        await expect(toolbar.locator('[data-theme=dark]')).to_be_hidden()
+        await page.emulate_media(media='screen')
 
         await page.set_viewport_size({'width':390, 'height':844})
         await page.goto(DOCS)
@@ -103,7 +116,7 @@ async def main():
         await expect(guide).to_have_url(DOCS)
         await expect(guide.locator('h1')).to_contain_text('PhaseSmith Viewer user guide')
         assert not errors, errors
-        print(f'Documentation: {len(parsed)} pages, anchors, images, search, mobile navigation, theme and viewer Help passed')
+        print(f'Documentation: {len(parsed)} pages, anchors, images, search, mobile navigation, screenshot themes, print and viewer Help passed')
         await browser.close()
 
 

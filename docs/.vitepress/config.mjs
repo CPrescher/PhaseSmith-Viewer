@@ -23,6 +23,7 @@ export default defineConfig({
       { text: 'Start here', items: [
         { text: 'Overview', link: '/' },
         { text: 'Your first structure', link: '/getting-started' },
+        { text: 'Find the controls', link: '/interface' },
         { text: 'Worked examples', link: '/tutorials' },
       ] },
       { text: 'Using the viewer', items: [

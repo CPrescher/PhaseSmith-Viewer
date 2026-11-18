@@ -27,7 +27,7 @@ To use it on a tablet on the same network, bind the server to `0.0.0.0` and open
 
 ## Edit this guide
 
-Edit pages in `docs/guide/`. Navigation and search are configured in `docs/.vitepress/config.mjs`; shared styles are in `docs/.vitepress/theme/`. Screenshots are in `docs/guide/public/images/`. Internal design reviews in `docs/reviews/` are outside the published source directory.
+Edit pages in `docs/guide/`. Navigation and search are configured in `docs/.vitepress/config.mjs`; shared styles are in `docs/.vitepress/theme/`. Screenshots are in `docs/guide/public/images/`. The shared `ViewerFigure` component chooses the image matching the documentation theme; its labels and outlines are defined in `docs/.vitepress/theme/figures.json`. Internal design reviews in `docs/reviews/` are outside the published source directory.
 
 ```sh
 npm run docs:dev
@@ -40,6 +40,18 @@ npm run docs:build
 ```
 
 VitePress checks internal page links during the build. Match documented control names and behavior to the version being released. Keep unfinished features out of the public guide until that version ships. Update the relevant page when changing a feature, and add a worked example when a task is easier to understand by trying it.
+
+## Capture screenshots
+
+With the production viewer served locally and Playwright installed, run:
+
+```sh
+VIEWER_URL=http://127.0.0.1:4179 python3 scripts/capture-docs.py
+```
+
+Set `BROWSER_CHANNEL=chrome` to use an installed Chrome. The script captures each scene in both themes on the same page, preserving camera, selections, and panel scroll. It measures the real button positions for the callout labels. Commit both theme images and the generated figure metadata together.
+
+When documenting a control, explain **where it is**, show its actual icon or panel, and state **what opens or changes**. Include the phone route when it differs. Keep small icon controls large enough to recognize; a full-window screenshot alone is not enough. Use a `ViewerFigure` for every screenshot so manual theme switching also switches its image.
 
 ## GitHub Pages
 

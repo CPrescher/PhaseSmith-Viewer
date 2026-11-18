@@ -1,5 +1,7 @@
 # Navigation and display
 
+Use the [desktop and phone control map](./interface.md) to locate the tool rail, measurement buttons, and visibility controls.
+
 ## Using the tool windows
 
 Settings start closed. On desktop and tablet, choose **Pairs**, **Style**, **Lattice**, **Sites**, **Extent** or **Export** from the right-hand bar. Click the active item again to close it; choosing another replaces its content in the same palette. Each tool keeps its values and scroll position. There is one settings window, with a Close button and no Pin or Minimize controls. Desktop palettes can be dragged and resized; double-clicking the title restores the default position.
@@ -8,9 +10,15 @@ At phone width, the round **Tools** button is at the lower right and opens a lab
 
 Settings are overlays: opening, switching, moving, resizing or closing them never moves, zooms or refits the structure. Use the original rotation, pan, wheel/pinch zoom, axis directions, Turn pad and explicit Fit controls to place the structure. Picking atoms updates the info readout beneath the measurement modes without changing the active editor.
 
+<ViewerFigure name="visibility" alt="The lower-left visibility strip with labels pointing to Atoms, Polyhedra, element controls and Size." />
+
 The icon toggles at the lower left independently show/hide **Atoms** and **Polyhedra**. Hiding polyhedra hides both faces and outlines, preserving every pair's cutoff, opacity, colors and enabled state; planes and arrows are unaffected. The Pairs filter **Hide atoms outside polyhedra** is different: it limits the atoms to centers and vertices belonging to enabled polyhedra.
 
 ## Mouse and touch navigation
+
+The **view toolbar is at the upper left inside the crystal area**, below the header.
+
+<ViewerFigure name="view-controls" alt="Actual view toolbar with axis directions a, b, c, uvw, Turn and Reset." />
 
 Left-drag continuously in any direction to turn the model over its poles around the current view center. The wheel zooms about the cursor. Right-drag pans with the point you grab held under the cursor. A right-click zooms out one step, and a double right-click fits the displayed structure while preserving its orientation. Use the **a**, **b**, or **c** views to align the camera with a direct lattice axis. For a custom direction, enter the three indices of [uvw]. The camera looks toward the structure from the positive side of the vector u**a** + v**b** + w**c**. The parallel projection aligns rows of atoms along that direction. These are direct lattice directions. In a nonorthogonal cell a direct direction and the normal to the plane with the same indices generally differ.
 
@@ -20,11 +28,19 @@ On a touchscreen, one finger rotates the crystal. Two fingers can also twist to 
 
 ## Plotting extent
 
+Open **Extent** on the right-hand tool rail, or **Tools → Extent** on a phone. Edit the lower and upper coordinate fields, then click **Apply** below the fields.
+
+<ViewerFigure name="extent" alt="Extent window with a, b and c plotting-range fields and the Apply button." />
+
 Set the lower and upper fractional coordinates independently along **a**, **b**, and **c**. A range of 0 to 1 spans one cell, −1 to 1 spans two cells, and fractional limits select part of a cell. Applying the range repeats the structure by lattice translations and fits the new extent in the current orientation. Each translated atom remains individually selectable for distance measurements.
 
 Open [the wollastonite example](https://cprescher.github.io/PhaseSmith-Viewer/?example=wollastonite) to follow the Si–O chains through three cells along **b**. The example opens looking along **c** and uses the triclinic structure from the Freiburg exercise, with **a** and **c** each spanning one cell. Shared oxygen vertices connect successive tetrahedra across both internal cell boundaries. Increasing the upper b limit extends the chains. For a shorter view, change it back to 1.
 
 ## Appearance
+
+Open **Style**, the palette icon near the bottom of the tool rail, or **Tools → Style** on a phone.
+
+<ViewerFigure name="appearance" alt="Appearance window showing the style target selector, colors and size controls." />
 
 Every element from H to Og has a defined default color. Common mineral elements use contrasting colors: O red, Si blue, Mg green, Al violet, Ca gold and Fe orange. Polyhedra inherit their central element's default color, so their colors stay consistent when pairs are added or deleted. Colors stay the same in both themes. Other element colors and the fallback covalent radii are adapted from the [Blue Obelisk Data Repository](https://github.com/BlueObelisk/bodr/blob/master/bodr/elements/elements.xml).
 

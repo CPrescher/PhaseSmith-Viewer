@@ -1,5 +1,9 @@
 # Files and structure library
 
+Use **Library** or **Open file** in the header at the upper right, above the crystal view. These controls are separate from the right-hand tool rail. On narrow screens, Open file is shortened to **Open**.
+
+<ViewerFigure name="file-controls" alt="Actual Library and Open file buttons with labels pointing to each." />
+
 ## Open a structure
 
 Choose **Open file** in the header and select a CIF. The file is read on your device, parsed by the PhaseSmith WebAssembly engine, and expanded using its crystallographic symmetry. If the file contains several data blocks, use the block selector in the header to choose the structure.
