@@ -72,6 +72,8 @@ jobs:
         run: node --test tests/*.test.mjs
       - name: Production build for GitHub Pages
         run: npm run build -- --base "$VITE_BASE_PATH"
+      - name: Build searchable documentation
+        run: npm run docs:build
       - name: Install browser test dependencies
         run: |
           python -m pip install -r tests/requirements-browser.txt
@@ -88,6 +90,7 @@ jobs:
           viewer_server_pid=$!
           trap 'kill "$viewer_server_pid"; rm -rf "$viewer_site_root"' EXIT
           curl --retry 10 --retry-connrefused --retry-delay 1 -fsS "http://127.0.0.1:4181$VITE_BASE_PATH" > /dev/null
+          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/docs_smoke.py
           if [ "${{ inputs.full_browser_matrix }}" = true ]; then
             VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/run_browser_checks.py --timeout 1200
           else

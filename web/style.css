@@ -2337,6 +2337,8 @@ button.element[aria-pressed="false"] .dot {
   -webkit-backdrop-filter: blur(6px);
 }
 .rail-button {
+  text-decoration: none;
+  font: inherit;
   position: relative;
   display: grid;
   justify-items: center;

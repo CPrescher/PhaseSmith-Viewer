@@ -3,3 +3,4 @@ engine/target/
 dist/
 .DS_Store
 __pycache__/
+docs/.vitepress/cache/
