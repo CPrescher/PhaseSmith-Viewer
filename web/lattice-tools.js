@@ -523,8 +523,9 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   //    REVERSE_PENALTY extra, so a label does not hop straight back;
   //  - permanent priority: a label's rank is fixed when first seen and
   //    kept while it is hidden, so hide/show never reorders collisions.
-  // Frames count rendered frames only (on-demand rendering: no timers or
-  // extra frames); a hard block still relocates immediately.
+  // Frames count rendered frames only; a hard block relocates immediately.
+  // Suppressed labels get one recovery pass after interaction settles, so
+  // on-demand rendering cannot leave a temporary suppression stuck forever.
   const SWITCH_MARGIN = 30,
     FAMILY_NEW = 150, // a further family member needs a clear spot to appear…
     FAMILY_KEEP = 260, // …and keeps showing until it gets clearly worse.
@@ -537,12 +538,34 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     HELD_PENALTY = 260, // landing on another label's previous-frame spot
     DISPLACE_FREE = 24, // px of free movement for a relocating label…
     DISPLACE_COST = 0.45, // …then this cost per px (a 180 px jump ≈ +70)
-    LONG_JUMP = 110; // a second long forced jump within REVERSE_FRAMES culls
+    LONG_JUMP = 110, // a second long forced jump within REVERSE_FRAMES culls
+    RECOVERY_MS = 180; // retry suppressed labels once interaction settles
   // key → { rank, cand, nv, visible, lastCand, switchFrame, switches }
   const placementCache = new Map();
   let nextRank = 0,
     frameNo = 0,
     cachedPosition = labelPosition;
+  let recoveryTimer = null;
+  function cancelLabelRecovery() {
+    clearTimeout(recoveryTimer);
+    recoveryTimer = null;
+  }
+  function recoverLabelsWhenIdle() {
+    if (exportMode || !lastCulled.length) return;
+    recoveryTimer = setTimeout(() => {
+      recoveryTimer = null;
+      // Rendering is on demand: a frame-count cooldown cannot expire while
+      // idle. Forget only suppressed spots, keeping visible labels and the
+      // permanent collision order, then request one fresh placement pass.
+      for (const entry of placementCache.values()) {
+        if (!entry.culled) continue;
+        entry.cand = entry.lastCand = entry.switchFrame = null;
+        entry.culled = false;
+        delete entry.rect;
+      }
+      invalidate();
+    }, RECOVERY_MS);
+  }
   // All candidates for one plane label, each with a stable id.
   function planeCandidates(sv, w, ctx) {
     const h = LABEL_H;
@@ -620,6 +643,12 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   // Placement for one plane label with hysteresis, or null (hidden).
   function placePlane(a, sv, w, ctx, prev) {
     const cands = planeCandidates(sv, w, ctx);
+    const familyPlaced = ctx.placed.some((p) => p.planeId === a.planeId);
+    const limit = prev?.visible ? FAMILY_KEEP : FAMILY_NEW;
+    // Apply visibility limits while selecting a spot. Otherwise a remembered
+    // spot (or a low movement cost) can win and then hide the label, even
+    // though another candidate has enough room to show it.
+    const eligible = (c) => c.s < REJECT && (!familyPlaced || c.s < limit);
     const sinceSwitch = prev?.switchFrame == null ? Infinity : frameNo - prev.switchFrame;
     const edgeOf = (id) => {
       const [i, , sign] = String(id).split(":");
@@ -646,7 +675,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     let best = null,
       bestScore = Infinity;
     for (const c of cands)
-      if (!c.hard) {
+      if (!c.hard && eligible(c)) {
         const v = adjusted(c);
         if (v < bestScore) {
           best = c;
@@ -654,7 +683,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         }
       }
     // The held spot stays usable until it truly overlaps (KEEP_PAD).
-    const kept = prev?.cand && prev.nv === sv.length ? cands.find((c) => c.id === prev.cand && !c.hardKeep) : null;
+    const kept = prev?.cand && prev.nv === sv.length ? cands.find((c) => c.id === prev.cand && !c.hardKeep && eligible(c)) : null;
     let chosen,
       reason;
     if (kept) {
@@ -674,14 +703,11 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         return null;
       }
     }
-    if (!chosen || chosen.s >= REJECT) return null;
-    // Do not cover the middle of the model just to label every member of
-    // a family; a visible member hides only when clearly worse.
-    const limit = prev?.visible ? FAMILY_KEEP : FAMILY_NEW;
-    if (chosen.s >= limit && ctx.placed.some((p) => p.planeId === a.planeId)) return null;
+    if (!chosen) return null;
     return { ...chosen, kept: chosen === kept, reason, displacement: Math.round(displacement(chosen)) };
   }
   function updateLabels(camera, canvas) {
+    cancelLabelRecovery();
     if (!anchors.length && !shownLabels.length) return;
     const layer = $("lattice-labels");
     const canvasRect = canvas.getBoundingClientRect();
@@ -792,6 +818,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         if (!ctx.culled.includes(key)) entry.culled = false;
       }
     lastCulled = [...ctx.culled];
+    recoverLabelsWhenIdle();
     while (labelPool.length < placed.length) {
       const span = make("span", { className: "lattice-label" });
       layer.append(span);
@@ -1363,6 +1390,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     setExportObstacles(rects) { exportObstacles = rects; },
     setExportMode(on) {
       if (exportMode === on) return;
+      cancelLabelRecovery();
       exportMode = on;
       if (on) {
         savedPlacement = { cache: new Map(placementCache), nextRank, frameNo, cachedPosition, shownLabels, lastPlaced, lastCulled, obstacles };
@@ -1410,6 +1438,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     },
     /** Apply validated session settings; invalid entries are skipped. */
     restoreState(state, { trusted = false } = {}) {
+      cancelLabelRecovery();
       if (!state || typeof state !== "object") return;
       const finite = (v) => typeof v === "number" && Number.isFinite(v);
       const triple = (v) => Array.isArray(v) && v.length === 3 && v.every(finite);
@@ -1475,6 +1504,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       collectLabelAnchors();
     },
     reset() {
+      cancelLabelRecovery();
       planes = [];
       arrows = [];
       placementCache.clear(); // new structure: no remembered label spots
