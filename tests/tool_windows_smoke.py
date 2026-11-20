@@ -1,3 +1,4 @@
+from smoke import reveal_control
 """Native inputs: stationary scene, single toggleable tools, aligned info,
 independent global visibility, precise editing and saved settings."""
 import asyncio, math, os
@@ -18,7 +19,11 @@ async def launcher(page,button):
   await settle(page)
   unchanged(prior,await diagnostics(page))
   menu=await page.locator('#tool-rail').bounding_box();trigger=await page.locator('#tools-menu').bounding_box()
-  assert menu['y']+menu['height']<=trigger['y']-4,(menu,trigger)
+  if page.viewport_size['height'] < 500:
+   for action in await page.locator('#tool-rail .rail-button').all():
+    assert await action.evaluate("e=>{const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));}"), 'landscape action covered'
+  else:
+   assert menu['y']+menu['height']<=trigger['y']-4,(menu,trigger)
  await page.locator(button).click()
  await settle(page)
 def unchanged(before,after):
@@ -105,6 +110,7 @@ async def matrix(browser):
 async def editing(browser):
  page=await browser.new_page(viewport={'width':1200 if QUICK else 1440,'height':800 if QUICK else 900},has_touch=True)
  await ready(page);await choose_tool(page,'#mode-pairs')
+ await page.locator('#pair-visibility-options > summary').click()
  assert 'Hide atoms outside polyhedra' in await page.locator('label:has(#polyhedra-only)').inner_text()
  await page.locator('#polyhedra-filter-help').wait_for(state='visible')
  pose=await diagnostics(page);window=await page.locator('#tool-window-pairs').bounding_box()
@@ -123,7 +129,7 @@ async def editing(browser):
  assert all(not m['visible'] and not m['outlineVisible'] for m in d['faceMaterials'])
  await choose_tool(page,'#mode-lattice');await page.locator('#plane-add').click();await settle(page)
  assert any(p['faces']['visible'] for p in (await diagnostics(page))['lattice']['planes'])
- await choose_tool(page,'#mode-export');await page.locator('#session-save').click()
+ await choose_tool(page,'#mode-export');await reveal_control(page,"#session-save");await page.locator('#session-save').click()
  await page.wait_for_function('!viewerDiagnostics().session.pending && viewerDiagnostics().session.status.startsWith("Saved")')
  await page.wait_for_timeout(1200) # let the IndexedDB save transaction commit
  await page.reload();await page.wait_for_function('window.viewerDiagnostics?.().session.restoredAt>0 && !viewerDiagnostics().session.suspended')

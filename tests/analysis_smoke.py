@@ -5,7 +5,7 @@ import io
 import os
 from pathlib import Path
 from playwright.async_api import async_playwright
-from smoke import URL, HERE, choose_tool, diagnostics
+from smoke import URL, HERE, choose_tool, diagnostics, reveal_control
 
 SIMPLE = """data_analysis_cube
 _cell_length_a 4
@@ -75,6 +75,8 @@ async def check(browser, width, height, theme):
         await page.mouse.up()
         moved = await page.locator("#analysis-window").bounding_box()
         assert abs(moved["x"] - box["x"] - 60) < 2 and abs(moved["y"] - box["y"] - 30) < 2
+    if await page.locator("#analysis-settings").get_attribute("open") is None:
+        await page.locator("#analysis-settings > summary").click()
     await page.locator("#analysis-rMax").fill("7")
     await ready(page, rows=3)
     assert "6.92820" in await page.locator("#analysis-table tbody tr").last.inner_text()
@@ -114,7 +116,7 @@ async def check(browser, width, height, theme):
     await page.keyboard.press("Escape")
     assert not await page.locator("#analysis-window").is_visible()
     assert (await diagnostics(page))["windows"]["visible"] == ["pairs"]
-    await choose_tool(page, "#mode-analysis")
+    await choose_tool(page, "#mode-powder")
     await ready(page, column="2θ (°)", rows=3)
     assert await page.locator("#analysis-rMax").input_value() == "7"
     # Autosave and reload preserve the plot preferences and independent visibility.
@@ -172,6 +174,7 @@ async def check(browser, width, height, theme):
     assert not await page.locator('#analysis-pair option[value="O–Si"]').count()
     assert await page.locator('#analysis-table .analysis-pair-swatch').count() > 0
     si_color = next(r["color"] for r in color_data if r["pair"] == "Si–O")
+    await reveal_control(page, "#analysis-pair")
     await page.locator("#analysis-pair").select_option("Si–O")
     await ready(page)
     assert all("Si–O" in text for text in await page.locator("#analysis-table tbody tr").all_inner_texts())

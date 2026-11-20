@@ -4,7 +4,7 @@ Use the [desktop and phone control map](./interface.md) to locate the tool rail,
 
 ## Using the tool windows
 
-Settings start closed. On desktop and tablet, choose **Pairs**, **Style**, **Lattice**, **Sites**, **Extent** or **Export** from the right-hand bar. Click the active item again to close it; choosing another replaces its content in the same palette. Each tool keeps its values and scroll position. There is one settings window, with a Close button and no Pin or Minimize controls. Desktop palettes can be dragged and resized; double-clicking the title restores the default position.
+Settings start closed. On desktop and tablet, choose **Bonds & polyhedra**, **Style**, **Lattice**, **Sites**, **Extent** or **Export** from the right-hand bar. Click the active item again to close it; choosing another replaces its content in the same palette. Each tool keeps its values and scroll position. There is one settings window, with a Close button and no Pin or Minimize controls. Desktop palettes can be dragged and resized; double-clicking the title restores the default position.
 
 At phone width, the round **Tools** button is at the lower right and opens a labeled list above it. Phone and portrait-tablet settings use a sheet above the persistent bottom controls. Short landscape phones put the editor under the direction toolbar at the left, leaving the measurement modes and aligned info readout at the right. **Tune** shows just the last-touched pair, plane or arrow; **All settings** restores the full editor and its scroll position.
 
@@ -12,7 +12,7 @@ Settings are overlays: opening, switching, moving, resizing or closing them neve
 
 <ViewerFigure name="visibility" alt="The lower-left visibility strip with labels pointing to Atoms, Polyhedra, element controls and Size." />
 
-The icon toggles at the lower left independently show/hide **Atoms** and **Polyhedra**. Hiding polyhedra hides both faces and outlines, preserving every pair's cutoff, opacity, colors and enabled state; planes and arrows are unaffected. The Pairs filter **Hide atoms outside polyhedra** is different: it limits the atoms to centers and vertices belonging to enabled polyhedra.
+The icon toggles at the lower left independently show/hide **Atoms** and **Polyhedra**. Hiding polyhedra hides both faces and outlines, preserving every pair's cutoff, opacity, colors and enabled state; planes and arrows are unaffected. The Bonds & polyhedra filter **Hide atoms outside polyhedra** is different: it limits the atoms to centers and vertices belonging to enabled polyhedra.
 
 ## Mouse and touch navigation
 
@@ -28,7 +28,7 @@ On a touchscreen, one finger rotates the crystal. Two fingers can also twist to 
 
 ## Plotting extent
 
-Open **Extent** on the right-hand tool rail, or **Tools → Extent** on a phone. Edit the lower and upper coordinate fields, then click **Apply** below the fields.
+Open **Extent** on the right-hand tool rail, or **Tools → Extent** on a phone. Edit the lower and upper coordinate fields, then click **Apply axes** in the panel header.
 
 <ViewerFigure name="extent" alt="Extent window with a, b and c plotting-range fields and the Apply button." />
 
@@ -48,7 +48,7 @@ Choose **Style** from the tools; the Appearance window opens. Choose an element 
 
 Under **Sphere radii**, choose **Crystal (Shannon 1976)** (the default), **Effective ionic (Shannon 1976)**, **Atomic (neutral atoms)**, or **Single-bond covalent (Pyykkö–Atsumi)**. Open **Shannon radii by site** to inspect or change the reference value for an individual crystallographic site. See [Atomic and ionic radii](./radii.md) for the sources, a comparison in ångströms, and a worked MgO example.
 
-To highlight one copy, enable **Pick one** and tap a sphere or a polyhedron face. Individually styled copies stay in the target list, also after a restart. The reset button names its target. **Reset atom** or **Reset polyhedron** removes only that copy's own style, so it follows the current element or pair style again. **Reset element** or **Reset pair** restores the defaults of the whole element or pair, including its individually styled copies. **Reset all … individual styles** removes every individual override at once. Resets never change coordinates. Close Appearance or choose another tool to return to measuring.
+To highlight one copy, enable **Style one copy** and tap a sphere or a polyhedron face. Individually styled copies stay in the target list, also after a restart. The reset button names its target. **Reset atom** or **Reset polyhedron** removes only that copy's own style, so it follows the current element or pair style again. **Reset element** or **Reset pair** restores the defaults of the whole element or pair, including its individually styled copies. **Reset all … individual styles** removes every individual override at once. Resets never change coordinates. Close Appearance or choose another tool to return to measuring.
 
 The **View** readout above the atom legend shows the current viewing direction as a direct-lattice vector [u v w], pointing from the crystal toward you, like the **a**, **b** and **c** buttons. Exact small-integer directions are shown as they are. Other directions are marked with ≈.
 

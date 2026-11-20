@@ -3095,3 +3095,395 @@ button.element[aria-pressed="false"] .dot {
   #app > header:has(#block-wrap:not([hidden])) { flex-wrap: wrap; }
   #block-wrap:not([hidden]) { order: 1; flex: 1 0 100%; }
 }
+
+/* Responsive review: put the active scientific result before secondary setup. */
+.tool-options { margin: 10px 0; border-top: 1px solid var(--line); padding-top: 8px; }
+.tool-options > summary { cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 600; min-height: 36px; display: list-item; align-content: center; }
+.tool-options[open] > summary { margin-bottom: 6px; color: var(--text); }
+.tool-window .coordination > .section-title { display: none; }
+.tool-window-head #add-rule { margin-left: 0; font-size: 13px; white-space: nowrap; }
+#pair-rules { padding-top: 4px; }
+#range-form { grid-template-columns: minmax(0, 1fr); }
+.range-actions { display: flex; gap: 8px; }
+.range-actions button { flex: 1; }
+#warnings::before { content: "CIF import notes · Expand for details"; display: block; font-weight: 650; }
+#warnings[aria-expanded="true"]::before { content: "CIF import notes · Collapse"; }
+#analysis-status:empty { display: none; }
+.analysis-head h2 { text-transform: none; letter-spacing: 0; }
+.tools-menu-label { font-size: 10px; font-weight: 650; line-height: 12px; }
+.tools-menu { display: none; }
+#app[data-launcher="menu"] .tools-menu { display: flex; flex-direction: column; justify-content: center; gap: 1px; }
+.detector-view-tabs, .reflection-mobile-tabs { display: none; }
+.reflection-options { position: relative; margin: 0; padding: 0; border: 0; }
+.reflection-option-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; }
+.reflection-options:not([open]) .reflection-option-fields { display: none; }
+.reflection-options > summary { padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: 6px; color: var(--text); }
+.reflection-options[open] { flex-basis: 100%; }
+.reflection-options[open] > summary { width: fit-content; }
+.reflection-options:not([open]) #reflection-wavelength { visibility: hidden; }
+/* Keep the desktop setup row open and in place. */
+@media (min-width: 901px) and (min-height: 501px) {
+  .reflection-options { display: contents; }
+  .reflection-options > summary { display: none; }
+  .reflection-options:not([open]) .reflection-option-fields { display: flex; }
+  .reflection-options:not([open]) #reflection-wavelength { visibility: visible; }
+}
+@media (pointer: coarse), (max-width: 900px) {
+  dialog input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]), dialog select, dialog textarea { font-size: 16px !important; }
+  dialog button, dialog summary, .tool-options > summary { min-height: 44px; }
+  #reflection-explorer button, #reflection-explorer input:not([type="range"]), #reflection-explorer select,
+  #detector-window button:not(.window-button), #detector-window .ewald-controls button,
+  #detector-options button, #detector-options input:not([type="checkbox"]), #detector-options select { min-height: 44px; }
+  #detector-window .ewald-controls button { min-width: 44px; }
+}
+/* One full-width diagram on a portrait phone, with a persistent view choice. */
+@media (max-width: 540px) {
+  .detector-view-tabs { display: flex; gap: 6px; margin-top: 10px; }
+  .detector-view-tabs button { flex: 1; }
+  .detector-view-tabs button[aria-pressed="true"] { background: var(--accent-soft) !important; border-color: var(--accent) !important; color: var(--text); }
+  .detector-views { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; flex: none; min-height: 0; margin-top: 6px; }
+  .detector-views figure { display: grid; grid-column: 1; grid-row: 1; grid-template-rows: auto 200px auto; }
+  .detector-views[data-view="ewald"] figure:nth-child(2), .detector-views[data-view="image"] figure:first-child { visibility: hidden; pointer-events: none; }
+  .detector-views figure > svg { height: 200px; }
+  .detector-views .ewald-hint { line-height: 1.5; }
+  .ewald-controls { flex-wrap: wrap; }
+  #detector-window .analysis-head { flex-wrap: wrap; gap: 4px; padding-left: 10px; }
+  #detector-title { flex: 1 1 0; min-width: 0; font-size: 14px; white-space: normal; }
+  #detector-reveal:not([hidden]) { order: 2; width: 100%; }
+  .detector-angles { gap: 8px; }
+  .detector-navigation { gap: 8px; }
+  .detector-navigation button { flex: 1; }
+}
+/* The link is useful only if the main crystal can actually be reached. */
+#detector-window.showing-crystal {
+  top: auto !important; bottom: 12px; left: 12px !important; width: min(540px, calc(100vw - 24px)) !important; height: 245px !important; min-height: 0;
+}
+#detector-window.showing-crystal #detector-open-options { display: none; }
+@media (min-width: 541px) and (min-height: 501px) {
+  #detector-window.showing-crystal { bottom: var(--linked-bottom, 96px); }
+}
+#detector-window.showing-crystal .detector-angles { margin-top: 0; }
+@media (max-height: 500px) {
+  #detector-window.showing-crystal { width: min(320px, 48vw) !important; height: calc(100dvh - 80px) !important; bottom: 8px; }
+}
+/* Compact reflection views give each diagram a usable area; all settings
+   and values remain in the same DOM and keep their scientific state. */
+@media (max-width: 900px), (max-height: 500px) {
+  #reflection-explorer { padding: 10px 12px; resize: none; }
+  .reflection-head h2 { font-size: 18px; }
+  .reflection-head p { font-size: 11px; }
+  .reflection-toolbar { margin: 6px 0; gap: 6px; }
+  .reflection-harmonics { gap: 4px; }
+  .reflection-options { flex-basis: auto; }
+  .reflection-options[open] { flex-basis: 100%; }
+  .reflection-mobile-tabs { display: flex; gap: 6px; margin: 4px 0 8px; }
+  .reflection-mobile-tabs > button { flex: 1; }
+  #reflection-content { display: flex; flex-direction: column; }
+  .reflection-equation { order: 2; font-size: 15px; margin: 8px 0; }
+  .reflection-layout { display: block; }
+  #reflection-explorer[data-view="crystal"] .reflection-calculation,
+  #reflection-explorer:not([data-view="crystal"]) .reflection-crystal,
+  #reflection-explorer .reflection-tabs { display: none; }
+  #reflection-stage { height: 230px; }
+  .reflection-intensity { gap: 4px; margin-top: 6px; padding-top: 6px; flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .reflection-intensity strong { font-size: 12px; }
+  .reflection-intensity p { display: none; }
+  .reflection-intensity output { font-size: 15px; }
+  #reflection-summary, .reflection-model-note { order: 3; }
+}
+@media (max-height: 500px) {
+  .reflection-head p { display: none; }
+  .reflection-toolbar { gap: 6px; }
+  #reflection-hkl { width: 76px; }
+  .reflection-mobile-tabs { margin: 2px 0 4px; }
+  #reflection-stage { height: 180px; }
+  .reflection-view-controls { gap: 4px; }
+  .reflection-intensity { flex-wrap: nowrap; }
+  #reflection-explorer .reflection-intensity output { font-size: 13px; }
+  #reflection-explorer .reflection-intensity strong { font-size: 11px; }
+  #structure-library .library-head p { display: none; }
+  #structure-library { padding: 12px; }
+  #app[data-launcher="menu"] .tool-rail { width: min(480px, calc(100% - 16px)); }
+  #app[data-launcher="menu"] .tool-rail.menu-open { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+  #app[data-launcher="menu"] .rail-button { min-height: 44px; font-size: 13px; }
+  #app[data-launcher="menu"] .rail-hint { display: none; }
+  #app[data-launcher="menu"] .rail-group-start { margin-top: 0; }
+  #app[data-launcher="menu"] .rail-button svg { grid-row: 1; }
+  #app[data-profile="side"] .size-control { max-width: 100px; }
+  #app[data-profile="side"] .size-control input { width: 60px; }
+  #app[data-profile="side"] .size-control span { display: none; }
+  #app[data-profile="side"] #elements { max-width: 180px; }
+}
+.range-actions { padding-top: 0; }
+@media (max-height: 500px) {
+  .reflection-head { min-height: 44px; padding: 0; align-items: center; }
+  #reflection-explorer { padding-top: 4px; padding-bottom: 4px; }
+  .reflection-toolbar { margin: 2px 0; }
+  .reflection-intensity { padding-top: 3px; margin-top: 3px; }
+  #reflection-stage { height: 140px; margin-top: 4px; }
+  #analysis-window .analysis-body { display: grid; grid-template-columns: 180px minmax(0, 1fr); align-items: start; gap: 8px 14px; }
+  #analysis-form { grid-column: 1; grid-row: 1; }
+  #analysis-status { grid-column: 1; grid-row: 2; margin: 0; }
+  #analysis-results { grid-column: 2; grid-row: 1 / span 5; }
+  #analysis-observed, #analysis-note { grid-column: 1; }
+  #analysis-window .analysis-fields { grid-template-columns: 1fr; }
+  #analysis-window .analysis-view { display: grid; }
+  #analysis-window .analysis-legend { margin-top: 0; }
+  #analysis-chart { height: 200px; }
+  .analysis-head { min-height: 48px; padding-top: 2px; padding-bottom: 2px; }
+  .analysis-body { padding-top: 8px; }
+  #app[data-profile="side"] .element { padding: 0 5px; }
+  #app[data-profile="side"] .element small { display: none; }
+}
+/* On shallow phones, compare all three axes across two compact rows. */
+#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid { grid-template-columns: 28px repeat(3, minmax(0, 1fr)); gap: 3px 4px; }
+#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid > span:not(.col-label) { display: none; }
+#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid > .col-label { grid-column: 1; padding: 0; }
+#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid > .col-label:nth-child(2) { grid-row: 2; }
+#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid > .col-label:nth-child(4) { grid-row: 3; }
+#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid strong { grid-row: 1; text-align: center; }
+#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid strong:nth-of-type(1), #app:is([data-profile="side"], [data-profile="sheet"]) .range-grid input[id^="range-a"] { grid-column: 2; }
+#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid strong:nth-of-type(2), #app:is([data-profile="side"], [data-profile="sheet"]) .range-grid input[id^="range-b"] { grid-column: 3; }
+#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid strong:nth-of-type(3), #app:is([data-profile="side"], [data-profile="sheet"]) .range-grid input[id^="range-c"] { grid-column: 4; }
+#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid input[id$="min"] { grid-row: 2; }
+#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid input[id$="max"] { grid-row: 3; }
+#app:is([data-profile="side"], [data-profile="sheet"]) #range-form { margin-top: 0; }
+#app[data-profile="side"] .tool-window-body { padding-top: 2px; }
+/* Advanced detector inputs use the same field grammar as manual geometry. */
+#detector-options input:not([type="file"]):not([type="checkbox"]), #detector-options select, #detector-options textarea {
+  min-width: 0; max-width: 100%; border: 1px solid var(--line-strong); border-radius: var(--radius-field);
+  padding: 6px 8px; background: var(--field); color: var(--text); font: inherit; font-size: 14px;
+}
+#detector-wedge .detector-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+#detector-wedge .detector-actions label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
+#detector-wedge input { width: 100%; }
+#detector-shape { display: flex; flex-wrap: wrap; gap: 8px; }
+#detector-mount-form input[type="file"] { width: 100%; }
+@media (max-width: 540px) {
+  #detector-wedge .detector-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #detector-wedge .detector-actions label:last-child { grid-column: 1 / -1; }
+  #detector-mount-form { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .measure-mode .view-button { line-height: 22px; }
+  .measure-mode .view-button::after { content: attr(aria-label); display: block; font: 9px/10px system-ui, sans-serif; }
+}
+@media (max-height: 500px) {
+  #app[data-launcher="menu"] .tool-rail.menu-open { gap: 2px; padding: 4px; max-height: calc(100% - 68px); }
+}
+#style-editor > .section-title { display: none; }
+#style-editor > .style-target { border: 0; margin: 6px 0 0; padding: 0; }
+.tool-window-head #style-pick, .tool-window-head #range-apply { font-size: 12px; min-height: var(--touch); padding: 0 8px; white-space: nowrap; }
+/* Landscape uses a narrow control column beside a complete teaching graphic. */
+@media (max-height: 500px) and (min-width: 600px) {
+  #reflection-explorer[open] { display: grid; grid-template-columns: 180px minmax(0, 1fr); grid-template-rows: 44px minmax(0, 1fr) auto 24px; gap: 4px 12px; }
+  .reflection-head { grid-column: 1 / -1; grid-row: 1; }
+  .reflection-toolbar { grid-column: 1; grid-row: 2; margin: 0; align-content: start; align-items: center; overflow: auto; min-height: 0; }
+  .reflection-harmonics { margin: 0; flex: 1; justify-content: space-between; }
+  .reflection-harmonics > span { font-size: 11px; }
+  .reflection-options { width: 100%; }
+  .reflection-options > summary { font-size: 12px; padding-inline: 6px; }
+  .reflection-mobile-tabs { grid-column: 1; grid-row: 3; flex-direction: column; margin: 0; gap: 3px; }
+  #reflection-content { grid-column: 2; grid-row: 2 / span 2; height: 100%; }
+  .reflection-intensity { grid-column: 1 / -1; grid-row: 4; margin: 0; }
+  #reflection-error { grid-column: 1 / -1; }
+  #reflection-stage { height: 180px; }
+  .reflection-calculation { display: block; }
+  #reflection-ray-status { margin: 4px 0; }
+  #reflection-explorer .reflection-ray-controls { gap: 4px; }
+  #reflection-explorer .reflection-ray-controls select { max-width: 150px; }
+  #reflection-rays { height: 150px; }
+  #detector-window.showing-crystal { width: min(280px, 42vw) !important; left: 8px !important; }
+}
+@media (max-height: 500px) and (min-width: 600px) {
+  .reflection-mobile-tabs { flex-direction: row; gap: 3px; }
+  #reflection-explorer .reflection-mobile-tabs button { min-width: 0; padding: 4px; font-size: 12px; }
+  #detector-window:not(.showing-crystal) .detector-body { display: grid; grid-template-columns: 190px minmax(0, 1fr); grid-auto-rows: min-content; align-items: start; gap: 6px 14px; }
+  #detector-window:not(.showing-crystal) .detector-sample { grid-column: 1; grid-row: 1; margin: 0; }
+  #detector-window:not(.showing-crystal) #detector-form { grid-column: 1; grid-row: 2; gap: 4px; }
+  #detector-window:not(.showing-crystal) .detector-angles { grid-column: 1; grid-row: 3; grid-template-columns: 1fr; margin: 0; }
+  #detector-window:not(.showing-crystal) .detector-actions,
+  #detector-window:not(.showing-crystal) .detector-body > p:not(.detector-sample) { grid-column: 1; }
+  .detector-view-tabs { grid-column: 2; grid-row: 1; display: flex; gap: 6px; }
+  .detector-view-tabs button { flex: 1; }
+  .detector-view-tabs button[aria-pressed="true"] { background: var(--accent-soft) !important; border-color: var(--accent) !important; }
+  .detector-views { grid-column: 2; grid-row: 2 / span 6; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; min-height: 0; margin: 0; }
+  .detector-views figure { display: grid; grid-column: 1; grid-row: 1; grid-template-rows: auto 170px auto; }
+  .detector-views figure > svg { height: 170px; }
+  .detector-views[data-view="ewald"] figure:nth-child(2), .detector-views[data-view="image"] figure:first-child { visibility: hidden; pointer-events: none; }
+  .detector-views .ewald-hint { font-size: 10px; }
+  .reciprocal-size { padding-top: 0; }
+}
+@media (max-height: 500px) and (min-width: 600px) {
+  #detector-window:not(.showing-crystal) #detector-form { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 4px; }
+  #detector-window:not(.showing-crystal) #detector-form > label { grid-column: 1 / -1; }
+  #detector-window:not(.showing-crystal) #detector-hkl { width: 100%; }
+  #detector-window:not(.showing-crystal) .detector-navigation { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+  #detector-window:not(.showing-crystal) .detector-navigation button { min-width: 0; padding: 6px; }
+  #detector-window:not(.showing-crystal) .detector-navigation > label { grid-column: 1 / -1; min-height: 32px; }
+}
+
+/* Separate landscape scrolling keeps the live spot diagram in view while
+   the user changes reflections or adjusts the scan controls. */
+.detector-controls, .detector-visuals { display: contents; }
+.detector-sample { order: 0; }
+#detector-form { order: 1; }
+.detector-view-tabs { order: 2; }
+.detector-views { order: 3; }
+.detector-angles { order: 4; }
+.detector-actions { order: 5; }
+#detector-status, #detector-detail, #detector-scope { order: 6; }
+#detector-window.showing-crystal .detector-body > .detector-controls { display: contents; }
+#detector-window.showing-crystal .detector-controls > :not(.detector-angles):not(.detector-navigation) { display: none; }
+#detector-window.showing-crystal .detector-visuals { display: none; }
+@media (max-height: 500px) and (min-width: 600px) {
+  #detector-window:not(.showing-crystal) .detector-body { grid-template-rows: minmax(0, 1fr); overflow: hidden; }
+  #detector-window:not(.showing-crystal) .detector-controls { display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+  #detector-window:not(.showing-crystal) .detector-controls > * { flex: none; }
+  #detector-window:not(.showing-crystal) .detector-visuals { display: flex; flex-direction: column; gap: 6px; height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  #detector-window:not(.showing-crystal) .detector-view-tabs { flex: none; }
+  #detector-window:not(.showing-crystal) .detector-views { flex: none; width: 100%; }
+}
+.detector-controls > *, .detector-view-tabs { flex: none; }
+.compact-button { font-size: 11px; font-weight: 600; padding: 0 6px; color: var(--accent); }
+#app[data-profile="side"] .pair-sub { gap: 4px; }
+#app[data-profile="side"] .pair-sub .chip { padding: 0 6px; font-size: 11px; }
+#app[data-profile="side"] .polyhedra-opacity { flex-basis: 84px; gap: 3px; padding-left: 0; }
+#app[data-profile="side"] .polyhedra-opacity .caption { display: none; }
+#app[data-profile="side"] .polyhedra-opacity output { width: 30px; font-size: 11px; }
+#app[data-profile="side"] .polyhedra-opacity input { min-width: 40px; }
+
+/* An explicitly opened tool menu must remain above modeless science windows. */
+#app[data-launcher="menu"] .tool-rail.menu-open { z-index: 3000; }
+#app[data-launcher="menu"] .tools-menu { z-index: 3001; }
+#warnings[data-informational="true"] { background: var(--raised); color: var(--muted); outline-color: var(--line-strong); }
+#shell-cutoff { min-height: var(--touch); padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-field); background: var(--field); color: var(--text); }
+#shell-controls label { font-size: 13px; line-height: 1.5; }
+#analysis-family { align-items: center; font-size: 13px; }
+#analysis-family select { max-width: 100%; min-height: var(--touch); }
+#analysis-observed input[type="file"] { font-size: 13px; color: var(--muted); }
+input[type="file"]::file-selector-button { min-height: 36px; border: 1px solid var(--line-strong); border-radius: var(--radius-field); background: var(--raised); color: var(--text); font: inherit; padding: 6px 10px; margin-right: 8px; cursor: pointer; }
+#reflection-explorer { position: fixed; inset: auto; margin: 0; }
+.reflection-head { cursor: move; touch-action: none; user-select: none; }
+/* Leave room for the complete diagram inside the shallow landscape viewport. */
+@media (max-height: 500px) and (min-width: 600px) {
+  .detector-views figure { grid-template-rows: auto 150px auto; }
+  .detector-views figure > svg { height: 150px; }
+}
+.analysis-head h2, .reflection-head h2 { font-size: 16px; font-weight: 650; letter-spacing: 0; text-transform: none; }
+@media (pointer: coarse) { input[type="file"]::file-selector-button { min-height: 44px; } }
+/* Science windows host the same launcher in their header, leaving data and
+   linked crystal controls unobstructed. Returning closes no scientific state. */
+.tools-menu.in-science { display: grid; position: static; width: 44px; min-width: 44px; height: 44px; border-radius: 8px; z-index: auto; }
+.reflection-head > div { flex: 1; min-width: 0; }
+@media (pointer: coarse), (max-width: 900px) {
+  .detector-angles input[type="range"] { min-height: 44px; }
+}
+@media (max-width: 540px) {
+  #detector-window.showing-crystal { height: 320px !important; }
+  #detector-window.showing-crystal .detector-navigation { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; }
+  #detector-window.showing-crystal .detector-navigation > label { min-height: 28px; }
+}
+#shell-summary { position: sticky; top: -8px; z-index: 1; padding: 6px 0; margin: 2px 0; background: var(--panel); }
+#shell-summary:has(+ .table-scroll) { line-height: 1.5; }
+.detector-step-buttons { display: contents; }
+/* Keep the short-screen stepping actions ahead of rotation and secondary
+   options without scrolling the adjacent diagram. */
+@media (max-height: 500px) and (min-width: 600px) {
+  #detector-window:not(.showing-crystal) .detector-navigation { display: contents; }
+  #detector-window:not(.showing-crystal) .detector-step-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; order: 2; }
+  #detector-window:not(.showing-crystal) .detector-angles { order: 3; }
+  #detector-window:not(.showing-crystal) .detector-navigation > label { order: 4; }
+}
+@media (max-width: 540px) {
+  #detector-window:not(.showing-crystal) .detector-navigation { display: contents; }
+  #detector-window:not(.showing-crystal) .detector-step-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; order: 2; }
+  #detector-window:not(.showing-crystal) .detector-view-tabs { order: 3; }
+  #detector-window:not(.showing-crystal) .detector-views { order: 4; }
+  #detector-window:not(.showing-crystal) .detector-angles { order: 5; }
+  #detector-window:not(.showing-crystal) .detector-navigation > label { order: 6; min-height: 32px; }
+  #detector-window:not(.showing-crystal) .detector-actions:not(.detector-navigation) { order: 7; }
+}
+.tool-window[data-place="side"] #site-table :is(th, td) { padding-inline: 3px; }
+#detector-ewald text { stroke: var(--field); stroke-width: 3px; paint-order: stroke; stroke-linejoin: round; }
+#detector-ewald .spot-label { font-weight: 700; }
+/* The File menu owns editable projects and device saves; Export owns media. */
+#file-menu-button { flex: none; min-height: 44px; }
+.file-menu { inset: 64px 8px auto auto; margin: 0; width: min(360px, calc(100vw - 16px)); max-height: calc(100dvh - 80px); overflow-y: auto; padding: 16px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: 0 12px 40px var(--shadow); }
+.file-menu button { min-height: 44px; }
+.file-menu #open { width: 100%; }
+.file-menu .session-title { margin-top: 14px; }
+.file-menu .note { line-height: 1.5; }
+.file-menu .tool-options { margin-top: 16px; }
+/* Four semantic groups share the same order in the rail and phone menu. */
+.rail-group { display: contents; }
+.rail-group + .rail-group > .rail-button:first-child { margin-top: 12px; }
+.rail-group + .rail-group > .rail-button:first-child::before { content: ""; position: absolute; top: -8px; left: 7px; right: 7px; border-top: 1px solid var(--line-strong); pointer-events: none; }
+.rail-long { display: block; font-size: 9px; }
+#app[data-launcher="menu"] .rail-long { display: inline; font-size: inherit; }
+#tool-window-pairs .tool-window-title { white-space: normal; line-height: 1.15; }
+@media (max-height: 500px) {
+  #app[data-launcher="menu"] .rail-group + .rail-group > .rail-button:first-child { margin-top: 0; }
+  #app[data-launcher="menu"] .rail-group + .rail-group > .rail-button:first-child::before { top: -2px; width: calc(200% + 2px); left: 0; right: auto; border-color: var(--line); }
+  #app[data-launcher="menu"] .tool-rail.menu-open { row-gap: 4px; }
+}
+#detector-window.showing-crystal #detector-resize-left { display: none; }
+#detector-options { position: fixed; inset: auto; margin: 0; width: min(420px, calc(100vw - 16px)); }
+#detector-options .analysis-head { cursor: move; }
+#detector-options input[type="file"] { width: 100%; min-width: 0; }
+#detector-calibration .detector-actions label { display: grid; min-width: 0; gap: 4px; }
+#detector-options :is(input:not([type="checkbox"]), select, textarea) { font-size: 14px; min-height: 40px; }
+#detector-matrix { font-family: ui-monospace, monospace; white-space: pre; overflow-x: auto; }
+#detector-window input[type="range"] { accent-color: var(--accent); }
+#app[data-launcher="rail"] .rail-button { width: 56px; }
+@media (max-height: 500px) {
+  /* Eleven actions occupy six rows. The last row contains Help at left,
+     leaving the footer launcher's corner clear without hiding an action. */
+  #app[data-launcher="menu"] .tool-rail.menu-open { bottom: 8px; max-height: calc(100% - 16px); }
+}
+.science-file { display: none; }
+@media (max-width: 1350px), (max-height: 600px) {
+  .science-file { display: block; flex: none; min-width: 44px; min-height: 44px; font-size: 12px; padding: 0 6px; }
+}
+/* A narrow desktop inspector uses one full-size diagram, just like a phone;
+   increasing its width restores the simultaneous two-diagram comparison. */
+@container (max-width: 600px) {
+  .detector-view-tabs { display: flex; gap: 6px; }
+  .detector-view-tabs button { flex: 1; }
+  .detector-view-tabs button[aria-pressed="true"] { background: var(--accent-soft) !important; border-color: var(--accent) !important; }
+  .detector-views { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; flex: none; min-height: 0; }
+  .detector-views figure { display: grid; grid-column: 1; grid-row: 1; grid-template-rows: auto 200px auto; }
+  .detector-views figure > svg { height: 200px; }
+  .detector-views[data-view="ewald"] figure:nth-child(2), .detector-views[data-view="image"] figure:first-child { visibility: hidden; pointer-events: none; }
+}
+/* A visible rail keeps its own column, including on portrait tablets. */
+body:has(#app[data-launcher="rail"]) :is(.analysis-window, #reflection-explorer) { max-width: calc(100vw - 108px); }
+#app[data-launcher="rail"] .tool-rail { z-index: 3000; }
+/* Options occupy setup space on small screens, leaving the live diagram
+   visible. The fixed header remains reachable while advanced fields scroll. */
+@media (max-width: 540px) {
+  #detector-options { height: 270px; }
+}
+@media (min-width: 541px) and (max-width: 1000px) and (min-height: 501px) {
+  #detector-options { width: 320px; height: 270px; }
+  #detector-window { width: min(600px, calc(100vw - 24px)); }
+}
+@media (max-height: 500px) {
+  #detector-options { width: 220px; min-width: 0; height: calc(100dvh - 16px); }
+  #detector-options #detector-geometry-fields { grid-template-columns: minmax(0, 1fr); }
+  #detector-options .analysis-head { gap: 4px; flex-wrap: wrap; padding: 6px; }
+  #detector-options-title { width: 100%; font-size: 14px; }
+  #detector-options .analysis-body { padding: 10px; }
+  #detector-options #detector-mount-form { grid-template-columns: minmax(0, 1fr); }
+  #detector-options #detector-wedge .detector-actions { grid-template-columns: minmax(0, 1fr); }
+}
+/* Keep teaching text and controls legible without competing with results. */
+#reflection-explorer input:not([type="range"]), #reflection-explorer select { font-size: 14px; }
+#reflection-content { padding-bottom: 12px; }
+#detector-coverage { font-size: 13px; line-height: 1.5; }
+#detector-options input[type="file"]::file-selector-button {
+  min-height: 36px; border: 1px solid var(--line-strong); border-radius: 6px;
+  padding: 4px 8px; background: var(--raised); color: var(--text); cursor: pointer;
+}
+.science-file { border: 1px solid var(--line-strong); border-radius: 6px; background: var(--raised); color: var(--text); }
+#reflection-phasors .phasor-axis-labels text { paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }

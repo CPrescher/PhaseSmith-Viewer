@@ -24,6 +24,8 @@ async def settle(page):
 async def choose_tool(page, button, touch=None):
     """Choose a tool window from its launcher button (e.g. "#mode-lattice"):
     the rail on desktops and tablets, the header Tools menu on phones."""
+    if await page.locator('#file-menu:popover-open').count():
+        await page.keyboard.press('Escape')
     if touch is None:
         touch = await page.evaluate("matchMedia('(pointer: coarse)').matches")
     target = page.locator(button)
@@ -35,6 +37,19 @@ async def choose_tool(page, button, touch=None):
         await target.wait_for(state="visible")
     await (target.tap() if touch else target.click())
     await settle(page)
+
+async def reveal_control(page, selector):
+    """Open enclosing disclosures through their summaries before editing."""
+    control = page.locator(selector)
+    popover = control.locator("xpath=ancestor::*[@popover]")
+    if await popover.count() and not await popover.is_visible():
+        for trigger in await page.locator(f'[popovertarget="{await popover.get_attribute("id")}"]').all():
+            if await trigger.is_visible() and await trigger.evaluate('e=>{const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));}'):
+                await trigger.click()
+                break
+    closed = control.locator("xpath=ancestor::details[not(@open)]")
+    while await closed.count():
+        await closed.first.locator(":scope > summary").click()
 
 async def pair(page):
     d = await diagnostics(page)

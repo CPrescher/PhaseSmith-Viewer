@@ -1,3 +1,4 @@
+from smoke import reveal_control
 """Portable browser check of the production build under its GitHub Pages path."""
 
 import asyncio
@@ -59,6 +60,7 @@ async def main():
                     "window.viewerDiagnostics().lattice.planes[0].m===-1 && window.viewerDiagnostics().lattice.planes[0].polygons.length>0"
                 )
                 await page.locator("#mode-export").click()
+                await reveal_control(page, "#session-save")
                 await page.locator("#session-save").click()
                 await page.wait_for_timeout(200)
                 await page.reload()

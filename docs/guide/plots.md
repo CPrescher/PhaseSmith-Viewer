@@ -1,12 +1,12 @@
 # Pair distances and diffraction
 
-Find **Plots**, the small bar-chart button on the **right-hand tool rail between Extent and Style**. On a phone, tap **Tools** at the lower right, then **Plots**. Click it to open the floating **Structure plots** window. It stays independent of the active settings palette and does not change the camera. Drag its title to move it; resize it on desktop. Close it with **×** or **Escape**.
+Choose **Distances** or **Powder** in the analysis group of the right-hand rail (on a phone, open **Tools**). Each entry opens the corresponding plot directly. They share a floating window and retain their settings when you switch. **Reflection** explains one indexed reflection; **Detector** predicts where reflections land. The main crystal remains stationary when opening any of these tools. Drag a window’s title to move it; close it with its active launcher, **×**, or **Escape**.
 
 Both calculations use the **full symmetry-expanded unit cell**. The displayed extent, hidden spheres, boundary copies, and asymmetric-unit view do not change their results. Plot preferences are saved in the browser session and in `.psv` projects.
 
 ## Pair distances
 
-In the **Plot dropdown at the top of the window**, choose **Pair distances**, set the lower and upper distance limits, and optionally select an element pair. The defaults are **0–6 Å**, all atom pairs, and a grouping tolerance of **0.001 Å**.
+In the **Plot dropdown at the top of the window**, choose **Pair distances**, set the lower and upper distance limits, and optionally select an element pair. On compact screens, expand **Plot settings · range and appearance** to edit the limits. The defaults are **0–6 Å**, all atom pairs, and a grouping tolerance of **0.001 Å**.
 
 Each line represents a distance group. Its position is the mean distance, and its height counts **unordered geometric pairs per unit cell**. Periodic neighbors are included automatically, including pairs across cell faces and nonzero translations of a site onto itself.
 
@@ -32,7 +32,7 @@ The maximum distance is **30 Å**. A large structure or range can exceed the wor
 
 ## Powder diffraction (X-ray)
 
-Use that same **Plot dropdown** to choose **Powder diffraction (X-ray)**, then set:
+Choose **Powder** from the tools, or use the **Plot dropdown** to choose **Powder diffraction (X-ray)**, then set:
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -68,10 +68,10 @@ See [Scientific conventions](./science.md#diffraction) for the structure-factor 
 
 ## Explore a single reflection
 
-Open **X-ray** and enter the Miller indices and wavelength to inspect how the atomic layers contribute to the reflection. Use **Detector** to see where that reflection lands. The Ewald sphere shows the reciprocal lattice, the incident beam, and the diffracted beam.
+Open **Reflection** and enter the Miller indices and wavelength to inspect how the atomic layers contribute to the reflection. Like the plot windows and Detector, it is a movable window: its title bar moves it, and its launcher, ×, or Escape closes it without changing the main view. On compact screens, use **Crystal**, **Phase sum**, and **Ray paths** to choose the explanation, and expand **Wavelength / detector** for the wavelength, detector link, or exercise export. Use **Detector** to see where that reflection lands. The Ewald sphere shows the reciprocal lattice, the incident beam, and the diffracted beam.
 
-In **Detector**, enter **2 0 0** for periclase and press **Enter** to rotate to the reflection. Step through other crossings with **Previous reflection** and **Next reflection**. Choose **Link main view** to turn the specimen from the crystal view. With the powder plot open, selecting a detector spot also highlights its powder line when it is in range.
+In **Detector**, enter **2 0 0** for periclase and press **Enter** to rotate to the reflection. Step through other crossings with **Previous reflection** and **Next reflection**. Choose **Link main view** to turn the specimen from the crystal view. **Show crystal** reduces the detector to a control dock; **Show detector** restores the diagrams. On phones, switch between **Ewald sphere** and **Detector spots**. In landscape, the controls and diagrams scroll independently. With the powder plot open, selecting a detector spot also highlights its powder line when it is in range.
 
-Open **Options** to change the wavelength, detector distance, or detector shape, import a PONI calibration, or set the specimen orientation and rotation axis.
+Geometry edits apply immediately; mounting matrices use **Apply orientation**. Open **Options**, a movable window beside the detector on a wide screen, to change the wavelength, detector distance, or detector shape, import a PONI calibration, or set the specimen orientation and rotation axis.
 
 Under **Options → Rotation-wedge coverage**, set the start and end ω to count discrete crossings on the active detector and export their indices and angles. An optional DAC half-opening filters both incident and outgoing rays through a symmetric double cone aligned with the beam at ω = 0° and rotating with the spindle. Continuously excited indices are excluded from the discrete count.

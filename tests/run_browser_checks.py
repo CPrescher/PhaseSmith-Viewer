@@ -16,7 +16,7 @@ CHECKS = [
     "symmetry_selection_smoke", "pair_defaults_smoke", "project_smoke",
     "pages_smoke", "library_smoke", "touch_pan_smoke", "page_zoom_smoke",
     "turn_smoke", "analysis_smoke", "direction_inputs_smoke",
-    "axis_framing_smoke", "detector_smoke",
+    "axis_framing_smoke", "detector_smoke", "gui_review_smoke",
 ]
 
 

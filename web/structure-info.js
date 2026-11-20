@@ -71,7 +71,18 @@ export function createStructureInfo() {
       citation.textContent = reference.source.citation;
     }
     rows("info-source", [["File", reference?.file.split("/").pop() || filename], ["CIF data block", structure.block], ["Reference", citation]]);
-    $("info-warnings").textContent = structure.warnings.join(" ");
+    $("info-warnings").replaceChildren();
+    if (structure.warnings.length) {
+      const summary = document.createElement("p");
+      summary.textContent = structure.warnings.map(warning => warning.startsWith("space-group definitions disagree:") && warning.includes("explicit_operations")
+        ? "Symmetry uses the operations listed in this CIF; its other space-group definitions differ."
+        : warning).join(" ");
+      const original = document.createElement("details"), label = document.createElement("summary"), messages = document.createElement("p");
+      label.textContent = "Original CIF messages";
+      messages.textContent = structure.warnings.join(" ");
+      original.append(label, messages);
+      $("info-warnings").append(summary, original);
+    }
     $("info-warnings").hidden = !structure.warnings.length;
   };
 }

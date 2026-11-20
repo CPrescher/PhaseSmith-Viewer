@@ -10,14 +10,16 @@ The header shows the structure name and space group. Select either to open **Str
 
 ## On a computer or landscape tablet
 
+The right-hand rail is vertically centered where it fits, shifting upward only to clear the lower controls. Separators group structure tools, analysis, appearance/output and Help.
+
 <ViewerFigure name="interface" alt="The full viewer with numbered outlines identifying the file buttons, view toolbar, measurement toolbar, right-hand tool rail and lower-left visibility strip." />
 
 | Group | Location | What to do there |
 | --- | --- | --- |
-| **1 · Files** | Upper-right header, above the crystal | Open the Library or load a CIF/project with Open file. |
+| **1 · Files** | Upper-right header, above the crystal | Open the Library or use File to load a structure or save/open a project. |
 | **2 · View** | Upper left inside the crystal | Look along a, b, c or [uvw]; open Turn for exact rotations. |
 | **3 · Measurements** | Upper right inside the crystal, below the header | Choose Info, Distance, or Angle, then select atoms. |
-| **4 · Tools** | Vertical rail at the right edge | Open Pairs, Sites, Lattice, Extent, Plots, X-ray, Detector, Style, Export, or Help. |
+| **4 · Tools** | Vertical rail at the right edge | Grouped structure, analysis, appearance/output and Help tools. |
 | **5 · Visibility** | Lower left inside the crystal | Show/hide atoms or polyhedra, toggle element spheres, or change sphere size. |
 
 ## Recognize the measurement buttons
@@ -36,24 +38,27 @@ The header stays at the top. The measurement buttons move into a **vertical colu
 
 Tap **Tools** to reveal the labeled menu shown below, then choose the tool. Its settings open in a sheet over the lower part of the crystal. In short landscape phone views, the placement adapts to the available space. **Details** under the measurement buttons expands the selected-atom or measurement readout.
 
-<ViewerFigure name="phone-tools" alt="The expanded phone Tools menu listing Pairs, Sites, Lattice, Extent, Plots, Style, Export and Help, above the round launcher." caption="The menu contains settings tools. Distance and Angle remain in the separate measurement column." />
+<ViewerFigure name="phone-tools" alt="The expanded phone Tools menu listing Bonds & polyhedra, Sites, Lattice, Extent, Distances, Powder, Reflection, Detector, Style, Export and Help." caption="The menu contains settings tools. Distance and Angle remain in the separate measurement column." />
 
 ## Which tool do I need?
 
 | Tool label | Opens | Guide |
 | --- | --- | --- |
-| **Pairs** | Bonds, coordination cutoffs and polyhedra | [Bonds and polyhedra](./coordination.md) |
+| **Bonds & polyhedra** | Bonds, coordination cutoffs and polyhedra | [Bonds and polyhedra](./coordination.md) |
 | **Sites** | CIF sites, labels, coordination numbers and volumes | [Measurements and sites](./measurements.md#site-labels-and-polyhedron-volumes) |
 | **Lattice** | Planes, arrows and symmetry overlays | [Planes and directions](./lattice.md) |
 | **Extent** | Displayed fractional-coordinate range | [Plotting extent](./navigation.md#plotting-extent) |
-| **Plots** | Pair distances and X-ray powder patterns | [Structure plots](./plots.md) |
-| **X-ray** | Atomic layers, phases, and the structure factor for one reflection | [Explore a single reflection](./plots.md#explore-a-single-reflection) |
+| **Distances** | Periodic interatomic distance distribution | [Pair distances](./plots.md#pair-distances) |
+| **Powder** | Calculated powder diffraction and measured traces | [Powder diffraction](./plots.md#powder-diffraction-x-ray) |
+| **Reflection** | Atomic layers, phases, and the structure factor for one reflection | [Explore a single reflection](./plots.md#explore-a-single-reflection) |
 | **Detector** | Ewald sphere, specimen rotation, and predicted detector spots | [Diffraction detector](./plots.md#explore-a-single-reflection) |
 | **Style** | Colors, sphere sizes and individual overrides | [Appearance](./navigation.md#appearance) |
-| **Export** | PNG, movie, project file and saved session | [Saving and exporting](./saving.md) |
+| **Export** | PNG images and turntable movies | [Saving and exporting](./saving.md) |
 
 ## When a control is out of sight
 
-Scroll **inside the open settings window** to see its lower sections. Export, for example, has Project file below the image and movie controls. A **Tune** view shows only the last edited item; choose **All settings** to restore the full editor. Close or switch the tool from the rail/menu to reach another set of settings.
+Scroll **inside the open settings window** to see its lower sections. Export, for example, has movie controls below the PNG settings. Project files and local saves are in the header’s File menu. Use **Compact** when a panel has unused space; **Expand** restores its full height. This changes only the panel, not the camera. A **Tune** view shows only the last edited item; choose **All settings** to restore the full editor. Close or switch the tool from the rail/menu to reach another set of settings. Choosing a settings tool closes the science windows while retaining their values, so the selected controls are immediately reachable. Close a panel temporarily to reach atoms behind it, then reopen it to continue editing.
 
 The crystal stays in place while you open and switch tools. Drag on the crystal to rotate it; drag inside a scrollable panel to scroll its settings on touch screens.
+
+Dense panels offer **Fold** to leave only their header visible while you inspect or measure the crystal. **Expand** restores the panel without moving the structure. In a phone science window, **Tools** moves into its header so it cannot cover results.

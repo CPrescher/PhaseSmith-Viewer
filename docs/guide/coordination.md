@@ -1,8 +1,8 @@
 # Bonds and coordination polyhedra
 
-Open **Pairs**, the top button on the right-hand tool rail. On a phone, tap **Tools** at the lower right, then **Pairs**. The window contains a row for each central-element / neighbor-element pair.
+Open **Bonds & polyhedra**, the top button on the right-hand tool rail. On a phone, tap **Tools** at the lower right, then **Bonds & polyhedra**. The window contains a row for each central-element / neighbor-element pair. **＋ Pair** stays in the title bar.
 
-<ViewerFigure name="pairs" alt="Pairs window showing cutoff fields, Bonds and Polyhedra switches and opacity sliders." />
+<ViewerFigure name="pairs" alt="Bonds & polyhedra window showing cutoff fields, Bonds and Polyhedra switches and opacity sliders." />
 
 ## Define a pair
 
@@ -22,9 +22,9 @@ The **Opacity** slider controls each pair’s polyhedron faces. At 0% only the o
 
 ## Transparent surfaces
 
-Transparent faces from all pairs and lattice planes are composed in depth order at each pixel, including intersecting polyhedra. The renderer adapts up to 24 surface layers. Deeper stacks use an approximate remainder and show a status note: next to the atom count below the view, or on a phone at the end of the Pairs tool. The note clears once the view needs 24 layers or fewer. Exactly coincident faces share one layer. A small depth tolerance prevents surfaces from being drawn repeatedly because of floating-point rounding. PNG and movie exports use the same renderer with the full layer budget.
+Transparent faces from all pairs and lattice planes are composed in depth order at each pixel, including intersecting polyhedra. The renderer adapts up to 24 surface layers. Deeper stacks use an approximate remainder and show a status note: next to the atom count below the view, or on a phone at the end of the Bonds & polyhedra tool. The note clears once the view needs 24 layers or fewer. Exactly coincident faces share one layer. A small depth tolerance prevents surfaces from being drawn repeatedly because of floating-point rounding. PNG and movie exports use the same renderer with the full layer budget.
 
-By default, surrounding atoms stay visible when you enable polyhedra. Select **Hide atoms outside polyhedra** to show only their centers and vertices. Changing the cutoff changes which neighbors qualify for the display; the imported atom positions stay fixed.
+By default, surrounding atoms stay visible when you enable polyhedra. Expand **Atom visibility** below the pair rows and select **Hide atoms outside polyhedra** to show only their centers and vertices. Changing the cutoff changes which neighbors qualify for the display; the imported atom positions stay fixed.
 
 ## Inspect all neighbors of one site
 

@@ -5,16 +5,16 @@
     "display": 740,
     "regions": [
       {
-        "x": 1039,
-        "y": 6,
-        "width": 228,
-        "height": 43,
+        "x": 1083,
+        "y": 3,
+        "width": 184,
+        "height": 50,
         "number": 1,
-        "text": "Library and Open file"
+        "text": "Library and File"
       },
       {
         "x": 9,
-        "y": 65,
+        "y": 66,
         "width": 334,
         "height": 52,
         "number": 2,
@@ -22,24 +22,24 @@
       },
       {
         "x": 1023,
-        "y": 65,
+        "y": 66,
         "width": 168,
         "height": 52,
         "number": 3,
         "text": "Info, Distance, Angle and Clear"
       },
       {
-        "x": 1199,
-        "y": 117,
-        "width": 64,
-        "height": 398,
+        "x": 1191,
+        "y": 120,
+        "width": 72,
+        "height": 567,
         "number": 4,
         "text": "Tool rail"
       },
       {
         "x": 9,
         "y": 729,
-        "width": 475,
+        "width": 505,
         "height": 62,
         "number": 5,
         "text": "Visibility, elements and sphere size"
@@ -79,19 +79,19 @@
     "display": 600
   },
   "file-controls": {
-    "width": 238,
-    "height": 53,
+    "width": 194,
+    "height": 58,
     "display": 420,
     "labels": [
       {
-        "x": 53.8828125,
-        "y": 44.5,
+        "x": 54.3671875,
+        "y": 46,
         "text": "Library"
       },
       {
-        "x": 173.6953125,
-        "y": 44.5,
-        "text": "Open file"
+        "x": 151.9375,
+        "y": 50,
+        "text": "File"
       }
     ]
   },
@@ -129,37 +129,37 @@
   },
   "pairs": {
     "width": 336,
-    "height": 478,
+    "height": 477,
     "display": 420
   },
   "sites": {
     "width": 336,
-    "height": 478,
+    "height": 477,
     "display": 420
   },
   "extent": {
     "width": 336,
-    "height": 478,
+    "height": 477,
     "display": 420
   },
   "appearance": {
     "width": 336,
-    "height": 478,
+    "height": 477,
     "display": 420
   },
   "lattice": {
     "width": 336,
-    "height": 478,
+    "height": 477,
     "display": 420
   },
   "export": {
     "width": 336,
-    "height": 478,
+    "height": 477,
     "display": 420
   },
   "project": {
-    "width": 336,
-    "height": 478,
+    "width": 376,
+    "height": 309,
     "display": 420
   },
   "pair-distances": {
@@ -178,9 +178,9 @@
     "display": 320,
     "regions": [
       {
-        "x": 327,
+        "x": 318,
         "y": 62,
-        "width": 58,
+        "width": 67,
         "height": 196,
         "number": 1,
         "text": "Measurement buttons at the upper right"
@@ -197,7 +197,7 @@
   },
   "phone-tools": {
     "width": 336,
-    "height": 543,
+    "height": 723,
     "display": 360
   },
   "tutorial-forsterite-start": {

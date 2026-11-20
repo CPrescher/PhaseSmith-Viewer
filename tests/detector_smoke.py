@@ -6,7 +6,7 @@ import os
 import math
 import json
 import struct
-from smoke import HERE, URL, choose_tool
+from smoke import HERE, URL, choose_tool, reveal_control
 from playwright.async_api import async_playwright
 
 
@@ -30,6 +30,7 @@ async def check(browser, width, height):
         )
     await choose_tool(page, "#mode-reflection")
     await page.fill("#reflection-hkl", "2 0 0")
+    await reveal_control(page, "#reflection-detector")
     await page.click("#reflection-detector")
     assert await page.is_visible("#detector-window")
     assert not await page.is_visible("#reflection-explorer")
@@ -201,7 +202,11 @@ async def check(browser, width, height):
     await page.click("#reflection-close")
     await page.click("#detector-next")
     assert await page.locator("#detector-image .detector-hit").count()
+    if width < 500:
+        await page.locator('[data-detector-view="image"]').click()
     await page.locator("#detector-image .detector-hit").first.click()
+    if width < 500:
+        await page.locator('[data-detector-view="ewald"]').click()
     await page.fill("#detector-hkl", "1 0 0")
     await page.locator("#detector-hkl").press("Enter")
     assert "cancels" in await page.inner_text("#detector-status")
@@ -212,6 +217,7 @@ async def check(browser, width, height):
     await page.locator("#detector-hkl").press("Enter")
     await page.click("#detector-explain")
     await page.fill("#reflection-hkl", "2 2 2")
+    await reveal_control(page, "#reflection-detector")
     await page.click("#reflection-detector")
     assert await page.input_value("#detector-spots") == "2 2 2"
     assert float(await page.input_value("#detector-distance")) < 100
@@ -397,7 +403,7 @@ async def check(browser, width, height):
     await page.wait_for_function(
         "document.querySelector('#detector-distance').disabled"
     )
-    assert await page.inner_text("#detector-size") == "2200 × 1000 px"
+    assert await page.text_content("#detector-size") == "2200 × 1000 px"
     assert await page.locator("#detector-image rect.sensor").count()
     await page.click("#detector-options-done")
     await page.click("#detector-next")
@@ -405,7 +411,7 @@ async def check(browser, width, height):
     await page.click("#detector-open-options")
     await page.click("#detector-clear-poni")
     await page.click("#detector-options-done")
-    assert await page.inner_text("#detector-size") == "200 mm diameter"
+    assert await page.text_content("#detector-size") == "200 mm diameter"
     if width > 500:
         # Capture the selected reflection across real main-canvas drag samples.
         await page.click("#detector-open-options")

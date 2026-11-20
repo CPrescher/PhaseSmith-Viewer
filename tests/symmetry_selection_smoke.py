@@ -1,3 +1,4 @@
+from smoke import reveal_control
 """Almandine space-group axis selection and session restoration."""
 
 import asyncio
@@ -28,6 +29,7 @@ async def check(browser, width, height):
     assert await page.locator("#sym-view, #sym-view-note, .sym-help").count() == 0
     # Save through the normal export panel, then restore from IndexedDB.
     await choose_tool(page, "#mode-export")
+    await reveal_control(page, "#session-save")
     await page.locator("#session-save").click()
     # The status may still show an earlier save from the same minute.
     # Wait for this selection's transaction rather than its unchanged text.

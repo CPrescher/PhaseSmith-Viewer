@@ -8,7 +8,7 @@ Explore a crystal structure from its atoms to its coordination polyhedra, lattic
 
 **[Open the viewer ↗](https://cprescher.github.io/PhaseSmith-Viewer/)** · **[Start the five-minute guide](./getting-started.md)** · [Impressum & privacy](#impressum)
 
-<ViewerFigure name="forsterite" alt="Forsterite in PhaseSmith Viewer, showing Si–O tetrahedra and Mg–O octahedra with the Pairs controls." />
+<ViewerFigure name="forsterite" alt="Forsterite in PhaseSmith Viewer, showing Si–O tetrahedra and Mg–O octahedra with the Bonds & polyhedra controls." />
 <p class="caption">Forsterite: use pair cutoffs to explore the coordination around silicon and magnesium.</p>
 
 ## What would you like to do?
@@ -21,7 +21,7 @@ Explore a crystal structure from its atoms to its coordination polyhedra, lattic
 | Measure a distance, angle, or polyhedron volume | [Measurements and sites](./measurements.md) |
 | Build coordination polyhedra | [Bonds and polyhedra](./coordination.md) |
 | Show a plane, direction, or symmetry element | [Lattice tools](./lattice.md) |
-| Calculate distance groups or an X-ray powder pattern | [Structure plots](./plots.md) |
+| Calculate distance groups or an X-ray powder pattern | [Distances and Powder](./plots.md) |
 | Save a reusable project, image, or movie | [Saving and exporting](./saving.md) |
 | Understand the calculations and their limits | [Scientific conventions](./science.md) |
 

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { ViewControls } from "./view-controls.js";
+import { floatingDialog, isFrontDialog } from "./floating-dialog.js";
 import { formatMillerIndices, clipPlaneToBox, planeOffsets, parseMillerIndices, matVec } from "./crystal-math.js";
 import { translatedSites, defaultRanges, rangeEdges } from "./plot-range.js";
 import { elementColor } from "./elements.js";
@@ -31,11 +32,18 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
         <span id="reflection-harmonic-label">Harmonic</span>
         <button id="reflection-next" type="button" aria-label="Next harmonic">→</button>
       </div>
+      <details class="reflection-options tool-options"><summary>Wavelength / detector</summary><div class="reflection-option-fields">
       <label>λ (Å)<input id="reflection-wavelength" type="number" value="1.5406" min="0.001" step="any" required aria-label="X-ray wavelength" /></label>
       <button id="reflection-detector" type="button">Show on detector</button>
       <button id="reflection-project" type="button">Save exercise</button>
+      </div></details>
     </form>
     <p id="reflection-error" role="alert" hidden></p>
+    <div class="reflection-mobile-tabs" role="group" aria-label="Reflection explanation">
+      <button type="button" data-reflection-view="crystal" aria-pressed="true">Crystal</button>
+      <button type="button" data-reflection-view="sum" aria-pressed="false">Phase sum</button>
+      <button type="button" data-reflection-view="rays" aria-pressed="false">Ray paths</button>
+    </div>
     <div id="reflection-content">
       <p class="reflection-equation"><span id="reflection-equation"></span> <span>→ e<sup>2πim</sup></span></p>
       <div class="reflection-layout">
@@ -84,7 +92,34 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     </div>
     <div class="reflection-intensity"><div><strong>Reflection intensity · I ∝ |F(hkl)|²</strong><p>Structure-factor contribution; experimental corrections are separate.</p></div><output id="reflection-intensity"></output></div>`;
   document.body.append(dialog);
+  const closeReflection = () => { dialog.close(); opener?.focus({ preventScroll: true }); };
+  const showReflection = floatingDialog(dialog, opener, dialog.querySelector(".reflection-head"), closeReflection);
   const $ = id => dialog.querySelector(`#${id}`), stage = $("reflection-stage");
+  dialog.dataset.view = "crystal";
+  const compactLayout = matchMedia("(max-width: 900px), (max-height: 500px)");
+  const reflectionOptions = dialog.querySelector(".reflection-options");
+  let compactOptionsOpen = false;
+  reflectionOptions.open = !compactLayout.matches;
+  reflectionOptions.addEventListener("toggle", () => {
+    reflectionOptions.querySelector("summary").setAttribute("aria-expanded", String(reflectionOptions.open));
+    if (compactLayout.matches) compactOptionsOpen = reflectionOptions.open;
+  });
+  compactLayout.addEventListener("change", event => {
+    if (event.matches) reflectionOptions.open = compactOptionsOpen;
+    else { compactOptionsOpen = reflectionOptions.open; reflectionOptions.open = true; }
+  });
+  for (const button of dialog.querySelectorAll("[data-reflection-view]")) {
+    button.onclick = () => {
+      const view = button.dataset.reflectionView;
+      dialog.dataset.view = view;
+      for (const other of dialog.querySelectorAll("[data-reflection-view]"))
+        other.setAttribute("aria-pressed", String(other === button));
+      if (view !== "crystal") dialog.querySelector(`[data-panel="${view}"]`).click();
+      $("reflection-content").scrollTop = 0;
+      resize();
+    };
+  }
+
   let structure = null, renderedStructure = null, result = null, selected = 0, reference = 0, count = 0;
   let clickedPosition = null, savedExercise = null;
   const rayMode = () => !$("reflection-rays-panel").hidden;
@@ -92,6 +127,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
   const selectedPosition = () => clickedPosition ?? result.atoms[selected].frac;
   const selectedDepth = () => selectedPosition().reduce((sum, v, i) => sum + v * result.hkl[i], 0);
   let renderer, scene, camera, viewCamera, controls, model, planeGroup, spheres, copies = [];
+  let resettingView = false;
   let center = new THREE.Vector3(), radius = 1, fitDistance = 10, frame = 0, active = false;
   let selectionGroup, layerGroup, sphereRadius, planeTruncated = false;
   let layerAnchors = [];
@@ -226,7 +262,11 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
 
   function setView(view) {
     if (!result) return;
-    controls.reset();
+    for (const button of dialog.querySelectorAll("[data-view]")) button.setAttribute("aria-pressed", String(button.dataset.view === view));
+    // Trackball reset briefly restores its construction-time camera at the
+    // origin. Do not project layer labels through that singular interim view.
+    resettingView = true;
+    try { controls.reset(); } finally { resettingView = false; }
     const normal = new THREE.Vector3(...result.normal);
     const helper = Math.abs(normal.z) < 0.9 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
     const edge = helper.cross(normal).normalize();
@@ -240,7 +280,10 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     // Fit the projected cell, rather than a sphere around its bounding box.
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-    const aspect = stage.clientWidth / Math.max(1, stage.clientHeight);
+    // A compact explanation tab can hide the crystal while hkl is edited.
+    // Retain its last real viewport for framing until the Crystal tab returns.
+    const lastSize = renderer.getSize(new THREE.Vector2());
+    const aspect = (stage.clientWidth || lastSize.x || 300) / (stage.clientHeight || lastSize.y || 230);
     const points = rangeEdges(defaultRanges()).map(position);
     const half = Math.max(...points.map(p => Math.max(Math.abs(p.dot(up)) + sphereRadius * 2, (Math.abs(p.dot(right)) + sphereRadius * 2) / aspect))) * 1.15;
     fitDistance = half / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
@@ -327,7 +370,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
   }
 
   function render() {
-    if (!active || !result || !renderer || !controls) return;
+    if (resettingView || !active || !result || !renderer || !controls) return;
     const half = camera.position.distanceTo(controls.target) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     viewCamera.left = -half * camera.aspect;
     viewCamera.right = half * camera.aspect;
@@ -380,13 +423,14 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     const y = value => height / 2 - (value - (minY + maxY) / 2) * scale;
     line(chart, 22, y(0), width - 18, y(0), "var(--line-strong)");
     line(chart, x(0), 20, x(0), height - 22, "var(--line-strong)");
-    text(chart, width - 4, y(0) - 8, "Re (e)", "end");
-    text(chart, Math.max(34, Math.min(width - 34, x(0))), 12, "Im (e)");
-    text(chart, x(0) - 8, y(0) + 17, "0");
+    const axisLabels = svg(chart, "g", { class: "phasor-axis-labels", "pointer-events": "none" });
+    text(axisLabels, width - 4, y(0) - 8, "Re (e)", "end");
+    text(axisLabels, Math.max(34, Math.min(width - 34, x(0))), 12, "Im (e)");
+    text(axisLabels, x(0) - 8, y(0) + 17, "0");
     const tick = Number((span / 2).toPrecision(2));
     for (const value of [tick, -tick]) {
-      if (x(value) > 28 && x(value) < width - 35) text(chart, x(value), y(0) + 17, format(value));
-      if (y(value) > 32 && y(value) < height - 30) text(chart, x(0) + 7, y(value) + 4, format(value), "start");
+      if (x(value) > 28 && x(value) < width - 35) text(axisLabels, x(value), y(0) + 17, format(value));
+      if (y(value) > 32 && y(value) < height - 30) text(axisLabels, x(0) + 7, y(value) + 4, format(value), "start");
     }
     // Draw the selected contribution last so exact overlapping arrows remain inspectable.
     const visible = result.groups.slice(0, count);
@@ -410,6 +454,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     resultant.style.pointerEvents = "none";
     svg(chart, "circle", { cx: x(total[0]), cy: y(total[1]), r: 4, fill: "var(--text)", "pointer-events": "none" });
     text(chart, Math.min(width - 10, Math.max(10, x(total[0]) + 9)), Math.max(28, y(total[1]) - 12), count === result.groups.length ? "F" : "Partial F", x(total[0]) > width - 80 ? "end" : "start");
+    chart.append(axisLabels);
     updateSumReadout(chart);
   }
 
@@ -457,7 +502,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     rays.replaceChildren();
     waves.replaceChildren();
     const delta = selectedDepth() - result.atoms[reference].m;
-    $("reflection-ray-equation").textContent = `Δm = ${format(delta)} · Δz⊥ = d × Δm = ${format(result.d * delta)} Å. At Bragg: ΔL = 2Δz⊥ sin θ = λΔm → Δφ = 2πΔm.`;
+    $("reflection-ray-equation").textContent = `Selected atom minus reference: Δm = ${format(delta)} · Δz⊥ = d × Δm = ${format(result.d * delta)} Å. At Bragg: ΔL = 2Δz⊥ sin θ = λΔm → Δφ = 2πΔm.`;
     const accessible = result.theta !== null;
     rays.hidden = waves.hidden = !accessible;
     $("reflection-translation").hidden = !accessible;
@@ -469,7 +514,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     if (!width) return;
     const { layers, translation, shift } = crystalRayLayers(result, reference, selected, selectedDepth());
     const span = layers.at(-1).cycles;
-    const centerX = width / 2 + 38, top = 52, depthScale = 100 / span;
+    const centerX = width / 2 + 38, top = 52, depthScale = Math.max(40, rays.clientHeight - top - 12) / span;
     const theta = result.theta, sin = Math.sin(theta), cos = Math.cos(theta);
     const reach = Math.min((width - 170) / 2, 44 / Math.max(Math.tan(theta), 1e-8));
     for (const layer of layers) {
@@ -503,7 +548,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
       svg(waves, "circle", { cx: instant, cy: height(instant), r: 3.5, fill: layerColor(layer) });
       text(waves, right + 5, baseline + 4, `${Number(layer.cycles.toPrecision(3))}λ`, "start");
     }
-    $("reflection-translation").textContent = `A–C match the crystal layers, translated together by [${shift.join(" ")}] unit cells for visibility. t = [${translation.join(" ")}] connects the reference copies. Extra paths 2z⊥ sin θ are measured from the uppermost layer. Wave heights are normalized; in-plane offsets are suppressed.`;
+    $("reflection-translation").textContent = `${layers.map(layer => layer.id).join("–")} match the crystal layers, translated together by [${shift.join(" ")}] unit cells for visibility. t = [${translation.join(" ")}] connects the reference copies. Extra paths 2z⊥ sin θ are measured from the uppermost layer. Wave heights are normalized; in-plane offsets are suppressed.`;
     rays.setAttribute("aria-label", layers.map(layer => `${layerName(layer)} (${layer.names.join(" and ")}): ${format(layer.cycles)} wavelengths extra path`).join(". "));
     waves.setAttribute("aria-label", "Normalized waves at the detector. " + rays.getAttribute("aria-label"));
   }
@@ -618,7 +663,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
         ? "Systematic absence: a space-group operation preserves this reciprocal vector and shifts its phase. The contributions cancel."
         : result.f2 <= result.scale ** 2 * 1e-12
         ? "The atomic contributions cancel for this structure within numerical precision. The supplied space-group operations allow this reflection."
-        : `Full-cell |F|² = ${format(result.f2)} e². Powder multiplicity and experimental intensity corrections are applied separately in Structure plots.`;
+        : `Full-cell |F|² = ${format(result.f2)} e². Powder multiplicity and experimental intensity corrections are applied separately in Powder.`;
       $("reflection-intensity").textContent = `(${formatMillerIndices(hkl)}) · ${format(result.f2)} e²`;
       fillAtoms();
       fillTable();
@@ -634,7 +679,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
 
   function resize() {
     if (!active || !renderer || !result || $("reflection-content").hidden) return;
-    if (!stage.clientWidth || !stage.clientHeight) return;
+    if (!stage.clientWidth || !stage.clientHeight) { drawSum(); drawRays(); return; }
     renderer.setSize(stage.clientWidth, stage.clientHeight);
     camera.aspect = stage.clientWidth / stage.clientHeight;
     camera.updateProjectionMatrix();
@@ -662,7 +707,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     structure = nextStructure;
     if (wavelength !== undefined) $("reflection-wavelength").value = wavelength;
     $("reflection-hkl").value = hkl.join(" ");
-    if (!dialog.open) dialog.showModal();
+    if (!dialog.open) showReflection();
     opener?.setAttribute("aria-expanded", "true");
     active = true;
     try {
@@ -692,7 +737,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
       $("reflection-error").hidden = false;
     }
   }
-  opener?.addEventListener("click", () => open());
+  opener?.addEventListener("click", () => dialog.open ? (isFrontDialog(dialog) ? closeReflection() : showReflection()) : open());
   $("reflection-project").onclick = () => document.getElementById("project-save").click();
   $("reflection-detector").addEventListener("click", () => {
     try {
@@ -706,7 +751,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
       $("reflection-error").hidden = false;
     }
   });
-  $("reflection-close").addEventListener("click", () => dialog.close());
+  $("reflection-close").addEventListener("click", closeReflection);
   dialog.addEventListener("close", () => {
     if (dialog.open) return;
     active = false;

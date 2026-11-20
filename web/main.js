@@ -852,6 +852,10 @@ function initialize() {
     renderRules();
   }
   const pairName = (rule) => `${rule.center}–${rule.neighbor}`;
+  const pairTargetLabel = (rule) => {
+    const same = rules.filter(r => r.center === rule.center && r.neighbor === rule.neighbor);
+    return same.length > 1 ? `${pairName(rule)} #${same.indexOf(rule) + 1} (${formatCutoff(rule.cutoff)} Å)` : pairName(rule);
+  };
   const CUTOFF_MIN = 0.1;
   // At least hundredths are always shown (1.80); typed precision is shown
   // exactly as entered (2.123456 stays 2.123456, never rounded).
@@ -1331,6 +1335,7 @@ function initialize() {
         });
         opacityInput.dataset.field = "opacity";
         opacityInput.setAttribute("aria-describedby", opacityValue.id);
+        opacityInput.setAttribute("aria-label", "Polyhedron face opacity");
         opacityValue.htmlFor = opacityInput.id;
         const showOpacity = () => {
           opacityValue.value = `${opacityInput.value}%`;
@@ -1854,6 +1859,7 @@ function initialize() {
   function inspectShell(center) {
     $("shell-controls").hidden = !center;
     const summary = $("shell-summary"), body = $("shell-ligands");
+    summary.hidden = !center;
     body.replaceChildren();
     if (!center) { summary.textContent = "Select a site to inspect its periodic neighbors."; return; }
     try {
@@ -2553,7 +2559,7 @@ function initialize() {
         })),
         ...rules.map((r) => ({
           value: `pair:${r.id}`,
-          label: `${pairName(r)} polyhedra`,
+          label: `${pairTargetLabel(r)} polyhedra`,
           group: "All polyhedra of pair",
         })),
         // Every individually styled copy stays selectable, so each one can
@@ -2617,7 +2623,7 @@ function initialize() {
       const opacity = rule.opacity ?? DEFAULT_FACE_OPACITY;
       if (type === "pair")
         return {
-          title: `All ${pairName(rule)} polyhedra`,
+          title: `All ${pairTargetLabel(rule)} polyhedra`,
           kind: "poly",
           color: ruleColor(rule),
           opacity,
@@ -2868,7 +2874,13 @@ function initialize() {
     );
     const warnings = data.warnings || [];
     $("warnings").hidden = !warnings.length;
-    $("warnings").textContent = warnings.join(" ");
+    const listedSetting = warning => warning.startsWith("space-group definitions disagree:") && warning.includes("explicit_operations");
+    $("warnings").dataset.full = warnings.join(" ");
+    $("warnings").dataset.summary = warnings.map(warning => listedSetting(warning)
+      ? "Symmetry uses the operations listed in this CIF; its other space-group definitions differ."
+      : warning).join(" ");
+    $("warnings").dataset.informational = String(warnings.length > 0 && warnings.every(listedSetting));
+    $("warnings").textContent = $("warnings").dataset.summary;
     $("warnings").title = warnings.join(" ");
     $("warnings").setAttribute("aria-expanded", "false");
     plotRanges = defaultRanges();
@@ -3085,10 +3097,23 @@ function initialize() {
   });
   // The [uvw] form is a label obstacle too while open.
   document.querySelector(".view-directions details")?.addEventListener("toggle", invalidate);
+  // Group supporting radius conventions after the direct target controls.
+  const radiusOptions = document.createElement("details");
+  radiusOptions.className = "tool-options";
+  radiusOptions.id = "radius-model-options";
+  radiusOptions.innerHTML = "<summary>Radius model &amp; displacement</summary>";
+  const radiusStart = $("radius-model").closest("label");
+  const radiusNodes = [];
+  for (let node = radiusStart; node && node !== $("style-target").closest("label"); node = node.nextElementSibling) radiusNodes.push(node);
+  radiusOptions.append(...radiusNodes);
+  $("style-editor").append(radiusOptions);
+  $("warnings").setAttribute("aria-label", "CIF import notes. Activate to expand or collapse the full explanation.");
+
   // CIF warnings stay to two lines until opened, keeping controls in reach.
   const toggleWarnings = () => {
     const open = $("warnings").getAttribute("aria-expanded") !== "true";
     $("warnings").setAttribute("aria-expanded", String(open));
+    $("warnings").textContent = open ? $("warnings").dataset.full : $("warnings").dataset.summary;
   };
   $("warnings").onclick = toggleWarnings;
   $("warnings").onkeydown = (e) => {
@@ -3476,7 +3501,8 @@ function initialize() {
       const row = document.querySelector(".measure-row").getBoundingClientRect();
       const rail = $("tool-rail").getBoundingClientRect();
       const bottomControls = [".view-bottom", "#view-readout", ".axis-compass", "#tools-menu"]
-        .map(selector => document.querySelector(selector).getBoundingClientRect()).filter(rect => rect.width && rect.height);
+        .map(selector => document.querySelector(selector)).filter(element => !element.classList.contains("in-science"))
+        .map(element => element.getBoundingClientRect()).filter(rect => rect.width && rect.height);
       const bottomGap = Math.ceil(Math.max(0, ...bottomControls.map(rect => view.bottom - rect.top)) + 8);
       viewport.style.setProperty("--bottom-controls-gap", `${bottomGap}px`);
       const cardMax = parseFloat(getComputedStyle(viewport).getPropertyValue("--card-max")) || 168;
@@ -3498,6 +3524,18 @@ function initialize() {
     },
     onChange: () => scheduleSave(),
   });
+
+  // Choosing a settings tool reveals its controls even when a science
+  // window covers that area. Closing a window preserves its values.
+  $("tool-rail").addEventListener("click", event => {
+    const button = event.target.closest("[data-tool]");
+    if (!button) return;
+    const open = ["analysis", "detector", "reflection"].filter(id =>
+      $(id === "reflection" ? "reflection-explorer" : `${id}-window`)?.open);
+    if (!open.length) return;
+    for (const id of open) $(`${id}-close`).click();
+    if (toolWindows.isOpen(button.dataset.tool)) toolWindows.close(button.dataset.tool);
+  }, true);
 
   // Light/dark theme: CSS follows data-theme; scene overlays that carry
   // their own colors are rebuilt with the new palette.
@@ -3894,7 +3932,7 @@ function initialize() {
     if (control?.dataset.turn) return "Turn crystal";
     if (target.closest("#pair-rules") || id === "add-rule") return id === "add-rule" ? "Add pair" : control?.dataset.field === "cutoff" || target.closest(".cutoff-tuner") ? "Change pair cutoff" : "Edit pair";
     if (target.closest("#style-editor")) return id.startsWith("style-reset") ? "Reset style" : "Change style";
-    if (target.closest("#range-form") || id === "range-reset") return "Change extent";
+    if (target.closest("#range-form") || id === "range-reset" || id === "range-apply") return "Change extent";
     if (id.startsWith("plane-") || target.closest("#plane-list")) return "Edit plane";
     if (id.startsWith("arrow-") || target.closest("#arrow-list")) return "Edit arrow";
     if (id.startsWith("sym-") || target.closest("#sym-controls")) return "Change symmetry display";
@@ -4055,6 +4093,7 @@ function initialize() {
   // Start fresh: autosave stays suspended so the old session is not
   // written back, then the page entrypoint loads cleanly.
   $("session-fresh").onclick = async () => {
+    if (!confirm("Discard this browser’s saved session and start fresh? Save a project file first if you want to keep the current scene.")) return;
     saveSuspended++;
     clearTimeout(saveTimer);
     saveTimer = 0;

@@ -1,6 +1,6 @@
 import { diffractionModule } from "./diffraction-engine.js";
 import { formatMillerIndices } from "./crystal-math.js";
-import { floatingDialog } from "./floating-dialog.js";
+import { floatingDialog, isFrontDialog } from "./floating-dialog.js";
 import { readPowderTrace, powderFamilies } from "./powder-comparison.js";
 import { powderProfile } from "./structure-analysis.js";
 import { pairName, normalizePair, pairColors, pairSegments } from "./pair-presentation.js";
@@ -19,7 +19,12 @@ const hklText = row => {
 export function createAnalysisWindow({ getStructure, onExplain, onChange = () => {} }) {
   const $ = id => document.getElementById(id);
   const win = $("analysis-window"), opener = $("mode-analysis"), form = $("analysis-form");
+  const powderOpener = $("mode-powder");
+  let lastOpener = opener;
   const chart = $("analysis-chart"), status = $("analysis-status"), table = $("analysis-table");
+  $("analysis-settings").open = !matchMedia("(max-width: 760px), (max-height: 500px)").matches;
+  $("analysis-results").after($("analysis-observed"), $("analysis-note"));
+
   const legend = document.createElement("div");
   legend.id = "analysis-legend";
   legend.className = "analysis-legend";
@@ -78,6 +83,10 @@ export function createAnalysisWindow({ getStructure, onExplain, onChange = () =>
   }
   function updateMode() {
     const distance = controls.mode.value === "distances";
+    $("analysis-title").textContent = distance ? "Interatomic distances" : "Powder diffraction";
+    opener.setAttribute("aria-expanded", String(win.open && distance));
+    powderOpener.setAttribute("aria-expanded", String(win.open && !distance));
+    lastOpener = distance ? opener : powderOpener;
     $("analysis-distance-fields").hidden = !distance;
     $("analysis-powder-fields").hidden = distance;
     $("analysis-observed").hidden = distance;
@@ -121,9 +130,8 @@ export function createAnalysisWindow({ getStructure, onExplain, onChange = () =>
       stop();
       result = data.result;
       resultMode = options.mode;
-      const ms = Math.round(performance.now() - start);
       status.textContent = result.rows.length
-        ? `${result.rows.length.toLocaleString()} ${resultMode === "distances" ? "distinct distances" : "powder lines"} · ${ms} ms`
+        ? `${result.rows.length.toLocaleString()} ${resultMode === "distances" ? "distinct distances" : "powder lines"}`
         : "No pairs or reflections in this range.";
       if (result.partialOccupancy) status.textContent += " · Partial sites count as whole geometric sites; disorder correlations are not modeled.";
       csv.disabled = !result.rows.length;
@@ -345,10 +353,23 @@ export function createAnalysisWindow({ getStructure, onExplain, onChange = () =>
     stop();
     win.close();
     opener.setAttribute("aria-expanded", "false");
-    opener.focus({ preventScroll: true });
+    powderOpener.setAttribute("aria-expanded", "false");
+    lastOpener.focus({ preventScroll: true });
     onChange();
   }
-  opener.onclick = () => win.open ? close() : open();
+  for (const [button, mode] of [[opener, "distances"], [powderOpener, "powder"]]) {
+    button.onclick = () => {
+      if (win.open && controls.mode.value === mode) {
+        if (isFrontDialog(win)) close();
+        else { show(); updateMode(); }
+        return;
+      }
+      controls.mode.value = mode;
+      lastOpener = button;
+      if (win.open) { show(); calculate(); onChange(); }
+      else open();
+    };
+  }
   $("analysis-close").onclick = close;
   new ResizeObserver(() => { if (win.open) draw(); }).observe(chart);
   updateMode();
@@ -385,7 +406,7 @@ export function createAnalysisWindow({ getStructure, onExplain, onChange = () =>
       clear();
       const elements = [...new Set(getStructure()?.atoms.map(a => a.element))].sort();
       const pairs = [];
-      controls.pair.replaceChildren(new Option("All atom pairs", "all"));
+      controls.pair.replaceChildren(new Option("All pairs", "all"));
       elements.forEach((a, i) => elements.slice(i).forEach(b => {
         pairs.push(pairName(a, b));
       }));
@@ -408,7 +429,7 @@ export function createAnalysisWindow({ getStructure, onExplain, onChange = () =>
       if ([...controls.pair.options].some(o => o.value === pair)) controls.pair.value = pair;
       updateMode();
       if (state.open === true) { if (win.open) calculate(); else open(); }
-      else { stop(); clear(); win.close(); opener.setAttribute("aria-expanded", "false"); }
+      else { stop(); clear(); win.close(); updateMode(); }
     },
   };
 }

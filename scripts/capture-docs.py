@@ -42,18 +42,22 @@ async def capture(page, name, selectors=None, labels=(), regions=(), display=740
     figures[name] = meta
     (ROOT / 'docs/.vitepress/theme/figures.json').write_text(json.dumps(figures,indent=2)+'\n')
     menu_open = 'menu-open' in (await page.locator('#tool-rail').get_attribute('class') or '')
+    file_open = await page.locator('#file-menu:popover-open').count() > 0
     # Toggle on the SAME page to preserve camera, selections and panel scroll.
     for theme in ['light','dark']:
         if await page.locator('html').get_attribute('data-theme') != theme:
             plot_open = await page.locator('#analysis-window').get_attribute('open') is not None
+            plot_mode = await page.locator('#analysis-mode').input_value()
             if plot_open:
                 await page.locator('#analysis-close').click()
             await page.locator('#theme-toggle').click()
             if plot_open:
-                await page.locator('#mode-analysis').click()
+                await page.locator('#mode-powder' if plot_mode == 'powder' else '#mode-analysis').click()
                 await page.wait_for_function("document.querySelector('#analysis-table tbody tr')")
             if menu_open and 'menu-open' not in (await page.locator('#tool-rail').get_attribute('class') or ''):
                 await page.locator('#tools-menu').click()
+            if file_open and not await page.locator('#file-menu:popover-open').count():
+                await page.locator('#file-menu-button').click()
         if after_theme:
             await after_theme(page)
         await page.mouse.move(2, page.viewport_size['height'] - 2)
@@ -76,7 +80,7 @@ async def main():
             return page
         page = await scene()
         await capture(page, 'interface', regions=[
-            (['#library-open','#open'],'Library and Open file'),
+            (['#library-open','#file-menu-button'],'Library and File'),
             (['.view-directions'],'View directions and Turn'),
             (['.measure-row'],'Info, Distance, Angle and Clear'),
             (['#tool-rail'],'Tool rail'),
@@ -84,7 +88,7 @@ async def main():
         ])
         await capture(page, 'measurements', ['.measure-row'], labels=[('#measure-info','Info'),('#measure-distance','Distance'),('#measure-angle','Angle'),('#clear','Clear')], display=520)
         await capture(page, 'view-controls', ['.view-directions'], display=600)
-        await capture(page, 'file-controls', ['#library-open','#open'], labels=[('#library-open','Library'),('#open','Open file')], display=420)
+        await capture(page, 'file-controls', ['#library-open','#file-menu-button'], labels=[('#library-open','Library'),('#file-menu-button','File')], display=420)
         await capture(page, 'visibility', ['.atoms-bar'], labels=[('label:has(#show-atoms)','Atoms'),('label:has(#show-polyhedra)','Polyhedra'),('#elements','Elements'),('#size','Size')], display=620)
         await page.locator('#mode-pairs').click()
         await capture(page,'forsterite')
@@ -96,8 +100,9 @@ async def main():
             tool = 'style' if name == 'appearance' else name
             await capture(page,name,[f'#tool-window-{tool}'],display=420)
             if name == 'export':
-                await page.locator('#project-save').scroll_into_view_if_needed()
-                await capture(page,'project',['#tool-window-export'],display=420)
+                await page.locator('#file-menu-button').click()
+                await capture(page,'project',['#file-menu'],display=420)
+                await page.keyboard.press('Escape')
         await page.close()
         page=await scene(example='')
         await page.locator('#mode-analysis').click()

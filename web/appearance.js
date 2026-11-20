@@ -148,7 +148,7 @@ export function createAppearanceEditor(host) {
   pick.onclick = () => setPicking(!picking);
   // The Appearance tool window opens and closes the editor (host.setOpen);
   // Escape first ends picking, then the window's own Escape closes it.
-  root.addEventListener("keydown", (e) => {
+  root.closest(".tool-window").addEventListener("keydown", (e) => {
     if (e.key === "Escape" && picking) {
       e.preventDefault();
       setPicking(false);
@@ -160,7 +160,7 @@ export function createAppearanceEditor(host) {
     pick.setAttribute("aria-pressed", String(picking));
     // The pressed button carries the instruction, so no card covers the
     // crystal while picking.
-    pick.textContent = picking ? "⌖ Tap the crystal" : "⌖ Pick one";
+    pick.textContent = picking ? "⌖ Tap a copy" : "⌖ Style one copy";
     host.onPickMode(picking);
   }
   function setOpen(show) {
