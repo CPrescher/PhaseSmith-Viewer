@@ -1,13 +1,15 @@
-import { hasMineralIonPair, ionicEntries, radiusReference } from "./atom-radii.js";
+import { hasMineralIonPair, ionicEntries, neutralAtomRadius, radiusReference } from "./atom-radii.js";
 
 // One radius per independent CIF site. Symmetry mates and translated images
 // share the lookup, while existing element/copy appearance scales stay local.
 export function createRadiusControls(onChange) {
   const model = document.getElementById("radius-model");
+  const atomicNote = document.getElementById("atomic-radius-note");
   const details = document.getElementById("radius-details");
   const siteMenu = document.getElementById("radius-site");
   const entryMenu = document.getElementById("radius-entry");
   let sites = [], mineral = false;
+  let missingAtomicRadii = [];
   const overrides = new Map();
   const radii = new Map();
 
@@ -17,6 +19,10 @@ export function createRadiusControls(onChange) {
       const reference = radiusReference(site, model.value, mineral, overrides.get(site.label));
       radii.set(site.label, reference.radius);
     }
+    atomicNote.hidden = model.value !== "atomic" || !missingAtomicRadii.length;
+    if (!atomicNote.hidden)
+      atomicNote.textContent = "Neutral-atom data unavailable for " + missingAtomicRadii.join(", ") +
+        ". These elements use a schematic radius of 0.42 Å.";
     details.hidden = !["ionic", "crystal"].includes(model.value) || !sites.length;
     if (!details.hidden && details.open) updateEntries();
   }
@@ -67,6 +73,7 @@ export function createRadiusControls(onChange) {
     setSites(nextSites) {
       sites = nextSites;
       mineral = hasMineralIonPair(sites);
+      missingAtomicRadii = [...new Set(sites.map(site => site.element))].filter(e => neutralAtomRadius(e) === undefined);
       overrides.clear();
       siteMenu.replaceChildren();
       if (details.open) updateSites();
@@ -80,7 +87,7 @@ export function createRadiusControls(onChange) {
     },
     restore(state) {
       // Projects written before radius models used the original sphere table.
-      model.value = ["ionic", "crystal", "covalent"].includes(state.radiusModel) ? state.radiusModel : "classic";
+      model.value = ["ionic", "crystal", "atomic", "covalent"].includes(state.radiusModel) ? state.radiusModel : "classic";
       overrides.clear();
       const saved = new Map(Array.isArray(state.siteRadii)
         ? state.siteRadii.filter(pair => Array.isArray(pair) && pair.length === 2) : []);

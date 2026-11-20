@@ -22,3 +22,12 @@ test("elemental, ambiguous, and unsupported ions use explicit fallbacks", () => 
   assert.match(radii({element: "S", charge: -1}).label, /Covalent fallback/);
   assert.equal(radiusReference({element: "O"}, "classic", true).radius, 0.34);
 });
+
+test("neutral atom size follows the corrected free-atom table regardless of site chemistry", () => {
+  for (const charge of [0, 2, 3]) {
+    const site = {element: "Fe", charge};
+    assert.equal(radiusReference(site, "atomic", true, "3/IV_HS").radius, 2.37);
+  }
+  assert.equal(radiusReference({element: "O", charge: -2}, "atomic", true, "covalent").radius, 1.71);
+  assert.match(radiusReference({element: "Og"}, "atomic", false).label, /Schematic/);
+});

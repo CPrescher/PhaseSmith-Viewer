@@ -68,6 +68,28 @@ for (const [element, charge, values] of ionRows) {
 export const ionicEntries = (element, model = "ionic") =>
   (model === "crystal" ? crystalEntries : entries).get(element) ?? [];
 
+// Neutral free-atom radii (Å) at an electron density of 0.001 e/bohr³.
+// Rahm, Hoffmann & Ashcroft (2016), Table S1, with the 2017 corrections.
+// https://rahmlab.com/radii-of-the-elements/ · doi:10.1002/chem.201700610
+const freeAtoms = new Map(Object.entries({
+  H: 1.54, He: 1.34, Li: 2.20, Be: 2.19, B: 2.05, C: 1.90, N: 1.79,
+  O: 1.71, F: 1.63, Ne: 1.56, Na: 2.25, Mg: 2.40, Al: 2.39, Si: 2.32,
+  P: 2.23, S: 2.14, Cl: 2.06, Ar: 1.97, K: 2.34, Ca: 2.70, Sc: 2.63,
+  Ti: 2.57, V: 2.52, Cr: 2.33, Mn: 2.42, Fe: 2.37, Co: 2.33, Ni: 2.29,
+  Cu: 2.17, Zn: 2.22, Ga: 2.33, Ge: 2.34, As: 2.31, Se: 2.24, Br: 2.19,
+  Kr: 2.12, Rb: 2.40, Sr: 2.79, Y: 2.74, Zr: 2.69, Nb: 2.51, Mo: 2.44,
+  Tc: 2.52, Ru: 2.37, Rh: 2.33, Pd: 2.15, Ag: 2.25, Cd: 2.38, In: 2.46,
+  Sn: 2.48, Sb: 2.46, Te: 2.42, I: 2.38, Xe: 2.32, Cs: 2.49, Ba: 2.93,
+  La: 2.84, Ce: 2.82, Pr: 2.86, Nd: 2.84, Pm: 2.83, Sm: 2.80, Eu: 2.80,
+  Gd: 2.77, Tb: 2.76, Dy: 2.75, Ho: 2.73, Er: 2.72, Tm: 2.71, Yb: 2.77,
+  Lu: 2.70, Hf: 2.64, Ta: 2.58, W: 2.53, Re: 2.49, Os: 2.44, Ir: 2.40,
+  Pt: 2.30, Au: 2.26, Hg: 2.29, Tl: 2.42, Pb: 2.49, Bi: 2.50, Po: 2.50,
+  At: 2.47, Rn: 2.43, Fr: 2.58, Ra: 2.92, Ac: 2.93, Th: 2.88, Pa: 2.85,
+  U: 2.83, Np: 2.81, Pu: 2.78, Am: 2.76, Cm: 2.76,
+}));
+
+export const neutralAtomRadius = element => freeAtoms.get(element);
+
 const classic = new Map(Object.entries({
   H: 0.22, C: 0.37, N: 0.36, O: 0.34, Na: 0.52, Mg: 0.48,
   Al: 0.45, Si: 0.43, K: 0.60, Ca: 0.56, Fe: 0.45,
@@ -90,6 +112,12 @@ export function radiusReference(site, model, mineral, choice) {
   const { element, charge } = site;
   const covalent = covalentRadius(element);
   const fallback = { radius: covalent, label: "Covalent · " + covalent + " Å" };
+  if (model === "atomic") {
+    const radius = neutralAtomRadius(element);
+    return radius === undefined
+      ? { radius: 0.42, label: "Schematic · 0.42 Å" }
+      : { radius, label: "Neutral atom · " + radius + " Å" };
+  }
   if (model === "classic") return { radius: classic.get(element) ?? 0.42, label: "Classic" };
   if (model === "covalent" || choice === "covalent") return fallback;
   const options = ionicEntries(element, model);

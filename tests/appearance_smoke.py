@@ -52,6 +52,12 @@ async def check(browser, width, height):
     expected = {"Mg1": 0.355, "Mg2": 0.43, "Si": 0.20}
     for atom in crystal["atoms"]:
         assert math.isclose(atom["radius"], expected.get(atom["label"], 0.63))
+    await model.select_option("atomic")
+    neutral = await diagnostics(page)
+    check_crystal(neutral)
+    assert not await entry.is_visible()
+    for atom in neutral["atoms"]:
+        assert atom["radius"] == {"Mg": 1.20, "Si": 1.16, "O": 0.855}[atom["element"]]
     await model.select_option("covalent")
     assert not await entry.is_visible()
     assert {a["element"]: a["radius"] for a in (await diagnostics(page))["atoms"]}["O"] == 0.315
