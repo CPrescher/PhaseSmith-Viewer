@@ -54,7 +54,7 @@ For example, open forsterite and compare the default reference radii for Mg (0.7
 
 **Single-bond covalent (Pyykkö–Atsumi)** assigns one radius to each element. These values were fitted to molecular single-bond lengths so the sum of the two atoms' radii approximates their bond length. For Mg, Si, and O the values are 1.39, 1.16, and 0.63 Å. The viewer obtains this table from the Blue Obelisk Data Repository. [Pyykkö and Atsumi (2009)](https://doi.org/10.1002/chem.200800987) · [Blue Obelisk data update](https://github.com/BlueObelisk/bodr/commit/c7917225cad8)
 
-**Classic** uses the original schematic sizes, also used when reopening projects saved before the radius selector was added.
+Older projects saved with **Classic**, or before the radius selector was added, reopen with **Effective ionic (Shannon)** at their saved size setting.
 
 To highlight one copy, enable **Pick one** and tap a sphere or a polyhedron face. Individually styled copies stay in the target list, also after a restart. The reset button names its target. **Reset atom** or **Reset polyhedron** removes only that copy's own style, so it follows the current element or pair style again. **Reset element** or **Reset pair** restores the defaults of the whole element or pair, including its individually styled copies. **Reset all … individual styles** removes every individual override at once. Resets never change coordinates. Close Appearance or choose another tool to return to measuring.
 

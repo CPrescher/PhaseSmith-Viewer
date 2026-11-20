@@ -90,11 +90,6 @@ const freeAtoms = new Map(Object.entries({
 
 export const neutralAtomRadius = element => freeAtoms.get(element);
 
-const classic = new Map(Object.entries({
-  H: 0.22, C: 0.37, N: 0.36, O: 0.34, Na: 0.52, Mg: 0.48,
-  Al: 0.45, Si: 0.43, K: 0.60, Ca: 0.56, Fe: 0.45,
-}));
-
 // Apply uncharged mineral presets only in compounds containing both a likely
 // cation and an anion. Leave multivalent ions such as Fe to the site editor.
 const anions = new Set(["O", "F", "Cl", "Br", "I", "S"]);
@@ -118,7 +113,6 @@ export function radiusReference(site, model, mineral, choice) {
       ? { radius: 0.42, label: "Schematic · 0.42 Å" }
       : { radius, label: "Neutral atom · " + radius + " Å" };
   }
-  if (model === "classic") return { radius: classic.get(element) ?? 0.42, label: "Classic" };
   if (model === "covalent" || choice === "covalent") return fallback;
   const options = ionicEntries(element, model);
   const manual = options.find(entry => entry.key === choice);

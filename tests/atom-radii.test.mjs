@@ -20,7 +20,6 @@ test("elemental, ambiguous, and unsupported ions use explicit fallbacks", () => 
   assert.equal(hasMineralIonPair([...metal, {element: "O"}]), true);
   assert.equal(radii({element: "Fe"}).radius, 1.16);
   assert.match(radii({element: "S", charge: -1}).label, /Covalent fallback/);
-  assert.equal(radiusReference({element: "O"}, "classic", true).radius, 0.34);
 });
 
 test("neutral atom size follows the corrected free-atom table regardless of site chemistry", () => {

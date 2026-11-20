@@ -127,17 +127,21 @@ async def check(browser, phone):
     assert await page.locator("#open").evaluate("el => el.getBoundingClientRect().right <= innerWidth"), "Header open button is clipped"
     await page.locator("#project-save").scroll_into_view_if_needed()
     await page.screenshot(path=f"/tmp/viewer-project-{'phone' if phone else 'desktop'}.png")
-    # Import a project in the pre-model format and recover its exact sphere radii.
+    # Both legacy formats use the current default at the saved scale.
     old_atoms = saved["state"]["atoms"]
-    del old_atoms["siteRadii"], old_atoms["radiusModel"]
+    del old_atoms["siteRadii"]
+    if phone:
+        old_atoms["radiusModel"] = "classic"
+    else:
+        del old_atoms["radiusModel"]
     old_atoms["size"] = 1
     await page.locator("#file").set_input_files({
         "name": "legacy.psv", "mimeType": "application/json", "buffer": json.dumps(saved).encode()
     })
     await page.wait_for_function("document.getElementById('project-status').textContent === 'Opened legacy.psv.'")
     legacy = await diagnostics(page)
-    assert legacy["history"]["snapshot"]["atoms"]["radiusModel"] == "classic"
-    assert all(a["radius"] == 0.52 for a in legacy["atoms"] if a["element"] == "Na")
+    assert legacy["history"]["snapshot"]["atoms"]["radiusModel"] == "ionic"
+    assert {a["element"]: a["radius"] for a in legacy["atoms"]} == {"Na": 1.02, "Cl": 1.81}
     assert not errors, errors
     await context.close()
     print(f"{'Phone' if phone else 'Desktop'}: portable roundtrip, multiblock CIF, invalid files and autosave passed", flush=True)

@@ -35,6 +35,7 @@ async def check(browser, width, height):
 
     model = page.locator("#radius-model")
     assert await model.input_value() == "ionic"
+    assert await model.locator('option[value="classic"]').count() == 0
     assert {a["element"]: a["radius"] for a in before["atoms"]} == {"Mg": 0.36, "Si": 0.13, "O": 0.70}
     await page.locator("#radius-details summary").tap()
     await page.locator("#radius-site").select_option("Mg1")
@@ -61,8 +62,6 @@ async def check(browser, width, height):
     await model.select_option("covalent")
     assert not await entry.is_visible()
     assert {a["element"]: a["radius"] for a in (await diagnostics(page))["atoms"]}["O"] == 0.315
-    await model.select_option("classic")
-    assert {a["element"]: a["radius"] for a in (await diagnostics(page))["atoms"]}["O"] == 0.17
     await model.select_option("ionic")
     assert await entry.input_value() == "2/IV"
     await entry.select_option("")

@@ -86,8 +86,9 @@ export function createRadiusControls(onChange) {
       };
     },
     restore(state) {
-      // Projects written before radius models used the original sphere table.
-      model.value = ["ionic", "crystal", "atomic", "covalent"].includes(state.radiusModel) ? state.radiusModel : "classic";
+      // A missing or retired model opens with the same default as a new project.
+      const index = Array.from(model.options).findIndex(option => option.value === state.radiusModel);
+      model.selectedIndex = Math.max(0, index);
       overrides.clear();
       const saved = new Map(Array.isArray(state.siteRadii)
         ? state.siteRadii.filter(pair => Array.isArray(pair) && pair.length === 2) : []);
