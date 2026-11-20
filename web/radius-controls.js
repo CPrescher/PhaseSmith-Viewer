@@ -1,5 +1,7 @@
 import { hasMineralIonPair, ionicEntries, neutralAtomRadius, radiusReference } from "./atom-radii.js";
 
+import { createSiteCoordination } from "./site-coordination.js";
+
 // One radius per independent CIF site. Symmetry mates and translated images
 // share the lookup, while existing element/copy appearance scales stay local.
 export function createRadiusControls(onChange) {
@@ -9,6 +11,7 @@ export function createRadiusControls(onChange) {
   const siteMenu = document.getElementById("radius-site");
   const entryMenu = document.getElementById("radius-entry");
   let sites = [], mineral = false;
+  let assessCoordination, coordination = new Map();
   let missingAtomicRadii = [];
   const overrides = new Map();
   const radii = new Map();
@@ -16,7 +19,7 @@ export function createRadiusControls(onChange) {
   function updateRadii() {
     radii.clear();
     for (const site of sites) {
-      const reference = radiusReference(site, model.value, mineral, overrides.get(site.label));
+      const reference = radiusReference(site, model.value, mineral, overrides.get(site.label), coordination.get(site.label));
       radii.set(site.label, reference.radius);
     }
     atomicNote.hidden = model.value !== "atomic" || !missingAtomicRadii.length;
@@ -30,7 +33,7 @@ export function createRadiusControls(onChange) {
   function updateEntries() {
     const site = sites[siteMenu.selectedIndex];
     if (!site) return;
-    const automatic = radiusReference(site, model.value, mineral);
+    const automatic = radiusReference(site, model.value, mineral, undefined, coordination.get(site.label));
     const covalent = radiusReference(site, "covalent", mineral);
     const choices = [
       new Option("Auto · " + automatic.label, ""),
@@ -70,9 +73,18 @@ export function createRadiusControls(onChange) {
 
   return {
     radius: atom => radii.get(atom.label),
-    setSites(nextSites) {
+    updateCoordination(rules) {
+      const assessed = assessCoordination(rules);
+      if (assessed !== coordination) {
+        coordination = assessed;
+        updateRadii();
+      }
+    },
+    setSites(nextSites, structure) {
       sites = nextSites;
       mineral = hasMineralIonPair(sites);
+      assessCoordination = createSiteCoordination(structure, sites);
+      coordination = new Map();
       missingAtomicRadii = [...new Set(sites.map(site => site.element))].filter(e => neutralAtomRadius(e) === undefined);
       overrides.clear();
       siteMenu.replaceChildren();

@@ -550,6 +550,7 @@ function initialize() {
         cartesian: p.toArray(),
       };
     });
+    radiusControls.updateCoordination(rules);
     buildCoordination();
     selection = atoms.filter(
       (a) => selectedKeys.includes(atomKey(a)) && atomVisible(a),
@@ -2631,7 +2632,7 @@ function initialize() {
     $("asym-toggle").checked = false;
     highlightedSite = null;
     structure = data;
-    radiusControls.setSites(independentSites());
+    radiusControls.setSites(independentSites(), data);
     showSphereSize();
     pairEstimates.clear();
     latticeTools.reset();

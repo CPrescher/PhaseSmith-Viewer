@@ -1,6 +1,16 @@
 import { buildCoordinationEnvironments } from "./coordination.js";
 import { covalentRadius } from "./elements.js";
 
+// Index of the first distance outside the estimated shell in a sorted list.
+export function firstShellSize(distances) {
+  for (let i = 1; i < distances.length; i++) {
+    const previous = distances[i - 1];
+    if (distances[i] > distances[0] * 1.4 ||
+        distances[i] - previous > Math.max(0.2, previous * 0.18)) return i;
+  }
+  return distances.length;
+}
+
 // A display starting point, not a bond assignment. Prefer the actual periodic
 // first shell over tabulated radii, which cannot account for pressure or valence.
 export function estimatePairCutoff(structure, center, neighbor) {
@@ -35,16 +45,9 @@ export function estimatePairCutoff(structure, center, neighbor) {
       // them as an extremely short first coordination shell.
       const distances = environment.neighbors.map((n) => n.distance).filter((d) => d >= 0.3);
       if (!distances.length) continue;
-      let end = distances[0];
-      for (const distance of distances.slice(1)) {
-        const gap = distance - end;
-        if (distance > distances[0] * 1.4 || gap > Math.max(0.2, end * 0.18)) {
-          next = Math.min(next, distance);
-          break;
-        }
-        end = distance;
-      }
-      outer = Math.max(outer, end);
+      const count = firstShellSize(distances);
+      next = Math.min(next, distances[count] ?? Infinity);
+      outer = Math.max(outer, distances[count - 1]);
     }
     if (!outer) return fallback;
     // Include the most extended site's shell with a small margin, staying

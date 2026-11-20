@@ -3,7 +3,7 @@ import { covalentRadius } from "./elements.js";
 // Selected effective ionic radii in Å from R. D. Shannon (1976), Table 1.
 // https://doi.org/10.1107/S0567739476001551
 // Each row starts with the display preset for that charge. Coordination and
-// spin are choices for drawing the structure, independent of active pair rules.
+// spin presets are retained when the site has no supported exact CN match.
 const ionRows = [
   ["Li", 1, { VI: 0.76, IV: 0.59, VIII: 0.92 }],
   ["Be", 2, { IV: 0.27, VI: 0.45 }],
@@ -42,6 +42,7 @@ const ionRows = [
   ["Ba", 2, { VIII: 1.42, VI: 1.35, XII: 1.61 }],
 ];
 
+const coordinationNumbers = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
 const entries = new Map();
 const crystalEntries = new Map();
 for (const [element, charge, values] of ionRows) {
@@ -58,7 +59,7 @@ for (const [element, charge, values] of ionRows) {
     const crystalRadius = Number((radius + Math.sign(charge) * 0.14).toFixed(3));
     for (const [table, value] of [[entries, radius], [crystalEntries, crystalRadius]]) {
       table.get(element).push({
-        key: charge + "/" + environment, charge, radius: value,
+        key: charge + "/" + environment, charge, cn: coordinationNumbers.indexOf(cn), spin, radius: value,
         label: ion + " · CN " + cn + spinText + " · " + value + " Å",
       });
     }
@@ -103,7 +104,16 @@ export function hasMineralIonPair(sites) {
     sites.some(s => entries.has(s.element) && !anions.has(s.element));
 }
 
-export function radiusReference(site, model, mineral, choice) {
+// Only the sign is needed to assess shells. An uncharged multivalent metal
+// can contribute to an anion's CN without assigning that metal a valence.
+export function shellPolarity(site) {
+  if (site.charge != null) return Math.sign(site.charge);
+  if (anions.has(site.element)) return -1;
+  if (ionicEntries(site.element).some(entry => entry.charge > 0)) return 1;
+  return 0;
+}
+
+export function radiusReference(site, model, mineral, choice, coordination) {
   const { element, charge } = site;
   const covalent = covalentRadius(element);
   const fallback = { radius: covalent, label: "Covalent · " + covalent + " Å" };
@@ -118,11 +128,18 @@ export function radiusReference(site, model, mineral, choice) {
   const manual = options.find(entry => entry.key === choice);
   if (manual) return manual;
   const displayCharge = charge ?? (mineral ? mineralCharges.get(element) : undefined);
-  const automatic = options.find(entry => entry.charge === displayCharge);
+  const byCharge = options.filter(entry => entry.charge === displayCharge);
+  const match = byCharge.find(entry => entry.cn === coordination);
+  const automatic = match ?? byCharge[0];
+  const assessed = coordination != null;
+  const assessment = assessed ? "Assessed CN " + coordination : "Coordination unavailable";
   if (!automatic) {
     const reason = charge == null ? "Covalent fallback" : "Covalent fallback (CIF charge " + charge + ")";
-    return { radius: covalent, label: reason + " · " + covalent + " Å" };
+    return { radius: covalent, label: reason + " · " + covalent + " Å", source: assessment };
   }
-  const source = charge == null ? "Mineral preset" : "CIF charge, preset environment";
-  return { radius: automatic.radius, label: automatic.label, source };
+  const chargeSource = charge == null ? "Assumed charge" : "CIF charge";
+  const environment = match ? assessment : assessment + (assessed ? " unavailable in table" : "") +
+    " · Using preset CN " + automatic.cn;
+  const spinSource = automatic.spin ? " · Spin preset" : "";
+  return { radius: automatic.radius, label: automatic.label, source: chargeSource + " · " + environment + spinSource };
 }

@@ -36,8 +36,11 @@ async def check(browser, width, height):
     model = page.locator("#radius-model")
     assert await model.input_value() == "crystal"
     assert await model.locator('option[value="classic"]').count() == 0
-    assert {a["element"]: a["radius"] for a in before["atoms"]} == {"Mg": 0.43, "Si": 0.20, "O": 0.63}
+    assert {a["element"]: a["radius"] for a in before["atoms"]} == {"Mg": 0.43, "Si": 0.20, "O": 0.62}
     await page.locator("#radius-details summary").tap()
+    await page.locator("#radius-site").select_option("O3")
+    assert "CN IV" in await page.locator("#radius-entry option:checked").inner_text()
+    assert "Assessed CN 4" in await page.locator("#radius-source").inner_text()
     await page.locator("#radius-site").select_option("Mg1")
     entry = page.locator("#radius-entry")
     await model.select_option("ionic")
@@ -53,7 +56,7 @@ async def check(browser, width, height):
     check_crystal(crystal)
     expected = {"Mg1": 0.355, "Mg2": 0.43, "Si": 0.20}
     for atom in crystal["atoms"]:
-        assert math.isclose(atom["radius"], expected.get(atom["label"], 0.63))
+        assert math.isclose(atom["radius"], expected.get(atom["label"], 0.62))
     await model.select_option("atomic")
     neutral = await diagnostics(page)
     check_crystal(neutral)

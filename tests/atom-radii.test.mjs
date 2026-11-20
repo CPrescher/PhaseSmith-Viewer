@@ -30,3 +30,13 @@ test("neutral atom size follows the corrected free-atom table regardless of site
   assert.equal(radiusReference({element: "O", charge: -2}, "atomic", true, "covalent").radius, 1.71);
   assert.match(radiusReference({element: "Og"}, "atomic", false).label, /Schematic/);
 });
+
+test("exact site coordination selects the tabulated radius while charge, spin, and manual choices remain distinct", () => {
+  const site = {element: "Al", charge: 3};
+  const five = radiusReference(site, "crystal", true, undefined, 5);
+  assert.equal(five.radius, 0.62);
+  assert.match(five.source, /CIF charge · Assessed CN 5/);
+  assert.match(radiusReference(site, "crystal", true, undefined, 7).source, /CN 7 unavailable in table.*preset CN 6/i);
+  assert.equal(radiusReference(site, "crystal", true, "3/IV", 6).radius, 0.53);
+  assert.equal(radiusReference({element:"Fe"}, "ionic", true, undefined, 6).radius, 1.16);
+});
