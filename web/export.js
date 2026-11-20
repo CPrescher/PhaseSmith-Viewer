@@ -95,7 +95,7 @@ export async function withPngDpi(blob, dpi) {
   return new Blob(parts, { type: "image/png" });
 }
 
-function download(blob, filename) {
+export function download(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

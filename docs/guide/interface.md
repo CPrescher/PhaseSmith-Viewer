@@ -13,7 +13,7 @@ The images below are actual screenshots. Numbered outlines locate each group; en
 | **1 · Files** | Upper-right header, above the crystal | Open the Library or load a CIF/project with Open file. |
 | **2 · View** | Upper left inside the crystal | Look along a, b, c or [uvw]; open Turn for exact rotations. |
 | **3 · Measurements** | Upper right inside the crystal, below the header | Choose Info, Distance, or Angle, then select atoms. |
-| **4 · Tools** | Vertical rail at the right edge | Open Pairs, Sites, Lattice, Extent, Plots, Style, Export, or Help. |
+| **4 · Tools** | Vertical rail at the right edge | Open Pairs, Sites, Lattice, Extent, Plots, X-ray, Detector, Style, Export, or Help. |
 | **5 · Visibility** | Lower left inside the crystal | Show/hide atoms or polyhedra, toggle element spheres, or change sphere size. |
 
 ## Recognize the measurement buttons
@@ -43,6 +43,8 @@ Tap **Tools** to reveal the labeled menu shown below, then choose the tool. Its 
 | **Lattice** | Planes, arrows and symmetry overlays | [Planes and directions](./lattice.md) |
 | **Extent** | Displayed fractional-coordinate range | [Plotting extent](./navigation.md#plotting-extent) |
 | **Plots** | Pair distances and X-ray powder patterns | [Structure plots](./plots.md) |
+| **X-ray** | Atomic layers, phases, and the structure factor for one reflection | [Explore a single reflection](./plots.md#explore-a-single-reflection) |
+| **Detector** | Ewald sphere, specimen rotation, and predicted detector spots | [Diffraction detector](./plots.md#explore-a-single-reflection) |
 | **Style** | Colors, sphere sizes and individual overrides | [Appearance](./navigation.md#appearance) |
 | **Export** | PNG, movie, project file and saved session | [Saving and exporting](./saving.md) |
 

@@ -196,8 +196,6 @@ async def run(browser_type, touch):
     assert len(selected["selectedIds"]) == 2, selected
     selected_ids = selected["selectedIds"]
     distance = selected["distance"]
-    zoom = norm(eye(selected))
-    target = selected["camera"]["target"]
 
     async def check_direction(indices):
         await frames(page, 30)
@@ -222,8 +220,7 @@ async def run(browser_type, touch):
             assert all(
                 math.dist((a["x"], a["y"]), (b["x"], b["y"])) < 1e-6 for a, b in pairs
             ), "Indexed columns do not superimpose"
-        assert abs(norm(eye(d)) - zoom) < 1e-6, (zoom, d["camera"])
-        assert d["camera"]["target"] == target
+        assert d["stage"]["atFit"], "Direction did not recenter and fit the structure"
         assert d["selectedIds"] == selected_ids and d["distance"] == distance, d
         before = d["camera"]
         await frames(page, 45)
@@ -236,11 +233,11 @@ async def run(browser_type, touch):
         await check_direction(indices)
     await page.locator(".view-directions details summary").click()
     await page.locator("#view-direction").fill("1 -2 1")
-    await page.locator("#direction-form button").click()
+    await page.locator("#direction-form button[type=submit]").click()
     await check_direction([1, -2, 1])
     before = await diagnostics(page)
     await page.locator("#view-direction").fill("0 0 0")
-    await page.locator("#direction-form button").click()
+    await page.locator("#direction-form button[type=submit]").click()
     await frames(page, 30)
     after = await diagnostics(page)
     assert await page.locator("#direction-error").inner_text()

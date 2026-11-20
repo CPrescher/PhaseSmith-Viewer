@@ -2,6 +2,7 @@
 // elements. Owns its sidebar UI, its Three.js groups and its state; the
 // viewer supplies coordinate conversion and structure access.
 import {
+  formatMillerIndices,
   parseMillerIndices,
   parseTriple,
   dSpacing,
@@ -64,6 +65,9 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   const group = new THREE.Group();
   group.name = "lattice-tools";
   scene.add(group);
+  const detectorGroup = new THREE.Group();
+  scene.add(detectorGroup);
+  let detectorPlane = null;
   let planes = [],
     arrows = [],
     nextId = 0;
@@ -77,13 +81,13 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   };
 
   // ---- Rendering ----------------------------------------------------------
-  function disposeGroup() {
-    group.traverse((o) => {
+  function disposeGroup(destination = group) {
+    destination.traverse((o) => {
       if (o.isInstancedMesh) o.dispose();
       o.geometry?.dispose();
       o.material?.dispose?.();
     });
-    group.clear();
+    destination.clear();
   }
   const vec = (frac) => toScene(frac);
   function fan(polygons, positions, colors, color) {
@@ -131,8 +135,8 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     material.depthWrite = opaque;
     mesh.layers.set(opaque ? 0 : PEEL_LAYER);
   }
-  function renderPlanes(structure, ranges) {
-    for (const plane of planes) {
+  function renderPlanes(structure, ranges, items = planes, destination = group) {
+    for (const plane of items) {
       plane.faceMesh = null;
       plane.render = { offsets: [], polygons: [], truncated: false };
       if (plane.error) continue;
@@ -171,7 +175,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       mesh.userData.tool = "plane";
       plane.faceMesh = mesh;
       setFaceOpacity(mesh, plane.opacity);
-      group.add(
+      destination.add(
         mesh,
         new THREE.LineSegments(
           geometryOf(edges),
@@ -181,6 +185,16 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     }
   }
 
+  function drawDetectorPlane() {
+    disposeGroup(detectorGroup);
+    if (detectorPlane && getStructure()) renderPlanes(getStructure(), getRanges(), [detectorPlane], detectorGroup);
+  }
+  function setDetectorPlane(hkl) {
+    if ((hkl?.join(" ") ?? "") === (detectorPlane?.hkl.join(" ") ?? "")) return;
+    detectorPlane = hkl && { hkl, family:true, m:0, size:100, opacity:0.23, visible:true, color:"#db9b37" };
+    drawDetectorPlane();
+    invalidate();
+  }
   function renderArrows(structure) {
     const up = new THREE.Vector3(0, 1, 0);
     for (const arrow of arrows) {
@@ -309,6 +323,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     if (!structure) return;
     const ranges = getRanges();
     renderPlanes(structure, ranges);
+    drawDetectorPlane();
     renderArrows(structure);
     renderSymmetry(structure, ranges);
     refreshReadouts(structure, ranges);
@@ -331,9 +346,9 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   const labelPool = [];
   const projected = new THREE.Vector3();
   const indexText = (v, open, close) =>
-    v.every((x) => Number.isInteger(x) && Math.abs(x) < 10)
-      ? `${open}${v.map((x) => (x < 0 ? `${-x}̄` : String(x))).join("")}${close}`
-      : `${open}${v.map(fmt).join(" ")}${close}`;
+    v.every(Number.isInteger)
+      ? open + formatMillerIndices(v, v.every(x => Math.abs(x) < 10) ? "" : " ") + close
+      : open + v.map(fmt).join(" ") + close;
   function collectLabelAnchors() {
     anchors = [];
     if (!labelsOn) return;
@@ -1011,15 +1026,15 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         const row = make("div", { className: "tool-row" });
         row.dataset.planeId = plane.id;
         row.dataset.tuneItem = `plane:${plane.id}`;
-        row.dataset.tuneName = `plane (${plane.hkl.join(" ")})`;
+        row.dataset.tuneName = `plane (${formatMillerIndices(plane.hkl)})`;
         row.style.setProperty("--tool-color", plane.color);
-        const name = () => `(${plane.hkl.join(" ")})`;
+        const name = () => `(${formatMillerIndices(plane.hkl)})`;
         const hkl = textField(plane.hkl.join(" "), "Miller indices (h k l), integers", "hkl", (input) =>
           commit(input, plane, (text) => {
             const v = parseMillerIndices(text);
             plane.hkl = v;
             setHKL(v.join(" "));
-            row.dataset.tuneName = `plane (${v.join(" ")})`;
+            row.dataset.tuneName = `plane (${formatMillerIndices(v)})`;
             // Until m is edited by hand, it follows the indices so the
             // plane cuts through the middle of the displayed range.
             if (plane.autoOffset) {
@@ -1384,6 +1399,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
 
   return {
     rebuild,
+    setDetectorPlane,
     updateLabels,
     // Export frames use their own placement history and full canvas. Restore
     // the live history afterward so a movie never changes on-screen labels.
@@ -1525,6 +1541,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       const counts = {};
       for (const e of result?.elements ?? []) counts[elementCategory(e)] = (counts[elementCategory(e)] || 0) + 1;
       return {
+        detectorPlane: detectorPlane && {hkl:detectorPlane.hkl, polygons:detectorPlane.render.polygons.length},
         labels: {
           exporting: exportMode,
           obstacleCount: obstacles.length,

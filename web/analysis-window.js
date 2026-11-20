@@ -1,3 +1,6 @@
+import { diffractionModule } from "./diffraction-engine.js";
+import { formatMillerIndices } from "./crystal-math.js";
+import { floatingDialog } from "./floating-dialog.js";
 import { powderProfile } from "./structure-analysis.js";
 import { pairName, normalizePair, pairColors, pairSegments } from "./pair-presentation.js";
 
@@ -9,7 +12,7 @@ const hklText = row => {
   // Prefer the conventional positive representative for the table. The full
   // enumerated reciprocal-vector list, with ± mates implied, stays in the CSV.
   const sorted = [...row.hkls].sort((a, b) => a.filter(v => v < 0).length - b.filter(v => v < 0).length || b[0] - a[0] || b[1] - a[1]);
-  return sorted[0].join(" ");
+  return formatMillerIndices(sorted[0]);
 };
 
 export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
@@ -24,7 +27,7 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
   const more = $("analysis-more"), csv = $("analysis-csv"), detail = $("analysis-detail");
   const controls = Object.fromEntries(Object.keys(DEFAULTS).map(key => [key, $("analysis-" + key)]));
   let worker = null, timer = 0, result = null, resultMode = null, selected = -1, expanded = false;
-  let drag = null;
+  let detectorPeak = null;
   let colors = new Map();
   const settings = () => Object.fromEntries(Object.entries(controls).map(([key, field]) => [key, key === "mode" || key === "pair" ? field.value : Number(field.value)]));
 
@@ -54,7 +57,7 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
     for (const field of $("analysis-powder-fields").querySelectorAll("input, select")) field.disabled = distance;
     $("analysis-note").textContent = distance
       ? "Geometric pairs per unit cell, counted once. Periodic neighbors are included automatically for the distance range."
-      : "Ideal X-ray powder pattern: neutral-atom form factors, occupancies and powder Lorentz–polarization correction. No thermal motion, anomalous scattering, texture or instrumental model.";
+      : "PhaseSmith X-ray powder pattern: neutral-atom form factors, occupancies and powder Lorentz–polarization correction. No thermal motion, anomalous scattering, texture or instrumental model.";
   }
   function calculate() {
     stop();
@@ -101,8 +104,9 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
       renderLegend();
       renderTable();
       draw();
+      highlightDetectorPeak();
     };
-    worker.postMessage({ structure, mode: options.mode, options });
+    worker.postMessage({ structure, mode: options.mode, options, diffractionModule: options.mode === "powder" ? diffractionModule : undefined });
   }
 
   function queue() {
@@ -133,6 +137,26 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
     detail.textContent = description(result.rows[index]);
     for (const el of chart.querySelectorAll("[data-index]")) el.classList.toggle("selected", Number(el.dataset.index) === index);
     for (const row of table.querySelectorAll("tbody tr")) row.classList.toggle("selected", Number(row.dataset.index) === index);
+  }
+  function clearHighlight() {
+    selected = -1;
+    chart.querySelectorAll(".selected").forEach(line => line.classList.remove("selected"));
+    table.querySelectorAll(".selected").forEach(row => row.classList.remove("selected"));
+    detail.textContent = "Select a line or table row for details.";
+  }
+  function highlightDetectorPeak() {
+    if (!win.open || !detectorPeak || !result || resultMode !== "powder") return;
+    if (Math.abs(result.wavelength - detectorPeak.wavelength) > 1e-9) {
+      clearHighlight();
+      detail.textContent = "The detector uses a different wavelength.";
+      return;
+    }
+    const index = result.rows.findIndex(row => Math.abs(row.twoTheta - detectorPeak.twoTheta) <= 1.01e-5);
+    if (index >= 0) select(index);
+    else {
+      clearHighlight();
+      detail.textContent = "The detector reflection is outside the calculated powder lines.";
+    }
   }
   function pairTag(pair, count) {
     const tag = document.createElement("span");
@@ -260,20 +284,10 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  function clampWindow() {
-    const r = win.getBoundingClientRect();
-    win.style.left = `${Math.max(8, Math.min(r.left, innerWidth - r.width - 8))}px`;
-    win.style.top = `${Math.max(8, Math.min(r.top, innerHeight - r.height - 8))}px`;
-  }
+  const show = floatingDialog(win, opener, $("analysis-head"), close);
   function open() {
     if (win.open) return;
-    win.show();
-    opener.setAttribute("aria-expanded", "true");
-    if (!win.style.left) {
-      win.style.left = `${Math.max(8, (innerWidth - win.offsetWidth) / 2)}px`;
-      win.style.top = `${Math.max(8, (innerHeight - win.offsetHeight) / 2)}px`;
-    }
-    clampWindow();
+    show();
     calculate();
     onChange();
   }
@@ -286,36 +300,35 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
   }
   opener.onclick = () => win.open ? close() : open();
   $("analysis-close").onclick = close;
-  document.addEventListener("keydown", event => {
-    if (win.open && event.key === "Escape" && !event.defaultPrevented) {
-      // A modal library opened above this nonmodal window owns Escape.
-      if (document.querySelector("dialog:modal")) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      close();
-    }
-  }, true);
-  const handle = $("analysis-head");
-  handle.onpointerdown = event => {
-    if (event.button !== 0 || event.target.closest("button")) return;
-    const r = win.getBoundingClientRect();
-    drag = { x: event.clientX, y: event.clientY, left: r.left, top: r.top };
-    handle.setPointerCapture(event.pointerId);
-    event.preventDefault();
-  };
-  handle.onpointermove = event => {
-    if (!drag) return;
-    win.style.left = `${drag.left + event.clientX - drag.x}px`;
-    win.style.top = `${drag.top + event.clientY - drag.y}px`;
-    clampWindow();
-  };
-  handle.onpointerup = handle.onpointercancel = handle.onlostpointercapture = () => { drag = null; };
-  window.addEventListener("resize", () => { if (win.open) clampWindow(); });
   new ResizeObserver(() => { if (win.open) draw(); }).observe(chart);
   updateMode();
 
   return {
+    selectDetectorPeak(peak) {
+      const previous = detectorPeak;
+      detectorPeak = peak;
+      if (!win.open || controls.mode.value !== "powder") return;
+      if (!peak) {
+        if (previous && resultMode === "powder") clearHighlight();
+        return;
+      }
+      const [minWave, maxWave] = LIMITS.wavelength;
+      if (peak.wavelength < minWave || peak.wavelength > maxWave) {
+        highlightDetectorPeak();
+        return;
+      }
+      const options = settings();
+      controls.wavelength.value = peak.wavelength;
+      if (peak.twoTheta < options.twoThetaMin)
+        controls.twoThetaMin.value = Math.max(LIMITS.twoThetaMin[0], Math.floor(peak.twoTheta));
+      if (peak.twoTheta > options.twoThetaMax)
+        controls.twoThetaMax.value = Math.ceil(peak.twoTheta);
+      if (options.wavelength !== peak.wavelength || options.twoThetaMin !== Number(controls.twoThetaMin.value) ||
+          options.twoThetaMax !== Number(controls.twoThetaMax.value)) queue();
+      else highlightDetectorPeak();
+    },
     setStructure() {
+      detectorPeak = null;
       stop();
       clear();
       const elements = [...new Set(getStructure()?.atoms.map(a => a.element))].sort();

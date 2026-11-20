@@ -32,7 +32,10 @@ import { rotatedView } from "./view-rotation.js";
 import { createTurnControls } from "./turn-controls.js";
 import { createStructureLibrary, libraryEntry, libraryFilename, entryForFilename } from "./structure-library.js";
 import { createToolWindows, TOOL_IDS } from "./tool-windows.js";
+import { setDiffractionModule } from "./diffraction-engine.js";
+import { createDetectorWindow } from "./detector-window.js";
 import { createAnalysisWindow } from "./analysis-window.js";
+import { createReflectionExplorer } from "./reflection-explorer.js";
 import {
   createAppearance,
   clearAppearance,
@@ -66,7 +69,13 @@ function initialize() {
     $("library-open").disabled = true;
     return;
   }
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  function watchDisplayDensity() {
+    matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener("change", () => {
+      watchDisplayDensity();
+      invalidate();
+    }, { once: true });
+  }
+  watchDisplayDensity();
   renderer.setClearColor(0, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.domElement.setAttribute(
@@ -145,7 +154,7 @@ function initialize() {
   }
   let controls = createControls();
   function stopMotion() {
-    const { minDistance, maxDistance } = controls;
+    const { minDistance, maxDistance, staticMoving } = controls;
     const target = controls.target.clone();
     const orientation = camera.quaternion.clone();
     controls.dispose();
@@ -156,6 +165,7 @@ function initialize() {
     camera.quaternion.copy(orientation);
     controls.minDistance = minDistance;
     controls.maxDistance = maxDistance;
+    controls.staticMoving = staticMoving;
   }
   // Studio lighting fixed to the view: the lights live in a rig whose
   // orientation follows the rendered camera every frame, so the crystal
@@ -267,9 +277,24 @@ function initialize() {
   scene.add(selectionGroup);
   function render(exportView) {
     frame = 0;
+    if (!exportView?.crop) {
+      // Supersample translucent face edges on standard-density displays.
+      const scale = THREE.MathUtils.clamp(window.devicePixelRatio, 1.5, 2);
+      if (renderer.getPixelRatio() !== scale) renderer.setPixelRatio(scale);
+    }
     // Trackball emits change while damping moves the camera. That event
     // schedules the next frame; once settled, no animation frames remain.
     controls.update();
+    const sweepSpecimen = specimenDragMoved;
+    specimenDragMoved = false;
+    if (detectorLink && detectorLink.rotation.angleTo(camera.quaternion) > 1e-7) {
+      detectorLink.rotation.copy(camera.quaternion);
+      updatingFromMain = true;
+      // Trackball maps the canvas width to two radians before rotateSpeed.
+      const degreesPerPixel = THREE.MathUtils.radToDeg(2 * controls.rotateSpeed / controls.screen.width);
+      try { diffractionDetector.rotateSpecimen(mainCameraRotation(), sweepSpecimen ? degreesPerPixel : 0); }
+      finally { updatingFromMain = false; }
+    }
     syncViewCamera();
     syncStudio();
     faceSorter.sync([...faceMeshes.values()], viewCamera);
@@ -630,6 +655,74 @@ function initialize() {
     }
   }
   const structureAnalysis = createAnalysisWindow({ getStructure: () => structure, onChange: () => scheduleSave() });
+  const reflectionExplorer = createReflectionExplorer({
+    atomRadius,
+    getStructure: () => structure,
+    onDetector: (hkl, wavelength) => diffractionDetector.open(hkl, wavelength),
+  });
+  let detectorLink = null, updatingFromMain = false, specimenDragMoved = false;
+  renderer.domElement.addEventListener("pointerdown", () => {
+    if (detectorLink) diffractionDetector.beginSpecimenDrag();
+  });
+  renderer.domElement.addEventListener("pointermove", event => {
+    if (detectorLink && event.buttons) specimenDragMoved = true;
+  });
+  function mainCameraRotation() {
+    return [[1,0,0],[0,1,0],[0,0,1]].map(axis =>
+      new THREE.Vector3(...axis).applyQuaternion(camera.quaternion).toArray());
+  }
+  function linkDetectorView(pose, keepOrientation = false) {
+    if (!pose && !detectorLink) return;
+    latticeTools.setDetectorPlane(pose?.hkl ?? null);
+    const distance = camera.position.distanceTo(controls.target);
+    if (!pose) {
+      stopMotion();
+      if (!keepOrientation) {
+        camera.position.copy(detectorLink.eye).multiplyScalar(distance).add(controls.target);
+        camera.up.copy(detectorLink.up);
+      }
+      const previousView = keepOrientation ? null : detectorLink.active;
+      controls.staticMoving = detectorLink.staticMoving;
+      detectorLink = null;
+      controls.update();
+      setActiveView(previousView?.id ?? null, previousView?.dir);
+      if (keepOrientation) scheduleSave();
+      invalidate();
+      return;
+    }
+    const eye = new THREE.Vector3(...pose.eye).normalize();
+    const up = new THREE.Vector3(...pose.up).projectOnPlane(eye).normalize();
+    if (!updatingFromMain && detectorLink?.linkedEye.equals(eye) && detectorLink.linkedUp.equals(up)) return;
+    if (!detectorLink) {
+      stopMotion();
+      detectorLink = {
+        eye: camera.position.clone().sub(controls.target).normalize(),
+        up: camera.up.clone(), active: activeView, rotation: new THREE.Quaternion(),
+        staticMoving: controls.staticMoving,
+      };
+      // A manual specimen turn stops at the orientation where the user lets go.
+      controls.staticMoving = true;
+    }
+    detectorLink.linkedEye = eye;
+    detectorLink.linkedUp = up;
+    if (updatingFromMain) {
+      const currentEye = camera.position.clone().sub(controls.target).normalize();
+      if (currentEye.distanceToSquared(eye) < 1e-20 && camera.up.distanceToSquared(up) < 1e-20) return;
+    }
+    camera.position.copy(eye).multiplyScalar(distance).add(controls.target);
+    camera.up.copy(up);
+    controls.update();
+    detectorLink.rotation.copy(camera.quaternion);
+    setActiveView(null);
+    invalidate();
+  }
+  const diffractionDetector = createDetectorWindow({
+    getStructure: () => structure,
+    onExplain: (hkl, wavelength) => reflectionExplorer.open(hkl, wavelength),
+    onPeak: peak => structureAnalysis.selectDetectorPeak(peak),
+    onMainView: linkDetectorView,
+    getMainRotation: mainCameraRotation,
+  });
   const latticeTools = createLatticeTools({
     THREE,
     scene,
@@ -1628,6 +1721,7 @@ function initialize() {
     for (const stat of coordinationStats) {
       const p = $(`pair-count-${stat.id}`);
       if (!p) continue;
+      const groups = polyhedronGroups([stat]);
       const siteCounts = Object.entries(stat.siteCounts)
         .map(([label, counts]) => `${label}: ${counts.join(", ")}`)
         .join(" · ");
@@ -1639,7 +1733,16 @@ function initialize() {
           ? "Paused in asymmetric-unit view"
           : !(stat.bonds || stat.polyhedra)
           ? "Off · enable bonds or polyhedra"
-          : `CN ${stat.counts.join(", ") || "0"} · ${stat.centerCount || 0} centers · ${stat.polyhedronCount} poly · ${stat.bondCount} bonds`);
+          : `${groups.size ? "" : `CN ${stat.counts.join(", ") || "0"} · `}${stat.centerCount || 0} centers · ${stat.polyhedronCount} poly · ${stat.bondCount} bonds`);
+      const readouts = [...groups.values()].map((g) => {
+        const line = make("span", {
+          className: "pair-coordination",
+          textContent: `${g.label}: CN ${[...g.cn].sort((a, b) => a - b).join(", ")} · V ${polyhedronVolumeRange(g)} Å³`,
+          title: "Polyhedron volume from true neighbor positions; display scale does not change it.",
+        });
+        return line;
+      });
+      p.prepend(...readouts);
     }
     const note = $("isolation-note");
     note.textContent =
@@ -1684,12 +1787,10 @@ function initialize() {
     if (!Array.isArray(structure.independentSites))
       $("asym-note").textContent = "This engine build does not report independent sites; showing the first copy of each label.";
   }
-  function renderPolyTable() {
-    const body = $("poly-table")?.tBodies[0];
-    if (!body) return;
-    // Group by pair and central CIF site label: CN set and volume range.
+  // Shared by Pairs and Sites: CN set and physical volume range per site.
+  function polyhedronGroups(stats) {
     const groups = new Map();
-    for (const stat of coordinationStats)
+    for (const stat of stats)
       for (const env of stat.environments) {
         const key = `${pairName(stat)}|${env.centerLabel}`;
         if (!groups.has(key))
@@ -1698,12 +1799,20 @@ function initialize() {
         g.cn.add(env.coordination);
         g.volumes.push(env.volume);
       }
+    return groups;
+  }
+  function polyhedronVolumeRange(g) {
+    const lo = Math.min(...g.volumes), hi = Math.max(...g.volumes);
+    return hi - lo < 5e-4 ? lo.toFixed(3) : `${lo.toFixed(3)}–${hi.toFixed(3)}`;
+  }
+  function renderPolyTable() {
+    const body = $("poly-table")?.tBodies[0];
+    if (!body) return;
+    const groups = polyhedronGroups(coordinationStats);
     body.replaceChildren(
       ...[...groups.values()].map((g) => {
         const row = document.createElement("tr");
-        const lo = Math.min(...g.volumes),
-          hi = Math.max(...g.volumes);
-        const volume = hi - lo < 5e-4 ? lo.toFixed(3) : `${lo.toFixed(3)}–${hi.toFixed(3)}`;
+        const volume = polyhedronVolumeRange(g);
         for (const text of [g.label, g.pair, [...g.cn].sort((a, b) => a - b).join(", "), volume]) {
           const cell = document.createElement("td");
           cell.textContent = text;
@@ -1766,7 +1875,10 @@ function initialize() {
       stopMotion();
       camera.up.set(...up);
       camera.position.copy(target).addScaledVector(dir, zoomDistance);
-      controls.update();
+      // Touch pan and anchored pinch move the pivot. An explicit direction
+      // starts from the full structure again, fitted to this canvas aspect.
+      // Translating the pivot and camera together keeps [uvw] exact.
+      reset(true);
       setActiveView(viewId, dir);
       $("direction-error").textContent = "";
       invalidate();
@@ -1857,13 +1969,16 @@ function initialize() {
     const basis = new THREE.Matrix4().lookAt(direction, new THREE.Vector3(), viewUp);
     const right = new THREE.Vector3().setFromMatrixColumn(basis, 0);
     const up = new THREE.Vector3().setFromMatrixColumn(basis, 1);
-    let halfRight = 0,
-      halfUp = 0;
+    let minRight = Infinity, maxRight = -Infinity,
+      minUp = Infinity, maxUp = -Infinity;
     const offset = new THREE.Vector3();
     const extend = (point, radius = 0) => {
       offset.copy(point).sub(target);
-      halfRight = Math.max(halfRight, Math.abs(offset.dot(right)) + radius);
-      halfUp = Math.max(halfUp, Math.abs(offset.dot(up)) + radius);
+      const x = offset.dot(right), y = offset.dot(up);
+      minRight = Math.min(minRight, x - radius);
+      maxRight = Math.max(maxRight, x + radius);
+      minUp = Math.min(minUp, y - radius);
+      maxUp = Math.max(maxUp, y + radius);
     };
     for (const corner of fitCorners) extend(corner);
     if (atoms.length <= 200000) for (const a of atoms) extend(a.position, a.radius ?? 0);
@@ -1876,8 +1991,13 @@ function initialize() {
     }
     extra.union(latticeTools.bounds());
     if (!extra.isEmpty()) for (const corner of boxCorners(extra)) extend(corner);
-    halfRight = Math.max(halfRight, 0.5);
-    halfUp = Math.max(halfUp, 0.5);
+    // A world-space bounding-box center can look off-center after rotation,
+    // especially with a skew cell or unequal atom sizes. Center the actual
+    // projected extent without tilting away from the requested lattice axis.
+    target.addScaledVector(right, (minRight + maxRight) / 2)
+      .addScaledVector(up, (minUp + maxUp) / 2);
+    const halfRight = Math.max((maxRight - minRight) / 2, 0.5);
+    const halfUp = Math.max((maxUp - minUp) / 2, 0.5);
     // Canvas toolbars sit along the top and bottom edges; fit the crystal
     // between them. Settings overlays never influence this fit.
     const height = viewport.clientHeight || 1;
@@ -2621,6 +2741,7 @@ function initialize() {
   function display(data) {
     // A new file or data block starts clean: queued rebuilds from the
     // previous document are cancelled and appearance overrides forgotten.
+    linkDetectorView(null);
     structureGeneration++;
     cancelScheduledBuild();
     clearAppearance(appearance);
@@ -2712,6 +2833,8 @@ function initialize() {
     renderSiteTable();
     updateAsymmetricNote();
     structureAnalysis.setStructure();
+    reflectionExplorer.setStructure();
+    diffractionDetector.setStructure();
   }
   const worker = new Worker(new URL("./import-worker.js", import.meta.url), {
     type: "module",
@@ -2719,6 +2842,7 @@ function initialize() {
   let pending = [];
   let userIntent = 0;
   worker.onmessage = ({ data }) => {
+    if (data.diffractionModule) { setDiffractionModule(data.diffractionModule); return; }
     const task = pending.shift();
     if (!task || task.id !== request || task.intent !== userIntent) return;
     $("loading").hidden = true;
@@ -3424,8 +3548,8 @@ function initialize() {
       lattice: latticeTools.exportState(),
       analysis: structureAnalysis.exportState(),
       camera: {
-        position: camera.position.toArray(),
-        up: camera.up.toArray(),
+        position: detectorLink ? detectorLink.eye.clone().multiplyScalar(camera.position.distanceTo(controls.target)).add(controls.target).toArray() : camera.position.toArray(),
+        up: (detectorLink?.up ?? camera.up).toArray(),
         target: controls.target.toArray(),
         minDistance: controls.minDistance,
         maxDistance: controls.maxDistance,

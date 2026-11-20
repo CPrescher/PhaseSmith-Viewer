@@ -1,3 +1,4 @@
+import "./load-diffraction-engine.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { distanceDistribution, powderPattern, powderProfile, xrayFormFactor } from "../web/structure-analysis.js";
@@ -121,8 +122,8 @@ test("occupancy changes relative structure factors and wavelength obeys Bragg's 
 });
 
 test("neutral form factors and Gaussian FWHM have independent reference values", () => {
-  close(xrayFormFactor("Fe", 0), 25.9904);
-  close(xrayFormFactor("Fe", 0.5), 11.505687515802265);
+  close(xrayFormFactor("Fe", 0), 25.994602999999998);
+  close(xrayFormFactor("Fe", 0.5), 11.508484685282303);
   close(xrayFormFactor("D", 0.2), xrayFormFactor("H", 0.2));
   const profile = powderProfile([{ twoTheta: 20, intensity: 42 }], 19, 21, 0.2, 2001);
   close(profile[1000][1], 100);
@@ -138,6 +139,6 @@ test("invalid ranges, unsupported elements and oversized searches fail explicitl
   assert.throws(() => powderPattern(cubic(1000)), /Too many reflections/);
   assert.throws(() => powderPattern(cubic(), { twoThetaMin: 100 }), /exceed/);
   assert.throws(() => powderPattern(cubic(), { wavelength: 0.1 }), /sin/);
-  assert.throws(() => xrayFormFactor("Og", 0.1), /No X-ray/);
-  assert.throws(() => xrayFormFactor("Fe", 2), /sin/);
+  assert.throws(() => xrayFormFactor("Og", 0.1), /unknown X-ray/);
+  assert.throws(() => xrayFormFactor("Fe", 6.01), /exceed 6/);
 });

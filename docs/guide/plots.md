@@ -46,7 +46,7 @@ Use **FWHM = 0** for sticks. A nonzero width must be at least **0.01°** and at 
 
 ### What is calculated?
 
-The viewer calculates reciprocal-lattice positions and occupancy-weighted structure factors using neutral-atom Cromer–Mann X-ray form factors. Reflections with the same spacing are summed, including multiplicity and Friedel mates. A conventional unpolarized powder Lorentz–polarization correction is applied.
+The viewer calculates reciprocal-lattice positions and occupancy-weighted structure factors using PhaseSmith’s neutral-atom Waasmaier–Kirfel X-ray form factors. Reflections with the same spacing are summed, including multiplicity and Friedel mates. A conventional unpolarized powder Lorentz–polarization correction is applied.
 
 The table and CSV give **integrated line intensities**, scaled so the strongest line is 100. The Gaussian display is separately scaled so its highest profile value is 100. Consequently, profile heights and table intensities are not interchangeable when peaks overlap.
 
@@ -56,6 +56,14 @@ The table shows a representative Miller index for each line. The CSV retains the
 
 The calculation omits thermal motion, anomalous scattering, texture, absorption, and instrument-specific effects. The profile width is an illustrative Gaussian broadening. It is not a fit to measured data and does not represent crystallite size or strain.
 
-Form factors require **sin(θ)/λ < 2 Å⁻¹**. If that limit is exceeded, decrease the maximum 2θ or increase the wavelength. If the browser work limit is reached, narrowing the angular range can help.
+Form factors require **sin(θ)/λ ≤ 6 Å⁻¹**. If that limit is exceeded, decrease the maximum 2θ or increase the wavelength. If the browser work limit is reached, narrowing the angular range can help.
 
-The coefficient table is adapted from [Gemmi's ITC 1992 neutral-atom table](https://gemmi.readthedocs.io/en/stable/scattering.html#x-ray-form-factors). See [Scientific conventions](./science.md#diffraction) for the equations and [the source notice](https://github.com/CPrescher/PhaseSmith-Viewer/blob/main/public/notices/gemmi.txt) for attribution.
+See [Scientific conventions](./science.md#diffraction) for the structure-factor calculation.
+
+## Explore a single reflection
+
+Open **X-ray** and enter the Miller indices and wavelength to inspect how the atomic layers contribute to the reflection. Use **Detector** to see where that reflection lands. The Ewald sphere shows the reciprocal lattice, the incident beam, and the diffracted beam.
+
+In **Detector**, enter **2 0 0** for periclase and press **Enter** to rotate to the reflection. Step through other crossings with **Previous reflection** and **Next reflection**. Choose **Link main view** to turn the specimen from the crystal view. With the powder plot open, selecting a detector spot also highlights its powder line when it is in range.
+
+Open **Options** to change the wavelength, detector distance, or detector shape, import a PONI calibration, or set the specimen orientation and rotation axis.

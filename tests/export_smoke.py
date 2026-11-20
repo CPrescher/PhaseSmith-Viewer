@@ -148,7 +148,7 @@ async def check(browser):
         assert (await diagnostics(page))["camera"] == before["camera"]
 
         # Resizing during a recording stops it without a download and
-        # leaves the canvas at the CURRENT size (drawing buffer = CSS × dpr).
+        # restores the live render scale at the current viewport size.
         downloads = []
         page.on("download", lambda d: downloads.append(d))
         await page.locator("#export-video").tap()
@@ -165,10 +165,10 @@ async def check(browser):
         assert not downloads, downloads
         canvas = await page.evaluate(
             """()=>{const c=document.querySelector('#viewport canvas');const r=c.getBoundingClientRect();
-            return {w:c.width,h:c.height,cw:r.width,ch:r.height,dpr:devicePixelRatio};}"""
+            return {w:c.width,h:c.height,cw:r.width,ch:r.height};}"""
         )
-        assert abs(canvas["w"] - canvas["cw"] * canvas["dpr"]) <= 1, canvas
-        assert abs(canvas["h"] - canvas["ch"] * canvas["dpr"]) <= 1, canvas
+        assert abs(canvas["w"] - canvas["cw"] * 1.5) <= 1, canvas
+        assert abs(canvas["h"] - canvas["ch"] * 1.5) <= 1, canvas
         assert await page.locator("#export-video").is_enabled()
         print("Movie decoded", metadata)
     else:

@@ -1,14 +1,15 @@
 // Pure periodic geometry and kinematic powder diffraction. The full,
 // symmetry-expanded unit cell is used, independently of display bounds.
 import { inverse3, det3, matVec } from "./crystal-math.js";
-import { XRAY_COEFFICIENTS } from "./xray-coefficients.js";
+import { maxScatteringVector, structureFactors } from "./diffraction-engine.js";
+export { xrayFormFactor } from "./diffraction-engine.js";
 import { pairName, normalizePair } from "./pair-presentation.js";
 
 const positive = (h, k, l) => h > 0 || (h === 0 && (k > 0 || (k === 0 && l > 0)));
 const MAX_CHECKS = 8_000_000;
 const MAX_PAIRS = 500_000;
 
-function cell(structure) {
+export function analysisCell(structure) {
   if (!structure?.atoms?.length) throw Error("Load a crystal structure first.");
   const inverse = inverse3(structure.basis);
   if (!Number.isFinite(det3(structure.basis))) throw Error("Invalid unit cell.");
@@ -38,7 +39,7 @@ export function distanceDistribution(structure, { rMin = 0, rMax = 6, tolerance 
   if (rMin >= rMax) throw Error("Maximum distance must exceed minimum distance.");
   inRange(tolerance, 0.00001, 0.1, "Distance tolerance (Å)");
   pair = normalizePair(pair);
-  const { atoms, inverse, basis } = cell(structure);
+  const { atoms, inverse, basis } = analysisCell(structure);
   if (atoms.length * (atoms.length + 1) / 2 > MAX_CHECKS)
     throw Error("Too many sites for distance analysis in the browser.");
   const bounds = inverse.map(row => Math.hypot(...row) * rMax);
@@ -82,16 +83,6 @@ export function distanceDistribution(structure, { rMin = 0, rMax = 6, tolerance 
   return { rows, rMin, rMax, tolerance, count: pairs.length, partialOccupancy: atoms.some(a => (a.occupancy ?? 1) !== 1) };
 }
 
-/** f0(s) = sum ai exp(-bi s²) + c, s = sin(theta)/lambda in Å⁻¹.
- * Neutral atoms, ITC 1992; no anomalous or thermal scattering corrections.
- */
-export function xrayFormFactor(element, s) {
-  const c = XRAY_COEFFICIENTS[element === "D" ? "H" : element];
-  if (!c) throw Error(`No X-ray scattering factors available for ${element}.`);
-  if (!Number.isFinite(s) || s < 0 || s >= 2) throw Error("X-ray form factors require sin(θ)/λ < 2 Å⁻¹; reduce 2θ or increase the wavelength.");
-  return c[8] + c.slice(0, 4).reduce((sum, a, i) => sum + a * Math.exp(-c[i + 4] * s * s), 0);
-}
-
 /** Powder lines: sum |F(hkl)|² over all reciprocal vectors at each d.
  * Friedel mates contribute a factor of two; multiplicity is enumerated,
  * including accidental overlap, never inferred from a crystal system.
@@ -102,16 +93,27 @@ export function powderPattern(structure, { wavelength = 1.5406, twoThetaMin = 5,
   inRange(twoThetaMin, 0.1, 170, "Minimum 2θ (°)");
   inRange(twoThetaMax, 0.1, 170, "Maximum 2θ (°)");
   if (twoThetaMin >= twoThetaMax) throw Error("Maximum 2θ must exceed minimum 2θ.");
-  const { atoms, basis, inverse } = cell(structure);
-  const elements = [...new Set(atoms.map(a => a.element))];
+  const { atoms, basis, inverse } = analysisCell(structure);
+
   const qMax = 2 * Math.sin(twoThetaMax * Math.PI / 360) / wavelength;
-  elements.forEach(e => xrayFormFactor(e, qMax / 2));
+  if (qMax / 2 > maxScatteringVector) throw Error("PhaseSmith X-ray form factors require sin(θ)/λ ≤ 6 Å⁻¹.");
   const qMin = 2 * Math.sin(twoThetaMin * Math.PI / 360) / wavelength;
   const limits = [0, 1, 2].map(i => Math.floor(Math.hypot(...basis.map(row => row[i])) * qMax + 1e-9));
   if (limits.reduce((n, v) => n * (2 * v + 1), 1) > MAX_CHECKS)
     throw Error("Too many reflections; reduce maximum 2θ or increase the wavelength.");
   const lines = [];
   let checks = 0;
+  const batch = [];
+  function flush() {
+    if (!batch.length) return;
+    const intensities = structureFactors({ atoms, basis }, batch.map(line => line.hkl), { powder_wavelength: wavelength });
+    batch.forEach((line, i) => {
+      if (!intensities[i]) return;
+      if (lines.length >= 100_000) throw Error("Too many powder lines; reduce maximum 2θ or increase the wavelength.");
+      lines.push({ ...line, intensity: 2 * intensities[i] });
+    });
+    batch.length = 0;
+  }
   for (let h = 0; h <= limits[0]; h++)
     for (let k = -limits[1]; k <= limits[1]; k++)
       for (let l = -limits[2]; l <= limits[2]; l++) {
@@ -120,23 +122,11 @@ export function powderPattern(structure, { wavelength = 1.5406, twoThetaMin = 5,
         if (q < qMin - 1e-10 || q > qMax + 1e-10) continue;
         checks += atoms.length;
         if (checks > MAX_CHECKS) throw Error("Structure-factor calculation is too large; reduce maximum 2θ or increase the wavelength.");
-        const factors = Object.fromEntries(elements.map(e => [e, xrayFormFactor(e, q / 2)]));
-        let re = 0, im = 0, scale = 0;
-        for (const a of atoms) {
-          const phase = 2 * Math.PI * (h * a.frac[0] + k * a.frac[1] + l * a.frac[2]);
-          const f = factors[a.element] * (a.occupancy ?? 1);
-          re += f * Math.cos(phase);
-          im += f * Math.sin(phase);
-          scale += Math.abs(f);
-        }
-        const f2 = re * re + im * im;
-        if (f2 <= scale * scale * 1e-12) continue;
         const theta = Math.asin(Math.min(1, wavelength * q / 2));
-        const twoTheta = theta * 360 / Math.PI;
-        const lp = (1 + Math.cos(2 * theta) ** 2) / (Math.sin(theta) ** 2 * Math.cos(theta));
-        if (lines.length >= 100_000) throw Error("Too many powder lines; reduce maximum 2θ or increase the wavelength.");
-        lines.push({ twoTheta, d: 1 / q, intensity: 2 * f2 * lp, hkl: [h, k, l] });
+        batch.push({ twoTheta: theta * 360 / Math.PI, d: 1 / q, hkl: [h, k, l] });
+        if (batch.length >= 4096) flush();
       }
+  flush();
   lines.sort((a, b) => a.twoTheta - b.twoTheta);
   const rows = [];
   for (const line of lines) {

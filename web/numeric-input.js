@@ -2,6 +2,21 @@
 // the input focused and use the same change/undo/save path as typed edits.
 const make = (tag, props = {}) => Object.assign(document.createElement(tag), props);
 
+// A click moves focus on mousedown. Collapsing the extra row then can move
+// the pressed control before mouseup, so the browser clicks its parent.
+let mousePressed = false;
+const pendingHides = new Set();
+function releaseMouse() {
+  mousePressed = false;
+  for (const keys of pendingHides) keys.hidden = true;
+  pendingHides.clear();
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("mousedown", () => { mousePressed = true; }, true);
+  window.addEventListener("mouseup", () => setTimeout(releaseMouse, 0), true);
+  window.addEventListener("blur", releaseMouse);
+}
+
 export function numericKeys(input, caption, withSpace = false, { inputMode, onDone } = {}) {
   input.inputMode = inputMode ?? (withSpace ? "numeric" : "decimal");
   input.setAttribute("autocorrect", "off");
@@ -14,15 +29,28 @@ export function numericKeys(input, caption, withSpace = false, { inputMode, onDo
   keys.setAttribute("aria-label", `Extra keys for ${caption}`);
   keys.append(make("span", { className: "micro", textContent: caption }));
   let edited = false;
-  input.addEventListener("focus", () => { keys.hidden = false; });
+  const hideKeys = () => {
+    if (mousePressed) pendingHides.add(keys);
+    else keys.hidden = true;
+  };
+  input.addEventListener("focus", () => {
+    pendingHides.delete(keys);
+    keys.hidden = false;
+  });
   input.addEventListener("change", () => { edited = false; });
   input.addEventListener("blur", (event) => {
     // An accessory-only edit also needs the usual change/undo/save path.
     if (edited) input.dispatchEvent(new Event("change", { bubbles: true }));
-    if (!keys.contains(event.relatedTarget)) keys.hidden = true;
+    if (!keys.contains(event.relatedTarget)) {
+      // Native validation can refocus this input during the change/blur
+      // sequence. Recheck focus once the browser finishes moving it.
+      requestAnimationFrame(() => {
+        if (document.activeElement !== input && !keys.contains(document.activeElement)) hideKeys();
+      });
+    }
   });
   keys.addEventListener("focusout", (event) => {
-    if (event.relatedTarget !== input && !keys.contains(event.relatedTarget)) keys.hidden = true;
+    if (event.relatedTarget !== input && !keys.contains(event.relatedTarget)) hideKeys();
   });
   const edit = (apply) => {
     input.focus({ preventScroll: true });

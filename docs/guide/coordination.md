@@ -28,4 +28,4 @@ Use **Hide atoms outside polyhedra** to show only the centers and vertices of en
 
 Open [the forsterite example](https://cprescher.github.io/PhaseSmith-Viewer/?example=forsterite) for a worked example using the Mg end member of olivine (Boström, 1987, *American Mineralogist* 72, 965–972, AMCSD 0001118). The Si–O and Mg–O cutoffs of 1.80 Å and 2.30 Å include the complete first coordination shells. Hide one rule to examine the other. Lower the Mg–O cutoff to 2.15 Å to retain all six neighbors around Mg1 and three around Mg2.
 
-Coordination numbers and convex-hull volumes are reported by central site under **Sites**. See [Measurements and sites](./measurements.md) and [Scientific conventions](./science.md#coordination-and-polyhedron-volume) for their interpretation.
+Each pair shows the coordination number and convex-hull volume for its central sites. Open **Sites** for the table across all pairs. See [Measurements and sites](./measurements.md) and [Scientific conventions](./science.md#coordination-and-polyhedron-volume) for their interpretation.

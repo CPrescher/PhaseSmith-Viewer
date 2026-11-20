@@ -50,7 +50,7 @@ For fractional coordinates *(xⱼ, yⱼ, zⱼ)* and occupancy *oⱼ*, the X-ray 
 
 <div class="equation">F(hkl) = Σⱼ oⱼ fⱼ(s) exp[2πi(hxⱼ + kyⱼ + lzⱼ)]</div>
 
-Here **s = sin(θ)/λ = 1/(2d)**. Neutral-atom Cromer–Mann form factors depend on *s*. The structure-factor intensity contribution is |F|², and Bragg's law gives the scattering angle:
+Here **s = sin(θ)/λ = 1/(2d)**. Neutral-atom Waasmaier–Kirfel form factors depend on *s*. The structure-factor intensity contribution is |F|², and Bragg's law gives the scattering angle:
 
 <div class="equation">2d sin θ = λ</div>
 

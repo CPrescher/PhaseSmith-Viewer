@@ -157,7 +157,7 @@ async def check(browser, width, height, theme):
     assert await page.locator("#analysis-table tbody tr").count() == 10
     await page.locator("#analysis-rMax").fill("6")
     await ready(page)
-    await page.locator(".analysis-body").evaluate("el => el.scrollTop=0")
+    await page.locator("#analysis-window .analysis-body").evaluate("el => el.scrollTop=0")
     await page.screenshot(path=f"/tmp/phasesmith-analysis-{width}-{theme}.png")
     assert not await page.evaluate("document.scrollingElement.scrollWidth > innerWidth || document.scrollingElement.scrollHeight > innerHeight")
     assert not errors, errors

@@ -141,7 +141,8 @@ async def check(browser, engine, width, height, touch, theme):
         window = await page.locator(WINDOW).bounding_box()
         atom = next(a for a in (await page.evaluate("viewerDiagnostics()"))["atoms"] if a["label"] == "B")
         await page.locator(WINDOW + ' [data-action=close]').click()
-        dy = window["y"] - 80 - atom["y"]
+        # Keep the top atom outside the view toolbar’s touch hit area.
+        dy = window["y"] - 35 - atom["y"]
         await page.mouse.move(120, atom["y"])
         await page.mouse.down(button="right")
         await page.mouse.move(120, atom["y"] + dy, steps=8)

@@ -40,7 +40,7 @@ Check its indices, offset, and the plotting extent. The plane must intersect the
 
 An empty range can be valid: there may be no pairs or reflections within it. Widen it moderately. If the request exceeds the browser work limit, reduce the distance or angular range, select one pair type, or use a smaller structure. Oversized requests fail explicitly rather than returning a truncated distribution.
 
-For X-ray form factors, **sin(θ)/λ must stay below 2 Å⁻¹**. Reduce the upper 2θ limit or increase the wavelength. Use a peak width of zero for sticks, or at least 0.01° for a Gaussian profile.
+For X-ray form factors, **sin(θ)/λ must be at most 6 Å⁻¹**. Reduce the upper 2θ limit or increase the wavelength. Use a peak width of zero for sticks, or at least 0.01° for a Gaussian profile.
 
 ## An old structure returns when I reopen the viewer
 

@@ -1,6 +1,6 @@
 # PhaseSmith Viewer
 
-Explore crystal structures in your browser: atomic distances and angles, coordination polyhedra, lattice planes and directions, symmetry elements, pair-distance distributions, and ideal X-ray powder patterns. CIF parsing and symmetry expansion run locally with the PhaseSmith WebAssembly engine; Three.js renders the structure using WebGL.
+Explore crystal structures in your browser: atomic distances and angles, coordination polyhedra, lattice planes and directions, symmetry elements, pair-distance distributions, ideal X-ray powder patterns, and single-crystal diffraction on an interactive Ewald sphere and detector. CIF parsing and symmetry expansion run locally with the PhaseSmith WebAssembly engine; Three.js renders the structure using WebGL.
 
 **[Open the viewer](https://cprescher.github.io/PhaseSmith-Viewer/)** · **[Documentation](https://cprescher.github.io/PhaseSmith-Viewer/docs/)** · **[Worked examples](https://cprescher.github.io/PhaseSmith-Viewer/docs/tutorials.html)**
 
@@ -55,4 +55,4 @@ npm run build:engine
 
 ## Sources and attribution
 
-Library entries retain original structure citations and source links in `web/structure-library.json`. Idealized teaching models are labeled separately. The X-ray coefficient table is adapted from Gemmi's ITC 1992 table; its MPL 2.0 notice is in `public/notices/gemmi.txt`. Element colors and fallback covalent radii are adapted from the [Blue Obelisk Data Repository](https://github.com/BlueObelisk/bodr/blob/master/bodr/elements/elements.xml).
+Library entries retain original structure citations and source links in `web/structure-library.json`. Idealized teaching models are labeled separately. The powder plot, reflection explorer, and detector use PhaseSmith’s Waasmaier–Kirfel neutral-atom X-ray form factors. Element colors and fallback covalent radii are adapted from the [Blue Obelisk Data Repository](https://github.com/BlueObelisk/bodr/blob/master/bodr/elements/elements.xml).

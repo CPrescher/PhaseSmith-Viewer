@@ -327,7 +327,7 @@
           aria-label="Tools"
           aria-expanded="false"
           aria-controls="tool-rail"
-          title="Tools: Pairs, Sites, Lattice, Extent, Plots, Style, Export"
+          title="Tools: Pairs, Sites, Lattice, Extent, Plots, X-ray, Detector, Style, Export"
         >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
         </button>
@@ -346,6 +346,12 @@
             </button>
             <button id="mode-analysis" type="button" class="rail-button" aria-expanded="false" aria-controls="analysis-window" aria-haspopup="dialog" title="Plots: pair distances and theoretical powder diffraction in a floating window">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M7 17v-5M12 17V6M17 17v-8"/></svg><span class="rail-label">Plots</span><span class="rail-hint" aria-hidden="true">pair distances and theoretical powder diffraction</span>
+            </button>
+            <button id="mode-reflection" type="button" class="rail-button" aria-expanded="false" aria-controls="reflection-explorer" aria-haspopup="dialog" title="X-ray: crystal layers, ray paths, phases and reflection intensity">
+              <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7 16 19 29 7M4 23h24M7 28h18" opacity=".6"/><path d="m3 13 13 6L29 3M24 3h5v5"/><path d="m3 7 4 .5M3 7l.5 4"/><path d="m16 13 5 6-5 6-5-6Z" fill="currentColor" fill-opacity=".14"/><circle cx="16" cy="19" r="2" fill="currentColor" stroke="none"/></svg><span class="rail-label">X-ray</span><span class="rail-hint" aria-hidden="true">layers, phases and reflection intensity</span>
+            </button>
+            <button id="mode-detector" type="button" class="rail-button" aria-expanded="false" aria-controls="detector-window" aria-haspopup="dialog" title="Diffraction detector: rotate a crystal and predict X-ray spots">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="12" cy="12" r="6" stroke-dasharray="2 3"/><circle cx="12" cy="12" r="1"/><circle cx="17" cy="9" r="1.6" fill="currentColor"/></svg><span class="rail-label">Detector</span><span class="rail-hint" aria-hidden="true">Ewald sphere and single-crystal spots</span>
             </button>
             <button id="style-open" type="button" class="rail-button rail-group-start" data-tool="style" aria-pressed="false" title="Appearance: colors and sizes of elements, pairs and single copies">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.2-.3-.4-.5-.8-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg><span class="rail-label">Style</span><span class="rail-hint" aria-hidden="true">colors and sizes of elements, pairs and single copies</span>
@@ -904,6 +910,89 @@
           </div>
           <p id="analysis-table-note" class="hint"></p>
         </div>
+      </div>
+    </dialog>
+    <dialog id="detector-window" class="analysis-window" aria-labelledby="detector-title">
+      <header id="detector-head" class="analysis-head">
+        <h2 id="detector-title">Diffraction detector</h2>
+        <button id="detector-open-options" type="button" class="window-button tune-button" aria-haspopup="dialog" aria-controls="detector-options">Options</button>
+        <button id="detector-close" class="window-button" aria-label="Close diffraction detector">✕</button>
+      </header>
+      <div class="detector-body">
+        <p class="detector-sample" id="detector-sample"></p>
+        <form id="detector-form">
+          <label for="detector-hkl">Find reflection (h k l)</label>
+          <input id="detector-hkl" value="2 0 0" required spellcheck="false" enterkeyhint="go" title="Press Enter to rotate to this reflection">
+          <button type="submit" id="detector-go" aria-label="Rotate to reflection" title="Rotate to reflection">▶</button>
+        </form>
+        <div class="detector-views">
+          <figure><figcaption class="ewald-caption">Ewald sphere <span class="ewald-controls">
+              <button id="ewald-beam" type="button" title="Look from the sample toward the detector">Beam view</button>
+              <button id="ewald-out" type="button" aria-label="Zoom out on Ewald sphere">−</button>
+              <button id="ewald-in" type="button" aria-label="Zoom in on Ewald sphere">+</button>
+              <button id="ewald-reset" type="button" aria-label="Reset Ewald sphere view">Reset</button>
+            </span></figcaption><svg id="detector-ewald" viewBox="0 0 300 250" role="img" tabindex="0" aria-label="Ewald sphere with direct unit-cell axes a, b and c. Drag or use arrow keys to orbit O. Scroll, pinch or use plus and minus to zoom. Right-click to reset zoom."></svg>
+            <div><label class="reciprocal-size">Point size <input id="detector-point-size" type="range" min="50" max="250" step="10" value="100" title="Reciprocal-lattice ball diameter"><output id="detector-point-scale" for="detector-point-size">100%</output></label><small class="ewald-hint"><span class="incident-label">Incident</span> · <span class="spot-label">Diffracted</span> · <span id="detector-axis-caption"></span> · Drag to orbit O · Right-click to reset zoom</small></div></figure>
+          <figure><figcaption>Detector <small id="detector-size"></small></figcaption><svg id="detector-image" viewBox="0 0 250 250" aria-label="Diffraction spots viewed from the sample toward the detector"></svg><small class="ewald-hint" id="detector-view-caption">Viewed from sample toward detector</small></figure>
+        </div>
+        <div class="detector-angles">
+          <label for="detector-omega"><span id="detector-omega-label">Crystal rotation (ω)</span><output id="detector-omega-value" for="detector-omega"></output><input id="detector-omega" aria-labelledby="detector-omega-label" title="Drag through the marked reflection angles or use the arrow keys to step between crossings" type="range" min="-180" max="180" step="0.01" value="0"><svg id="detector-crossings" viewBox="0 0 360 5" preserveAspectRatio="none" aria-hidden="true"></svg></label>
+          <label for="detector-azimuth"><span id="detector-azimuth-label">Rotation about beam (φ)</span><output id="detector-azimuth-value" for="detector-azimuth"></output><input id="detector-azimuth" aria-labelledby="detector-azimuth-label" type="range" min="-180" max="180" step="0.01" value="0"></label>
+        </div>
+        <div class="detector-actions"><button type="button" id="detector-prev">Previous reflection</button><button type="button" id="detector-next">Next reflection</button>
+          <label><input type="checkbox" id="detector-animate" checked> Animate steps</label>
+          <label><input type="checkbox" id="detector-ring" checked> Powder ring</label>
+          <label><input type="checkbox" id="detector-link" title="Drag the main crystal through the fixed beam. The rotation snaps to Bragg crossings that land on the detector."> Link main view</label></div>
+        <div class="detector-actions"><label>Spot <select id="detector-spots"></select></label>
+          <button type="button" id="detector-explain">Explain reflection</button>
+          <button type="button" id="detector-save" title="Save the Ewald sphere and detector together" disabled>Save PNG</button>
+          <span id="detector-save-error" role="status"></span></div>
+        <p id="detector-status" role="status"></p>
+        <p id="detector-detail"></p>
+        <p class="hint" id="detector-scope"></p>
+      </div>
+      <span id="detector-resize-left" title="Resize from lower left"></span>
+    </dialog>
+    <dialog id="detector-options" class="analysis-window" aria-labelledby="detector-options-title">
+      <header class="analysis-head">
+        <h2 id="detector-options-title">Detector options</h2>
+        <button id="detector-options-done" type="button" class="window-button tune-button">Done</button>
+      </header>
+      <div class="analysis-body">
+        <div id="detector-geometry-fields">
+          <label>Wavelength (Å)<input id="detector-wavelength" type="number" min="0.001" step="any" value="1.5406" required></label>
+          <label>Distance (mm)<input id="detector-distance" type="number" min="0.001" step="any" value="100" required></label>
+          <label>Detector shape<select id="detector-outline"><option value="circle">Circular</option><option value="rectangle">Rectangular</option><option value="calibrated" hidden disabled>Calibrated panel</option></select></label>
+          <label id="detector-circle-field">Diameter (mm)<input id="detector-diameter" type="number" min="0.001" step="any" value="200" required></label>
+          <label id="detector-width-field" hidden>Width (mm)<input id="detector-width" type="number" min="0.001" step="any" value="200" required></label>
+          <label id="detector-height-field" hidden>Height (mm)<input id="detector-height" type="number" min="0.001" step="any" value="200" required></label>
+          <label id="detector-panel-field" hidden>Panel size (mm)<output id="detector-panel-size"></output></label>
+        </div>
+        <p id="detector-geometry-error" role="status"></p>
+        <details id="detector-calibration"><summary>Detector calibration (.poni)</summary>
+          <div class="detector-actions"><label>Load PONI <input type="file" id="detector-poni" accept=".poni"></label>
+            <button type="button" id="detector-clear-poni" hidden>Use manual geometry</button></div>
+          <form id="detector-shape" hidden><label>Image rows <input type="number" id="detector-rows" min="1" required></label>
+            <label>Columns <input type="number" id="detector-cols" min="1" required></label>
+            <button>Apply image shape</button></form>
+          <p id="detector-poni-status" role="status"></p>
+        </details>
+        <details id="detector-mount"><summary>Orientation and rotation axis</summary>
+          <form id="detector-mount-form">
+            <label>Matrix convention<select id="detector-convention"><option value="U">U · rotation matrix</option><option value="rows">PhaseSmith · reciprocal basis rows (Å⁻¹)</option><option value="UB">UB · reciprocal basis columns (Å⁻¹)</option></select></label>
+            <label>Matrix frame<select id="detector-frame"><option value="viewer">Viewer lab (+x beam, +z up)</option><option value="poni">PONI (+3 beam, +1 up)</option></select></label>
+            <label>Matrix at ω = 0°<textarea id="detector-matrix" rows="3" spellcheck="false">1 0 0
+0 1 0
+0 0 1</textarea></label>
+            <div><label>Scan axis in viewer lab (x y z)<input id="detector-axis" value="0 0 1" required></label>
+            <label>Set ω (°)<input id="detector-set-angle" type="number" step="any" value="0" required></label></div>
+            <label>PhaseSmith JSON<input type="file" id="detector-orientation-file" accept=".json,application/json"></label>
+            <label id="detector-candidate-field" hidden>Candidate<select id="detector-candidate"></select></label>
+            <div class="detector-actions"><button type="submit">Apply orientation</button><button type="button" id="detector-clear-mount">Reset mounting</button></div>
+          </form>
+          <p class="hint">The matrix sets the orientation of the loaded CIF at ω = 0°. The axis sets the right-hand rotation direction at zero beam rotation. Predictions use the wavelength and detector geometry shown here.</p>
+          <p id="detector-mount-status" role="status"></p>
+        </details>
       </div>
     </dialog>
     <script type="module" src="/web/main.js"></script>
