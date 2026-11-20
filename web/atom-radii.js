@@ -43,20 +43,30 @@ const ionRows = [
 ];
 
 const entries = new Map();
+const crystalEntries = new Map();
 for (const [element, charge, values] of ionRows) {
-  if (!entries.has(element)) entries.set(element, []);
+  if (!entries.has(element)) {
+    entries.set(element, []);
+    crystalEntries.set(element, []);
+  }
   for (const [environment, radius] of Object.entries(values)) {
     const [cn, spin] = environment.split("_");
     const ion = element + Math.abs(charge) + (charge > 0 ? "+" : "−");
     const spinText = spin === "HS" ? " high spin" : spin === "LS" ? " low spin" : "";
-    entries.get(element).push({
-      key: charge + "/" + environment, charge, radius,
-      label: ion + " · CN " + cn + spinText + " · " + radius + " Å",
-    });
+    // Shannon (1976), Table 1: moving the anion reference by −0.14 Å
+    // adds the same distance to each cation on the crystal-radius scale.
+    const crystalRadius = Number((radius + Math.sign(charge) * 0.14).toFixed(3));
+    for (const [table, value] of [[entries, radius], [crystalEntries, crystalRadius]]) {
+      table.get(element).push({
+        key: charge + "/" + environment, charge, radius: value,
+        label: ion + " · CN " + cn + spinText + " · " + value + " Å",
+      });
+    }
   }
 }
 
-export const ionicEntries = (element) => entries.get(element) ?? [];
+export const ionicEntries = (element, model = "ionic") =>
+  (model === "crystal" ? crystalEntries : entries).get(element) ?? [];
 
 const classic = new Map(Object.entries({
   H: 0.22, C: 0.37, N: 0.36, O: 0.34, Na: 0.52, Mg: 0.48,
@@ -82,7 +92,7 @@ export function radiusReference(site, model, mineral, choice) {
   const fallback = { radius: covalent, label: "Covalent · " + covalent + " Å" };
   if (model === "classic") return { radius: classic.get(element) ?? 0.42, label: "Classic" };
   if (model === "covalent" || choice === "covalent") return fallback;
-  const options = ionicEntries(element);
+  const options = ionicEntries(element, model);
   const manual = options.find(entry => entry.key === choice);
   if (manual) return manual;
   const displayCharge = charge ?? (mineral ? mineralCharges.get(element) : undefined);

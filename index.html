@@ -411,13 +411,14 @@
                   </div>
                   <label class="radius-field">Sphere radii
                     <select id="radius-model">
-                      <option value="ionic">Ionic (Shannon)</option>
-                      <option value="covalent">Covalent</option>
+                      <option value="ionic">Effective ionic (Shannon)</option>
+                      <option value="crystal">Crystal (Shannon)</option>
+                      <option value="covalent">Single-bond covalent (Pyykkö–Atsumi)</option>
                       <option value="classic">Classic</option>
                     </select>
                   </label>
                   <details id="radius-details" hidden>
-                    <summary>Ionic radii by site</summary>
+                    <summary>Shannon radii by site</summary>
                     <label class="radius-field">Crystal site <select id="radius-site"></select></label>
                     <label class="radius-field">Reference radius <select id="radius-entry"></select></label>
                     <p id="radius-source" class="style-size-hint" hidden></p>

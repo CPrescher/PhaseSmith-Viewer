@@ -17,19 +17,19 @@ export function createRadiusControls(onChange) {
       const reference = radiusReference(site, model.value, mineral, overrides.get(site.label));
       radii.set(site.label, reference.radius);
     }
-    details.hidden = model.value !== "ionic" || !sites.length;
+    details.hidden = !["ionic", "crystal"].includes(model.value) || !sites.length;
     if (!details.hidden && details.open) updateEntries();
   }
 
   function updateEntries() {
     const site = sites[siteMenu.selectedIndex];
     if (!site) return;
-    const automatic = radiusReference(site, "ionic", mineral);
+    const automatic = radiusReference(site, model.value, mineral);
     const covalent = radiusReference(site, "covalent", mineral);
     const choices = [
       new Option("Auto · " + automatic.label, ""),
       new Option(covalent.label, "covalent"),
-      ...ionicEntries(site.element).map(entry => new Option(entry.label, entry.key)),
+      ...ionicEntries(site.element, model.value).map(entry => new Option(entry.label, entry.key)),
     ];
     entryMenu.replaceChildren(...choices);
     entryMenu.value = overrides.get(site.label) ?? "";
@@ -80,7 +80,7 @@ export function createRadiusControls(onChange) {
     },
     restore(state) {
       // Projects written before radius models used the original sphere table.
-      model.value = ["ionic", "covalent"].includes(state.radiusModel) ? state.radiusModel : "classic";
+      model.value = ["ionic", "crystal", "covalent"].includes(state.radiusModel) ? state.radiusModel : "classic";
       overrides.clear();
       const saved = new Map(Array.isArray(state.siteRadii)
         ? state.siteRadii.filter(pair => Array.isArray(pair) && pair.length === 2) : []);

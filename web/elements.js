@@ -1,7 +1,8 @@
 // Element defaults, indexed by current IUPAC symbols (H–Og).
 // Colors: a mineral-focused palette for common elements; remaining colors
 // adapted from Blue Obelisk/Jmol with moderated saturation and brightness.
-// Covalent radii (Å): Blue Obelisk Data Repository, elements.xml.
+// Single-bond covalent radii (Å): Pyykkö & Atsumi (2009), doi:10.1002/chem.200800987,
+// via the Blue Obelisk Data Repository, elements.xml (commit c7917225cad8).
 // https://github.com/BlueObelisk/bodr/blob/master/bodr/elements/elements.xml
 // Data retrieved 2026-11-16; see public/notices/blue-obelisk.txt.
 // Covalent display radii also provide a fallback for pair estimates.

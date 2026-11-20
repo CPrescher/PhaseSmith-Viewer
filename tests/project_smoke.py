@@ -48,6 +48,7 @@ async def check(browser, phone):
     await page.locator("#radius-details summary").click()
     await page.locator("#radius-site").select_option("Na1")
     await page.locator("#radius-entry").select_option("1/VIII")
+    await page.locator("#radius-model").select_option("crystal")
     await choose_tool(page, "#mode-sites")
     await page.locator("#labels-toggle").check()
     await page.locator("#measure-distance").click()
@@ -72,6 +73,7 @@ async def check(browser, phone):
     assert saved["state"]["rules"][0]["cutoff"] == 5.2
     assert saved["state"]["lattice"]["planes"] and saved["state"]["lattice"]["arrows"]
     assert saved["state"]["appearance"]["elements"]
+    assert saved["state"]["atoms"]["radiusModel"] == "crystal"
     assert saved["state"]["atoms"]["siteRadii"] == [["Na1", "1/VIII"]]
     assert equivalent(saved["state"]["camera"], (await diagnostics(page))["history"]["snapshot"]["camera"])
     assert not errors, errors
