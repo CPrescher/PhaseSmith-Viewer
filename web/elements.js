@@ -4,7 +4,7 @@
 // Covalent radii (Å): Blue Obelisk Data Repository, elements.xml.
 // https://github.com/BlueObelisk/bodr/blob/master/bodr/elements/elements.xml
 // Data retrieved 2026-11-16; see public/notices/blue-obelisk.txt.
-// Radii are a fallback for pair estimates, NEVER the drawn sphere radii.
+// Covalent display radii also provide a fallback for pair estimates.
 export const ELEMENT_DEFAULTS = Object.freeze({
   H: ["#e8edf2", 0.32],
   He: ["#9adce3", 0.46],

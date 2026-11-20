@@ -45,6 +45,9 @@ async def check(browser, phone):
     await choose_tool(page, "#style-open")
     await page.locator("#style-target").select_option("element:Na")
     await page.locator("#style-swatches button:last-child").click()
+    await page.locator("#radius-details summary").click()
+    await page.locator("#radius-site").select_option("Na1")
+    await page.locator("#radius-entry").select_option("1/VIII")
     await choose_tool(page, "#mode-sites")
     await page.locator("#labels-toggle").check()
     await page.locator("#measure-distance").click()
@@ -69,6 +72,7 @@ async def check(browser, phone):
     assert saved["state"]["rules"][0]["cutoff"] == 5.2
     assert saved["state"]["lattice"]["planes"] and saved["state"]["lattice"]["arrows"]
     assert saved["state"]["appearance"]["elements"]
+    assert saved["state"]["atoms"]["siteRadii"] == [["Na1", "1/VIII"]]
     assert equivalent(saved["state"]["camera"], (await diagnostics(page))["history"]["snapshot"]["camera"])
     assert not errors, errors
     await context.close()
@@ -120,6 +124,17 @@ async def check(browser, phone):
     assert await page.locator("#open").evaluate("el => el.getBoundingClientRect().right <= innerWidth"), "Header open button is clipped"
     await page.locator("#project-save").scroll_into_view_if_needed()
     await page.screenshot(path=f"/tmp/viewer-project-{'phone' if phone else 'desktop'}.png")
+    # Import a project in the pre-model format and recover its exact sphere radii.
+    old_atoms = saved["state"]["atoms"]
+    del old_atoms["siteRadii"], old_atoms["radiusModel"]
+    old_atoms["size"] = 1
+    await page.locator("#file").set_input_files({
+        "name": "legacy.psv", "mimeType": "application/json", "buffer": json.dumps(saved).encode()
+    })
+    await page.wait_for_function("document.getElementById('project-status').textContent === 'Opened legacy.psv.'")
+    legacy = await diagnostics(page)
+    assert legacy["history"]["snapshot"]["atoms"]["radiusModel"] == "classic"
+    assert all(a["radius"] == 0.52 for a in legacy["atoms"] if a["element"] == "Na")
     assert not errors, errors
     await context.close()
     print(f"{'Phone' if phone else 'Desktop'}: portable roundtrip, multiblock CIF, invalid files and autosave passed", flush=True)

@@ -304,14 +304,14 @@
               <label class="chip icon-toggle" title="Show or hide atoms"><input id="show-atoms" type="checkbox" checked aria-label="Show atoms"/><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/></svg></label>
               <label class="chip icon-toggle" title="Show or hide all polyhedra; preserve pair settings"><input id="show-polyhedra" type="checkbox" checked aria-label="Show polyhedra"/><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 10-9 10L3 12 12 2Z M3 12l9 3 9-3 M12 2v13l0 7"/></svg></label>
               <div id="elements" class="elements" role="group" aria-label="Element visibility; scroll horizontally for more elements" title="Scroll or swipe to reach more elements"></div>
-              <label class="size-control" title="Atom size (50–150%)"
-                ><span>Size</span
+              <label class="size-control" title="Sphere size as a percentage of the selected radius"
+                ><span>Size <output id="size-percent" for="size">50%</output></span
                 ><input
                   id="size"
                   type="range"
-                  min="0.5"
+                  min="0.15"
                   max="1.5"
-                  value="1"
+                  value="0.5"
                   step="0.05"
                   aria-label="Atom size"
               /></label>
@@ -409,6 +409,19 @@
                       ⌖ Pick one
                     </button>
                   </div>
+                  <label class="radius-field">Sphere radii
+                    <select id="radius-model">
+                      <option value="ionic">Ionic (Shannon)</option>
+                      <option value="covalent">Covalent</option>
+                      <option value="classic">Classic</option>
+                    </select>
+                  </label>
+                  <details id="radius-details" hidden>
+                    <summary>Ionic radii by site</summary>
+                    <label class="radius-field">Crystal site <select id="radius-site"></select></label>
+                    <label class="radius-field">Reference radius <select id="radius-entry"></select></label>
+                    <p id="radius-source" class="style-size-hint" hidden></p>
+                  </details>
                   <label class="style-target"
                     ><span class="sr-only">Style target</span
                     ><select id="style-target"></select

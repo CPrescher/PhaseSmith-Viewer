@@ -16,6 +16,7 @@ import { parseProject, serializeProject, projectFilename } from "./project-file.
 import { createHistory } from "./history.js";
 import { buildCoordinationEnvironments, convexHull } from "./coordination.js";
 import { elementColor as defaultColor } from "./elements.js";
+import { createRadiusControls } from "./radius-controls.js";
 import { estimatePairCutoff } from "./pair-defaults.js";
 import { angleAt, hullVolume } from "./crystal-math.js";
 import { createLatticeTools } from "./lattice-tools.js";
@@ -428,19 +429,7 @@ function initialize() {
   const legendResize = new ResizeObserver(updateElementOverflow);
   legendResize.observe($("elements"));
   $("elements").addEventListener("scroll", updateElementOverflow, { passive: true });
-  const radii = {
-    H: 0.22,
-    C: 0.37,
-    N: 0.36,
-    O: 0.34,
-    Na: 0.52,
-    Mg: 0.48,
-    Al: 0.45,
-    Si: 0.43,
-    K: 0.6,
-    Ca: 0.56,
-    Fe: 0.45,
-  };
+  const radiusControls = createRadiusControls(updateSphereSizes);
   // Overlay colors (selection, measurement, pick marker, cell edges) per
   // theme; element and pair colors are scientific choices and never change.
   const SCENE_PALETTES = {
@@ -458,7 +447,7 @@ function initialize() {
   // Drawn radius = element default × global Size × appearance scale. The
   // same value drives the instance matrix, picking and the selection halo.
   const atomRadius = (a) =>
-    (radii[a.element] || 0.42) * Number($("size").value) * styleOf(a).scale;
+    radiusControls.radius(a) * Number($("size").value) * styleOf(a).scale;
   const ruleColor = (rule) => rule.color ?? defaultColor(rule.center);
   // A neutral procedural studio (no remote assets) lights the atoms only:
   // soft panel reflections give broad highlights, while polyhedra and bonds
@@ -599,18 +588,7 @@ function initialize() {
     }
     sphere.dispose();
     fitCorners = corners.map((p) => p.clone().sub(modelCenter));
-    fitBounds = new THREE.Box3().setFromPoints(fitCorners);
-    for (const atom of atoms) {
-      fitBounds.expandByPoint(atom.position.clone().addScalar(atom.radius));
-      fitBounds.expandByPoint(atom.position.clone().addScalar(-atom.radius));
-    }
-    // Enlarged polyhedra (display scale > 100%) reach past their ligand
-    // atoms; their drawn vertices count when fitting the view.
-    for (const faces of faceMeshes.values()) {
-      if (!faces.visible) continue;
-      faces.geometry.computeBoundingBox();
-      fitBounds.union(faces.geometry.boundingBox);
-    }
+    updateSphereBounds();
     const points = rangeEdges(plotRanges).map((p) => cart(p).sub(modelCenter));
     cellLines = new THREE.LineSegments(
       new THREE.BufferGeometry().setFromPoints(points),
@@ -635,6 +613,20 @@ function initialize() {
     latticeTools.rebuild();
     highlightSite(highlightedSite);
     invalidate();
+  }
+  function updateSphereBounds() {
+    fitBounds.setFromPoints(fitCorners);
+    const corner = new THREE.Vector3();
+    for (const atom of atoms) {
+      fitBounds.expandByPoint(corner.copy(atom.position).addScalar(atom.radius));
+      fitBounds.expandByPoint(corner.copy(atom.position).addScalar(-atom.radius));
+    }
+    // Include ligands beyond the plotted atom range.
+    for (const faces of faceMeshes.values()) {
+      if (!faces.visible) continue;
+      if (!faces.geometry.boundingBox) faces.geometry.computeBoundingBox();
+      fitBounds.union(faces.geometry.boundingBox);
+    }
   }
   const structureAnalysis = createAnalysisWindow({ getStructure: () => structure, onChange: () => scheduleSave() });
   const latticeTools = createLatticeTools({
@@ -2639,6 +2631,8 @@ function initialize() {
     $("asym-toggle").checked = false;
     highlightedSite = null;
     structure = data;
+    radiusControls.setSites(independentSites());
+    showSphereSize();
     pairEstimates.clear();
     latticeTools.reset();
     hiddenElements.clear();
@@ -2989,13 +2983,16 @@ function initialize() {
       }
     }
   };
-  $("size").oninput = () => {
+  function showSphereSize() {
+    $("size-percent").textContent = Math.round(Number($("size").value) * 100) + "%";
     $("size").setAttribute(
       "aria-valuetext",
       `${Math.round(Number($("size").value) * 100)}%`,
     );
+  }
+  function updateSphereSizes() {
+    showSphereSize();
     if (!structure) return;
-    const size = Number($("size").value);
     const matrix = new THREE.Matrix4(),
       rotation = new THREE.Quaternion(),
       scale = new THREE.Vector3();
@@ -3009,8 +3006,12 @@ function initialize() {
       // Instance bounds depend on radius; raycasting recomputes them lazily.
       m.boundingSphere = null;
     }
+    updateSphereBounds();
     updateSelection();
-  };
+    updatePickMarker();
+    highlightSite(highlightedSite);
+  }
+  $("size").oninput = updateSphereSizes;
   window.viewerDiagnostics = () => {
     camera.updateMatrixWorld();
     syncViewCamera();
@@ -3414,6 +3415,7 @@ function initialize() {
         show: $("show-atoms").checked,
         hidden: [...hiddenElements],
         size: Number($("size").value),
+        ...radiusControls.snapshot(),
         labels: labelsOn,
       },
       asymmetric,
@@ -3518,6 +3520,7 @@ function initialize() {
     }
     // Atom display.
     const a = s.atoms && typeof s.atoms === "object" ? s.atoms : {};
+    radiusControls.restore(a);
     if (typeof a.show === "boolean") $("show-atoms").checked = a.show;
     hiddenElements.clear();
     for (const e of Array.isArray(a.hidden) ? a.hidden : []) if (elements.has(e)) hiddenElements.add(e);
@@ -3526,7 +3529,7 @@ function initialize() {
     const size = $("size");
     if (finite(a.size) && a.size >= Number(size.min) && a.size <= Number(size.max)) {
       size.value = String(a.size);
-      size.setAttribute("aria-valuetext", `${Math.round(a.size * 100)}%`);
+      showSphereSize();
     }
     if (typeof a.labels === "boolean") {
       labelsOn = a.labels;

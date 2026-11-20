@@ -223,9 +223,9 @@ export function createAppearanceEditor(host) {
     sizeName.textContent = "Radius";
     size.min = "30";
     size.max = "250";
-    size.title = "Drawn radius relative to the element default; picking follows it";
+    size.title = "Drawn radius relative to the selected radius at the global Size setting";
     // Always-visible reference (touch has no tooltips).
-    hint.textContent = "100% = element default radius · display only";
+    hint.textContent = "100% follows the selected sphere radius and global Size";
     hint.classList.toggle("off-true", info.scale !== 1);
     size.value = String(Math.round((info.scale ?? 1) * 100));
     sizeValue.value = `${size.value}%`;

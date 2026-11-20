@@ -1941,6 +1941,19 @@ button.element[aria-pressed="false"] .dot {
   border-color: var(--accent);
   font-weight: 600;
 }
+#radius-details, .radius-field {
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+#radius-details summary {
+  cursor: pointer;
+  padding: 5px 0;
+}
+.radius-field {
+  display: grid;
+  gap: 3px;
+}
+.radius-field select,
 .style-target select {
   width: 100%;
   max-width: none;

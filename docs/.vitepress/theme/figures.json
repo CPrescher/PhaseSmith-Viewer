@@ -96,7 +96,7 @@
     ]
   },
   "visibility": {
-    "width": 485,
+    "width": 515,
     "height": 72,
     "display": 620,
     "labels": [
@@ -116,7 +116,7 @@
         "text": "Elements"
       },
       {
-        "x": 421.984375,
+        "x": 451.453125,
         "y": 54,
         "text": "Size"
       }

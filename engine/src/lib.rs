@@ -285,7 +285,7 @@ fn structure(text: &str, requested: Option<&str>) -> Result<Value, String> {
         .enumerate()
         .map(|(index, site)| {
             json!({"label":site.site_id,"element":site.element_symbol,
-                "frac":site.fractional_xyz,"occupancy":site.occupancy,"siteIndex":index})
+                "charge":site.charge,"frac":site.fractional_xyz,"occupancy":site.occupancy,"siteIndex":index})
         })
         .collect::<Vec<_>>();
     let symmetry_operations = structure
@@ -363,6 +363,12 @@ mod tests {
         assert_eq!(structure(&text, Some("second")).unwrap()["block"], "second");
         assert!(structure(&text, Some("metadata")).is_err());
         assert!(structure(&text, Some("absent")).is_err());
+    }
+    #[test]
+    fn exposes_type_symbol_charge_on_independent_sites() {
+        let cif = format!("data_test\n{}", CELL.replace("Si1 Si ", "Si1 Si4+ "));
+        let data = structure(&cif, None).unwrap();
+        assert_eq!(data["independentSites"][0]["charge"], 4);
     }
     #[test]
     fn dotted_cartesian_single_crystal() {

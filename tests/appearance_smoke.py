@@ -33,6 +33,28 @@ async def check(browser, width, height):
         assert [r["counts"] for r in current["coordination"]["rules"]] == [[4], [6]]
         assert current["camera"] == before["camera"]
 
+    model = page.locator("#radius-model")
+    assert await model.input_value() == "ionic"
+    assert {a["element"]: a["radius"] for a in before["atoms"]} == {"Mg": 0.36, "Si": 0.13, "O": 0.70}
+    await page.locator("#radius-details summary").tap()
+    await page.locator("#radius-site").select_option("Mg1")
+    entry = page.locator("#radius-entry")
+    await entry.select_option("2/IV")
+    customized = await diagnostics(page)
+    check_crystal(customized)
+    for a in customized["atoms"]:
+        if a["label"] in ("Mg1", "Mg2"):
+            assert math.isclose(a["radius"], 0.285 if a["label"] == "Mg1" else 0.36)
+    await model.select_option("covalent")
+    assert not await entry.is_visible()
+    assert {a["element"]: a["radius"] for a in (await diagnostics(page))["atoms"]}["O"] == 0.315
+    await model.select_option("classic")
+    assert {a["element"]: a["radius"] for a in (await diagnostics(page))["atoms"]}["O"] == 0.17
+    await model.select_option("ionic")
+    assert await entry.input_value() == "2/IV"
+    await entry.select_option("")
+    await page.locator("#radius-details summary").tap()
+
     await target.select_option(mg)
     assert not await page.locator("#style-opacity-row").is_visible()
     await paint.tap()
