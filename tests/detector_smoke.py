@@ -47,6 +47,20 @@ async def check(browser, width, height):
         ]""")
         assert dx > 1 and abs(dy) < 1e-6, (dx, dy)
 
+    nodes = page.locator("#detector-ewald .lattice-node")
+    radii = lambda: nodes.evaluate_all("els => els.map(e => e.r.baseVal.value)")
+    normal_radii = await radii()
+    assert normal_radii and "ewald-lattice-ball" in await nodes.first.evaluate(
+        "e=>getComputedStyle(e).fill"
+    )
+    initial_spots = await page.locator("#detector-image").inner_html()
+    await page.locator("#detector-point-size").fill("200")
+    assert all(
+        abs(big - 2 * small) < 1e-5
+        for big, small in zip(await radii(), normal_radii, strict=True)
+    )
+    assert initial_spots == await page.locator("#detector-image").inner_html()
+    await page.locator("#detector-point-size").fill("100")
     await check_starting_beam()
     # In beam view, outgoing and detector offsets have the same signed azimuth.
     await page.click("#ewald-beam")
@@ -142,6 +156,9 @@ async def check(browser, width, height):
             .every((e,i)=>e.getBoundingClientRect().width>old[i]+15)""",
             arg=sizes,
         )
+        gap = await page.evaluate("""() => document.querySelector('#detector-window').getBoundingClientRect().bottom
+          - document.querySelector('#detector-scope').getBoundingClientRect().bottom""")
+        assert gap < 36, gap
         box = await win.bounding_box()
         handle = await page.locator("#detector-resize-left").bounding_box()
         x, y = handle["x"] + 6, handle["y"] + handle["height"] - 6
@@ -507,6 +524,35 @@ async def check(browser, width, height):
                         dot = sum(a * b for a, b in zip(axis, other))
                         assert abs(dot - int(i == j)) < 1e-9
         await page.mouse.up()
+        await check_linked_axes()
+        # Close/reopen preserves the exact selected reflection and the Ewald camera.
+        await page.click("#detector-next")
+        await page.wait_for_function(
+            "!document.querySelector('#detector-window').hasAttribute('aria-busy')"
+        )
+        pose = await camera()
+        index = await page.input_value("#detector-spots")
+        await page.click("#detector-close")
+        assert math.dist((await camera())["position"], pose["position"]) < 1e-9
+        assert await planes() is None
+        await choose_tool(page, "#mode-detector")
+        assert await page.is_checked("#detector-link")
+        assert await page.input_value("#detector-spots") == index
+        assert await near_path.get_attribute("d") == old_grid
+        await check_linked_axes()
+        await page.click("#detector-close")
+        await page.mouse.move(*xy)
+        await page.mouse.down()
+        await page.mouse.move(xy[0] + 65, xy[1] + 22, steps=8)
+        await page.mouse.up()
+        # Capture the actual pose at the click; normal trackball damping can
+        # still be moving the crystal between the release and the click.
+        await page.evaluate("""() => document.querySelector('#mode-detector').addEventListener('click',
+          () => { window.reopenPose = viewerDiagnostics().camera }, {capture:true, once:true})""")
+        await choose_tool(page, "#mode-detector")
+        moved = await page.evaluate("window.reopenPose")
+        assert math.dist(moved["position"], pose["position"]) > 0.01
+        assert math.dist((await camera())["position"], moved["position"]) < 1e-8
         await check_linked_axes()
         await page.uncheck("#detector-link")
     assert not errors, errors

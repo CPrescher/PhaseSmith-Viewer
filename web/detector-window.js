@@ -1,3 +1,4 @@
+import { maxScatteringVector } from "./diffraction-engine.js";
 import { circularDetector, rectangularDetector, readPoni, calibratedDetector } from "./detector-geometry.js";
 import { formatMillerIndices, parseMillerIndices, matMul } from "./crystal-math.js";
 import { detectorModel } from "./detector-model.js";
@@ -23,7 +24,7 @@ const signedAngle = (degrees) => (degrees > 180 ? degrees - 360 : degrees);
 const wrappedAngle = (degrees) => ((degrees % 360) + 360) % 360;
 const dragSnapPixels = 5;
 
-export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainView }) {
+export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainView, getMainRotation }) {
   const $ = (id) => document.getElementById("detector-" + id);
   const win = $("window"),
     opener = document.getElementById("mode-detector");
@@ -49,7 +50,8 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
     chosen = null,
     tracked = null,
     message = "";
-  let snapRemainder = null;
+  let snapRemainder = null,
+    closedRotation = null;
   let mounting = identity,
     spindle = [0, 0, 1],
     customMount = false,
@@ -60,7 +62,17 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
     syncMain();
   });
   function redrawSphere() {
-    if (model) drawEwald($("ewald"), model, rock, azimuth, spots, tracked, sphereCamera.view);
+    if (model)
+      drawEwald(
+        $("ewald"),
+        model,
+        rock,
+        azimuth,
+        spots,
+        tracked,
+        sphereCamera.view,
+        Number($("point-size").value) / 100,
+      );
   }
   function redrawDetector() {
     if (model) drawDetector($("image"), model.detector, spots, chosen, $("ring").checked, select);
@@ -88,9 +100,9 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   function close() {
     stopStep();
     if ($("options").open) $("options").close();
+    closedRotation = model && $("link").checked ? getMainRotation() : null;
     win.close();
-    $("link").checked = false;
-    syncMain();
+    onMainView(null, true);
     opener.setAttribute("aria-expanded", "false");
     opener.focus({ preventScroll: true });
   }
@@ -221,10 +233,10 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
         " · 2θ coverage to " +
         model.maxAngle.toFixed(1) +
         "°" +
-        (model.gMax >= 4 ? " (X-ray form-factor limit)" : "") +
+        (model.gMax > 2 * maxScatteringVector ? " (X-ray form-factor limit)" : "") +
         " · mounting tilt " +
         model.tilt.toFixed(1) +
-        "°. Spot area follows log-scaled |F|² (100% = strongest in this search).";
+        "°. Point area follows log-scaled PhaseSmith |F|² (100% = strongest in this search).";
     const marks = document.createElementNS("http://www.w3.org/2000/svg", "path");
     marks.setAttribute(
       "d",
@@ -270,7 +282,8 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
           "This reflection lands " +
           p.radius.toFixed(1) +
           " mm from the center, outside the detector. Reduce the distance.";
-      else if (p.length >= 4) message = "This reflection is outside the X-ray form-factor range.";
+      else if (p.length > 2 * maxScatteringVector)
+        message = "This reflection is outside the X-ray form-factor range.";
       else if (!p.angles.length && !p.continuous)
         message = "This reflection has no crossing about the selected scan axis.";
       else if (!model.intensity(p))
@@ -352,7 +365,15 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
     const startingView = !win.open || !model;
     show();
     safely(() => {
-      if (startingView) sphereCamera.reset();
+      const resume = startingView && model && closedRotation && $("link").checked;
+      const previous = closedRotation;
+      closedRotation = null;
+      if (startingView && !resume) sphereCamera.reset();
+      if (resume) {
+        const current = getMainRotation();
+        if (current.some((row, i) => row.some((v, j) => Math.abs(v - previous[i][j]) > 1e-10)))
+          api.rotateSpecimen(current, 0);
+      }
       if (hkl) {
         $("hkl").value = hkl.join(" ");
         if (!panel) $("wavelength").value = wavelength;
@@ -623,6 +644,10 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   document.getElementById("ewald-in").onclick = () => sphereCamera.zoom(1.25);
   document.getElementById("ewald-out").onclick = () => sphereCamera.zoom(0.8);
   document.getElementById("ewald-reset").onclick = sphereCamera.reset;
+  $("point-size").oninput = () => {
+    $("point-scale").value = $("point-size").value + "%";
+    redrawSphere();
+  };
   $("ring").onchange = redrawDetector;
   $("save").onclick = async () => {
     $("save-error").textContent = "";
@@ -642,7 +667,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   $("explain").onclick = () => {
     if (chosen) onExplain(chosen.point.hkl, model.wavelength);
   };
-  return {
+  const api = {
     open,
     beginSpecimenDrag() {
       snapRemainder = null;
@@ -679,6 +704,8 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
     },
     setStructure() {
       stopStep();
+      if (closedRotation) $("link").checked = false;
+      closedRotation = null;
       model = null;
       resetMountForm();
       rock = azimuth = 0;
@@ -686,4 +713,5 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       if (win.open) open();
     },
   };
+  return api;
 }

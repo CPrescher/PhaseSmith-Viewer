@@ -830,6 +830,13 @@ h2 {
   color: var(--danger);
   white-space: normal;
 }
+.pair-coordination {
+  display: block;
+  color: var(--text);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
 
 /* Extent ---------------------------------------------------------------- */
 #range-form {
@@ -974,6 +981,10 @@ h2 {
 }
 .view-directions details {
   position: relative;
+}
+.view-directions:has(details[open]) {
+  position: relative;
+  z-index: 1;
 }
 .view-directions summary {
   list-style: none;
@@ -1425,6 +1436,30 @@ button.element[aria-pressed="false"] .dot {
 }
 .tool-field.offset {
   width: 60px;
+}
+.numeric-keys,
+#direction-form > .numeric-keys {
+  display: none;
+}
+#direction-form > .numeric-keys {
+  margin-top: 6px;
+}
+#direction-form .numeric-keys .micro {
+  display: none;
+}
+@media (any-pointer: coarse) {
+  .numeric-keys:not([hidden]),
+  #direction-form > .numeric-keys:not([hidden]) {
+    display: flex;
+  }
+  .numeric-keys button {
+    min-width: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+  .numeric-keys [data-key="done"] {
+    margin-left: auto;
+  }
 }
 /* Plane and direction labels on the canvas, edged in the entry's color. */
 .lattice-label {
@@ -2868,7 +2903,7 @@ button.element[aria-pressed="false"] .dot {
 #detector-window button:not(.window-button) { background: var(--raised); font-size: 13px; cursor: pointer; }
 #detector-window button:disabled { opacity: .5; }
 .detector-views, .detector-angles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
-.detector-views { flex: 0 0 47%; min-height: 215px; grid-template-rows: auto minmax(0, 1fr) auto; row-gap: 0; }
+.detector-views { flex: 1 0 215px; min-height: 215px; grid-template-rows: auto minmax(0, 1fr) auto; row-gap: 0; }
 .detector-views figure { display: grid; grid-template-rows: subgrid; grid-row: span 3; margin: 0; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--field); }
 .detector-views figcaption { padding: 8px 10px 0; font-size: 13px; font-weight: 600; }
 .detector-views small { font-weight: 400; color: var(--muted); margin-left: 4px; }
@@ -2974,3 +3009,10 @@ button.element[aria-pressed="false"] .dot {
   #detector-form #detector-go { display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; }
   #detector-form input { min-height: 44px; }
 }
+
+.reciprocal-size { display: flex; align-items: center; gap: 6px; padding: 3px 8px; font-size: 11px; }
+.reciprocal-size input { width: 7em; min-width: 0; flex: 0 1 7em; }
+.reciprocal-size output { font-variant-numeric: tabular-nums; }
+#detector-ewald .lattice-node { fill: url(#ewald-lattice-ball); opacity: 1; }
+#detector-ewald .crossing { fill: url(#ewald-hit-ball); }
+#detector-ewald .tracked-node { fill: url(#ewald-tracked-ball); }

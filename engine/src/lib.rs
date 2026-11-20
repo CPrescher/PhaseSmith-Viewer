@@ -1,3 +1,4 @@
+mod diffraction;
 use phasesmith_io::{parse_cif_text, CifReadLimits};
 use serde_json::{json, Value};
 use std::cell::RefCell;
@@ -337,6 +338,17 @@ pub extern "C" fn import_cif() -> usize {
         std::str::from_utf8(bytes)
             .map(import_request)
             .unwrap_or_else(|error| json!({"error":error.to_string()}))
+    });
+    OUTPUT.with_borrow_mut(|bytes| {
+        *bytes = value.to_string().into_bytes();
+        bytes.len()
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn xray_reflections() -> usize {
+    let value = INPUT.with_borrow(|bytes| {
+        diffraction::calculate(bytes).unwrap_or_else(|err| json!({"error":err.to_string()}))
     });
     OUTPUT.with_borrow_mut(|bytes| {
         *bytes = value.to_string().into_bytes();

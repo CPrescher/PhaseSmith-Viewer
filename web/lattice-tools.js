@@ -2,6 +2,7 @@
 // elements. Owns its sidebar UI, its Three.js groups and its state; the
 // viewer supplies coordinate conversion and structure access.
 import {
+  formatMillerIndices,
   parseMillerIndices,
   parseTriple,
   dSpacing,
@@ -17,6 +18,7 @@ import {
   operationString,
 } from "./crystal-math.js";
 import { PEEL_LAYER } from "./peel.js";
+import { numericKeys } from "./numeric-input.js";
 
 const PLANE_COLORS = ["#f2c14e", "#7fb7ff", "#ef7fb0", "#8cdf9b"];
 const ARROW_COLORS = ["#ff8a5c", "#5cc8ff", "#c6a0ef", "#e7edf3"];
@@ -344,9 +346,9 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   const labelPool = [];
   const projected = new THREE.Vector3();
   const indexText = (v, open, close) =>
-    v.every((x) => Number.isInteger(x) && Math.abs(x) < 10)
-      ? `${open}${v.map((x) => (x < 0 ? `${-x}̄` : String(x))).join("")}${close}`
-      : `${open}${v.map(fmt).join(" ")}${close}`;
+    v.every(Number.isInteger)
+      ? open + formatMillerIndices(v, v.every(x => Math.abs(x) < 10) ? "" : " ") + close
+      : open + v.map(fmt).join(" ") + close;
   function collectLabelAnchors() {
     anchors = [];
     if (!labelsOn) return;
@@ -536,8 +538,9 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   //    REVERSE_PENALTY extra, so a label does not hop straight back;
   //  - permanent priority: a label's rank is fixed when first seen and
   //    kept while it is hidden, so hide/show never reorders collisions.
-  // Frames count rendered frames only (on-demand rendering: no timers or
-  // extra frames); a hard block still relocates immediately.
+  // Frames count rendered frames only; a hard block relocates immediately.
+  // Suppressed labels get one recovery pass after interaction settles, so
+  // on-demand rendering cannot leave a temporary suppression stuck forever.
   const SWITCH_MARGIN = 30,
     FAMILY_NEW = 150, // a further family member needs a clear spot to appear…
     FAMILY_KEEP = 260, // …and keeps showing until it gets clearly worse.
@@ -550,12 +553,34 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     HELD_PENALTY = 260, // landing on another label's previous-frame spot
     DISPLACE_FREE = 24, // px of free movement for a relocating label…
     DISPLACE_COST = 0.45, // …then this cost per px (a 180 px jump ≈ +70)
-    LONG_JUMP = 110; // a second long forced jump within REVERSE_FRAMES culls
+    LONG_JUMP = 110, // a second long forced jump within REVERSE_FRAMES culls
+    RECOVERY_MS = 180; // retry suppressed labels once interaction settles
   // key → { rank, cand, nv, visible, lastCand, switchFrame, switches }
   const placementCache = new Map();
   let nextRank = 0,
     frameNo = 0,
     cachedPosition = labelPosition;
+  let recoveryTimer = null;
+  function cancelLabelRecovery() {
+    clearTimeout(recoveryTimer);
+    recoveryTimer = null;
+  }
+  function recoverLabelsWhenIdle() {
+    if (exportMode || !lastCulled.length) return;
+    recoveryTimer = setTimeout(() => {
+      recoveryTimer = null;
+      // Rendering is on demand: a frame-count cooldown cannot expire while
+      // idle. Forget only suppressed spots, keeping visible labels and the
+      // permanent collision order, then request one fresh placement pass.
+      for (const entry of placementCache.values()) {
+        if (!entry.culled) continue;
+        entry.cand = entry.lastCand = entry.switchFrame = null;
+        entry.culled = false;
+        delete entry.rect;
+      }
+      invalidate();
+    }, RECOVERY_MS);
+  }
   // All candidates for one plane label, each with a stable id.
   function planeCandidates(sv, w, ctx) {
     const h = LABEL_H;
@@ -633,6 +658,12 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   // Placement for one plane label with hysteresis, or null (hidden).
   function placePlane(a, sv, w, ctx, prev) {
     const cands = planeCandidates(sv, w, ctx);
+    const familyPlaced = ctx.placed.some((p) => p.planeId === a.planeId);
+    const limit = prev?.visible ? FAMILY_KEEP : FAMILY_NEW;
+    // Apply visibility limits while selecting a spot. Otherwise a remembered
+    // spot (or a low movement cost) can win and then hide the label, even
+    // though another candidate has enough room to show it.
+    const eligible = (c) => c.s < REJECT && (!familyPlaced || c.s < limit);
     const sinceSwitch = prev?.switchFrame == null ? Infinity : frameNo - prev.switchFrame;
     const edgeOf = (id) => {
       const [i, , sign] = String(id).split(":");
@@ -659,7 +690,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     let best = null,
       bestScore = Infinity;
     for (const c of cands)
-      if (!c.hard) {
+      if (!c.hard && eligible(c)) {
         const v = adjusted(c);
         if (v < bestScore) {
           best = c;
@@ -667,7 +698,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         }
       }
     // The held spot stays usable until it truly overlaps (KEEP_PAD).
-    const kept = prev?.cand && prev.nv === sv.length ? cands.find((c) => c.id === prev.cand && !c.hardKeep) : null;
+    const kept = prev?.cand && prev.nv === sv.length ? cands.find((c) => c.id === prev.cand && !c.hardKeep && eligible(c)) : null;
     let chosen,
       reason;
     if (kept) {
@@ -687,14 +718,11 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         return null;
       }
     }
-    if (!chosen || chosen.s >= REJECT) return null;
-    // Do not cover the middle of the model just to label every member of
-    // a family; a visible member hides only when clearly worse.
-    const limit = prev?.visible ? FAMILY_KEEP : FAMILY_NEW;
-    if (chosen.s >= limit && ctx.placed.some((p) => p.planeId === a.planeId)) return null;
+    if (!chosen) return null;
     return { ...chosen, kept: chosen === kept, reason, displacement: Math.round(displacement(chosen)) };
   }
   function updateLabels(camera, canvas) {
+    cancelLabelRecovery();
     if (!anchors.length && !shownLabels.length) return;
     const layer = $("lattice-labels");
     const canvasRect = canvas.getBoundingClientRect();
@@ -805,6 +833,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         if (!ctx.culled.includes(key)) entry.culled = false;
       }
     lastCulled = [...ctx.culled];
+    recoverLabelsWhenIdle();
     while (labelPool.length < placed.length) {
       const span = make("span", { className: "lattice-label" });
       layer.append(span);
@@ -912,6 +941,52 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     input.onchange = () => onCommit(input);
     return input;
   };
+  // Text inputs retain selection support and accept signed, spaced indices;
+  // numericEdits enforces the allowed characters independently of the keyboard.
+  const numericEdits = (input, pattern) => {
+    input.setAttribute("autocorrect", "off");
+    input.setAttribute("autocapitalize", "off");
+    const normalize = (value) => value.replace(/−/g, "-");
+    let accepted = input.value;
+    let selection = [input.selectionStart, input.selectionEnd];
+    const remember = () => {
+      accepted = input.value;
+      selection = [input.selectionStart, input.selectionEnd];
+    };
+    input.addEventListener("beforeinput", (event) => {
+      remember();
+      // Some iPad edits are noncancelable or carry no data. The input and
+      // compositionend handlers below also check the resulting value.
+      if (event.data != null && event.inputType.startsWith("insert")) {
+        const next = input.value.slice(0, input.selectionStart) + event.data + input.value.slice(input.selectionEnd);
+        if (!pattern.test(normalize(next))) event.preventDefault();
+      }
+    });
+    const check = () => {
+      const value = normalize(input.value);
+      if (!pattern.test(value)) {
+        // Reject the entire edit; stripping letters could turn 1e2 into 12.
+        input.value = accepted;
+        input.setSelectionRange(...selection);
+      } else {
+        const caret = [input.selectionStart, input.selectionEnd];
+        if (input.value !== value) {
+          input.value = value;
+          input.setSelectionRange(...caret);
+        }
+        remember();
+      }
+    };
+    input.addEventListener("input", check);
+    input.addEventListener("compositionend", check);
+    input.addEventListener("select", () => {
+      selection = [input.selectionStart, input.selectionEnd];
+    });
+    return (value) => {
+      input.value = value;
+      remember();
+    };
+  };
   // A field with an always-visible caption inside its box.
   const captioned = (input, caption) => {
     const wrap = make("label", { className: "tool-capfield" });
@@ -951,48 +1026,32 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         const row = make("div", { className: "tool-row" });
         row.dataset.planeId = plane.id;
         row.dataset.tuneItem = `plane:${plane.id}`;
-        row.dataset.tuneName = `plane (${plane.hkl.join(" ")})`;
+        row.dataset.tuneName = `plane (${formatMillerIndices(plane.hkl)})`;
         row.style.setProperty("--tool-color", plane.color);
-        const name = () => `(${plane.hkl.join(" ")})`;
-        let acceptedHKL = plane.hkl.join(" ");
+        const name = () => `(${formatMillerIndices(plane.hkl)})`;
         const hkl = textField(plane.hkl.join(" "), "Miller indices (h k l), integers", "hkl", (input) =>
           commit(input, plane, (text) => {
             const v = parseMillerIndices(text);
             plane.hkl = v;
-            input.value = acceptedHKL = v.join(" ");
-            row.dataset.tuneName = `plane (${v.join(" ")})`;
+            setHKL(v.join(" "));
+            row.dataset.tuneName = `plane (${formatMillerIndices(v)})`;
             // Until m is edited by hand, it follows the indices so the
             // plane cuts through the middle of the displayed range.
             if (plane.autoOffset) {
               plane.m = initialPlaneOffset(v, getRanges());
-              m.value = fmt(plane.m);
+              setOffset(fmt(plane.m));
               m.setCustomValidity("");
             }
           }),
         );
         hkl.dataset.field = "hkl";
         hkl.title = "Three integer indices: 123 means 1 2 3. Separate multi-digit indices with spaces; use - for negative indices.";
-        // A number input cannot hold spaces. Reject whole edits containing
-        // other characters, including pasted text, rather than stripping them
-        // and potentially changing the intended indices (e.g. 1e2 → 12).
-        let selection = [0, 0];
-        hkl.onbeforeinput = (event) => {
-          selection = [hkl.selectionStart, hkl.selectionEnd];
-          if (event.data && /[^0-9 −-]/.test(event.data)) event.preventDefault();
-        };
-        hkl.oninput = () => {
-          const value = hkl.value.replace(/−/g, "-");
-          if (/[^0-9 -]/.test(value)) {
-            hkl.value = acceptedHKL;
-            hkl.setSelectionRange(...selection);
-          } else {
-            const caret = hkl.selectionStart;
-            hkl.value = acceptedHKL = value;
-            hkl.setSelectionRange(caret, caret);
-          }
-        };
+        const setHKL = numericEdits(hkl, /^[0-9 -]*$/);
         const m = textField(fmt(plane.m), "Offset m, fractional: plane h·x + k·y + l·z = m; with Parallel planes, planes at m + n", "offset", (input) =>
           commit(input, plane, (text) => {
+            // Empty values and unfinished signs are editing states, not zero.
+            if (!/^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(text))
+              throw Error("Enter a numeric offset m.");
             const v = Number(text.replace(",", "."));
             if (!Number.isFinite(v)) throw Error("Enter a finite offset m.");
             plane.m = v;
@@ -1000,6 +1059,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           }),
         );
         m.dataset.field = "m";
+        const setOffset = numericEdits(m, /^[+-]?\d*(?:[.,]\d*)?$/);
         m.title = "h·x + k·y + l·z = m (fractional coordinates, not Å). Shifts the plane, or all parallel planes (m + n).";
         // Show is the first control: it decides whether the entry (and its
         // label) is drawn. Captions sit inside the fields to save width.
@@ -1086,7 +1146,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         sliders.append(size, opacity);
         const bottom = make("div", { className: "tool-line" });
         bottom.append(family.label, readout);
-        row.append(top, sliders, bottom);
+        row.append(top, numericKeys(hkl, "(hkl)", true), numericKeys(m, "offset m"), sliders, bottom);
         return row;
       }),
     );
@@ -1143,7 +1203,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         readout.dataset.readout = "arrow";
         const bottom = make("div", { className: "tool-line" });
         bottom.append(captioned(origin, "origin x y z"), readout);
-        row.append(top, bottom);
+        row.append(top, numericKeys(uvw, "[uvw]", true, { inputMode: "decimal" }), bottom);
         return row;
       }),
     );
@@ -1346,6 +1406,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     setExportObstacles(rects) { exportObstacles = rects; },
     setExportMode(on) {
       if (exportMode === on) return;
+      cancelLabelRecovery();
       exportMode = on;
       if (on) {
         savedPlacement = { cache: new Map(placementCache), nextRank, frameNo, cachedPosition, shownLabels, lastPlaced, lastCulled, obstacles };
@@ -1393,6 +1454,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     },
     /** Apply validated session settings; invalid entries are skipped. */
     restoreState(state, { trusted = false } = {}) {
+      cancelLabelRecovery();
       if (!state || typeof state !== "object") return;
       const finite = (v) => typeof v === "number" && Number.isFinite(v);
       const triple = (v) => Array.isArray(v) && v.length === 3 && v.every(finite);
@@ -1458,6 +1520,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       collectLabelAnchors();
     },
     reset() {
+      cancelLabelRecovery();
       planes = [];
       arrows = [];
       placementCache.clear(); // new structure: no remembered label spots

@@ -10,7 +10,8 @@ async function engine() {
       const response = await fetch(engineURL);
       if (!response.ok) throw new Error(`Cannot load structure engine (${response.status})`);
       const bytes = await response.arrayBuffer();
-      const { instance } = await WebAssembly.instantiate(bytes, {});
+      const { instance, module } = await WebAssembly.instantiate(bytes, {});
+      self.postMessage({ diffractionModule: module });
       return instance.exports;
     })().catch(error => { enginePromise = undefined; throw error; });
   }

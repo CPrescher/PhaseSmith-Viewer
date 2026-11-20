@@ -9,8 +9,9 @@ function snapshot(svg, scale) {
   if (latticeNode) {
     // A dense lattice can contain thousands of identically styled circles.
     const paint = getComputedStyle(latticeNode);
+    const fill = paint.fill.replace(/url\([^)]*#([^)"']+)["']?\)/g, "url(#$1)");
     const rule = document.createElementNS(svg.namespaceURI, "style");
-    rule.textContent = `.lattice-node { fill: ${paint.fill}; opacity: ${paint.opacity}; }`;
+    rule.textContent = `.lattice-node { fill: ${fill}; opacity: ${paint.opacity}; }`;
     copy.prepend(rule);
   }
   svg.querySelectorAll("*").forEach((el, i) => {

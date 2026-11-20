@@ -1,4 +1,5 @@
-import { analysisCell, xrayFormFactor } from "./structure-analysis.js";
+import { structureFactors } from "./diffraction-engine.js";
+import { analysisCell } from "./structure-analysis.js";
 
 export function reflection(structure, hkl, wavelength = 1.5406) {
   if (hkl.length !== 3 || !hkl.every(Number.isSafeInteger) || hkl.every(v => v === 0))
@@ -6,15 +7,16 @@ export function reflection(structure, hkl, wavelength = 1.5406) {
   if (!Number.isFinite(wavelength) || wavelength <= 0) throw Error("Enter a positive wavelength in Å.");
   const { atoms, basis, inverse } = analysisCell(structure);
   const g = [0, 1, 2].map(i => inverse[0][i] * hkl[0] + inverse[1][i] * hkl[1] + inverse[2][i] * hkl[2]);
-  const length = Math.hypot(...g), d = 1 / length;
-  const factors = Object.fromEntries([...new Set(atoms.map(atom => atom.element))].map(element => [element, xrayFormFactor(element, length / 2)]));
+  const length = Math.hypot(...g);
+  const result = structureFactors({ basis, atoms }, [hkl], { detail: true });
+  const d = result.d;
   let re = 0, im = 0, scale = 0;
   const contributions = atoms.map((atom, index) => {
     const m = atom.frac.reduce((sum, v, i) => sum + v * hkl[i], 0);
     let cycles = m - Math.floor(m);
     if (cycles < 1e-10 || cycles > 1 - 1e-10) cycles = 0;
     const phase = 2 * Math.PI * cycles;
-    const amplitude = factors[atom.element] * (atom.occupancy ?? 1);
+    const amplitude = result.factors[index] * (atom.occupancy ?? 1);
     const real = amplitude * Math.cos(phase), imaginary = amplitude * Math.sin(phase);
     const start = [re, im];
     re += real;
@@ -26,7 +28,7 @@ export function reflection(structure, hkl, wavelength = 1.5406) {
   return {
     atoms: contributions, groups: phaseGroups(contributions), basis, hkl: [...hkl], order: hkl.reduce(gcd, 0), wavelength, d, normal: g.map(v => v / length),
     theta: sinTheta <= 1 + 1e-12 ? Math.asin(Math.min(1, sinTheta)) : null,
-    re, im, f2: re * re + im * im, scale,
+    re: result.re, im: result.im, f2: result.f2, scale,
   };
 }
 

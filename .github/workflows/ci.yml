@@ -62,9 +62,11 @@ jobs:
           VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/pages_smoke.py
           VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/library_smoke.py
           VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/pair_defaults_smoke.py
+          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/analysis_smoke.py
           VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/symmetry_selection_smoke.py
           VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/history_smoke.py
           VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/touch_pan_smoke.py
+          VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/axis_framing_smoke.py
           VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/project_smoke.py
           VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/layout_smoke.py
           VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/page_zoom_smoke.py

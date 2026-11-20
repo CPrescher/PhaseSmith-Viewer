@@ -57,7 +57,7 @@ function gridPaths(project, depth, center, radius) {
   return paths;
 }
 
-export function drawEwald(root, model, rock, azimuth, spots, tracked, view) {
+export function drawEwald(root, model, rock, azimuth, spots, tracked, view, pointScale = 1) {
   root.replaceChildren();
   const width = root.clientWidth,
     height = root.clientHeight;
@@ -94,27 +94,50 @@ export function drawEwald(root, model, rock, azimuth, spots, tracked, view) {
     ["100%", "0.36"],
   ])
     element(gradient, "stop", { offset, "stop-color": "var(--analysis-pair-4)", "stop-opacity": opacity });
+  for (const [name, color] of [
+    ["lattice", "var(--muted)"],
+    ["hit", "var(--analysis-pair-1)"],
+    ["tracked", "var(--analysis-pair-0)"],
+  ]) {
+    const ball = element(defs, "radialGradient", {
+      id: "ewald-" + name + "-ball",
+      cx: "32%",
+      cy: "28%",
+      r: "76%",
+    });
+    element(ball, "stop", { offset: 0, "stop-color": "white" });
+    element(ball, "stop", { offset: 0.43, "stop-color": color });
+    element(ball, "stop", { offset: 1, "stop-color": "color-mix(in srgb, " + color + " 48%, black)" });
+  }
   const [back, front] = gridPaths(project, depth, center, radius);
   circle(svg, center, radius, "sphere");
   element(svg, "path", { d: back, class: "sphere-grid far" });
   element(svg, "path", { d: front, class: "sphere-grid near" });
   const rotate = (v) => labVector(v, model.tilt, rock, azimuth, model.axis);
   const locate = (p) => map(rotate(p.g));
-  for (const point of model.points) {
-    const p = locate(point);
-    if (p[0] > 4 && p[0] < width - 4 && p[1] > 5 && p[1] < height - 5)
-      circle(svg, p, spotRadius(point, 1.2, 2.7), "lattice-node");
+  const highlighted = new Set([...spots.map((s) => s.point), tracked]);
+  const nodes = model.points
+    .filter((point) => !highlighted.has(point))
+    .map((point) => {
+      const g = rotate(point.g);
+      return { point, p: map(g), depth: depth(g) };
+    });
+  nodes.sort((a, b) => a.depth - b.depth);
+  for (const { point, p } of nodes) {
+    if (p[0] > 0 && p[0] < width && p[1] > 0 && p[1] < height)
+      circle(svg, p, spotRadius(point, 1.5, 3.5) * pointScale, "lattice-node");
   }
   const alongBeam = Math.hypot(origin[0] - center[0], origin[1] - center[1]) < 1;
   if (!alongBeam) arrow(svg, center, origin, "incident");
   for (const spot of spots)
-    if (spot.point !== tracked) circle(svg, locate(spot.point), spotRadius(spot.point, 2.2, 4.5), "crossing");
+    if (spot.point !== tracked)
+      circle(svg, locate(spot.point), spotRadius(spot.point, 2.5, 4.8) * pointScale, "crossing");
   if (tracked?.intensity > 0) {
     const onSphere = model.onSphere(tracked, rock);
     const p = locate(tracked);
     arrow(svg, origin, p, "reciprocal");
     if (onSphere) arrow(svg, center, p, "outgoing");
-    circle(svg, p, spotRadius(tracked, 2.2, 4.5), onSphere ? "crossing" : "tracked-node");
+    circle(svg, p, spotRadius(tracked, 2.5, 4.8) * pointScale, onSphere ? "crossing" : "tracked-node");
     label(
       svg,
       Math.min(width - 60, Math.max(5, p[0] + 7)),

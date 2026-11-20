@@ -71,7 +71,10 @@
 
         <button id="open" class="primary" aria-label="Open structure or project file" title="Open a CIF structure or a saved .psv project">
           ＋ Open<span class="desktop"> file</span></button
-        ><input id="file" type="file" accept=".cif,.mcif,.psv,text/plain" hidden />
+        >
+        <!-- No accept filter: iPadOS can disable CIF/PSV files with unrecognized types.
+             The importer validates the selected file's contents. -->
+        <input id="file" type="file" hidden />
       </header>
       <dialog id="structure-library" aria-labelledby="library-title" aria-describedby="library-intro">
         <div class="library-head">
@@ -819,7 +822,8 @@
             <div class="export-row session-actions">
               <button id="project-save" type="button" class="primary" disabled>Save project</button>
               <button id="project-open" type="button" class="secondary">Open project</button>
-              <input id="project-file" type="file" accept=".psv" hidden />
+              <!-- Keep this picker unfiltered too; iPadOS may not recognize .psv. -->
+              <input id="project-file" type="file" hidden />
             </div>
             <p id="project-status" class="note" role="status" aria-live="polite"></p>
             <!-- Local session (IndexedDB on this device only). -->
@@ -910,7 +914,7 @@
               <button id="ewald-in" type="button" aria-label="Zoom in on Ewald sphere">+</button>
               <button id="ewald-reset" type="button" aria-label="Reset Ewald sphere view">Reset</button>
             </span></figcaption><svg id="detector-ewald" viewBox="0 0 300 250" role="img" tabindex="0" aria-label="Ewald sphere with direct unit-cell axes a, b and c. Drag or use arrow keys to orbit O. Scroll, pinch or use plus and minus to zoom. Right-click to reset zoom."></svg>
-            <small class="ewald-hint"><span class="incident-label">Incident</span> · <span class="spot-label">Diffracted</span> · <span id="detector-axis-caption"></span> · Drag to orbit O · Right-click to reset zoom</small></figure>
+            <div><label class="reciprocal-size">Point size <input id="detector-point-size" type="range" min="50" max="250" step="10" value="100" title="Reciprocal-lattice ball diameter"><output id="detector-point-scale" for="detector-point-size">100%</output></label><small class="ewald-hint"><span class="incident-label">Incident</span> · <span class="spot-label">Diffracted</span> · <span id="detector-axis-caption"></span> · Drag to orbit O · Right-click to reset zoom</small></div></figure>
           <figure><figcaption>Detector <small id="detector-size"></small></figcaption><svg id="detector-image" viewBox="0 0 250 250" aria-label="Diffraction spots viewed from the sample toward the detector"></svg><small class="ewald-hint" id="detector-view-caption">Viewed from sample toward detector</small></figure>
         </div>
         <div class="detector-angles">

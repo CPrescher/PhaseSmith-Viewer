@@ -8,4 +8,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 phasesmith-io = { git = "https://github.com/CPrescher/PhaseSmith.git", rev = "d94cd17155d04b2cc29b1487fe635dcb526e27ce" }
+phasesmith-crystallography = { git = "https://github.com/CPrescher/PhaseSmith.git", rev = "d94cd17155d04b2cc29b1487fe635dcb526e27ce" }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -1,3 +1,4 @@
+import "./load-diffraction-engine.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { inverse3, matMul } from "../web/crystal-math.js";

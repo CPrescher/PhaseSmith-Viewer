@@ -22,6 +22,13 @@ async def check(browser, w, h):
     await page.wait_for_function(
         "window.viewerDiagnostics?.().coordination.polyhedronCount===12"
     )
+    await choose_tool(page, "#mode-pairs", True)
+    pair_volumes = await page.locator(".pair-coordination").all_inner_texts()
+    for label, cn, volume in [("Mg1", 6, "11.787"), ("Mg2", 6, "12.392"), ("Si", 4, "2.208")]:
+        assert f"{label}: CN {cn} · V {volume} Å³" in pair_volumes, pair_volumes
+    assert await page.locator(".pair-coordination").evaluate_all(
+        "rows => rows.every(row => row.scrollWidth <= row.clientWidth)"
+    ), pair_volumes
     await choose_tool(page, "#mode-sites", True)
     assert await page.locator("#site-table tbody tr").count() == 6
     volumes = await page.locator("#poly-table tbody tr").all_inner_texts()
@@ -35,8 +42,10 @@ async def check(browser, w, h):
     assert len(data["atoms"]) == 6, data
     assert {a["label"] for a in data["atoms"]} == {"Mg1", "Mg2", "Si", "O1", "O2", "O3"}
     assert data["coordination"]["polyhedronCount"] == 0
+    assert await page.locator(".pair-coordination").count() == 0
     await page.locator("#asym-toggle").uncheck()
     assert (await diagnostics(page))["coordination"]["polyhedronCount"] == 12
+    assert await page.locator(".pair-coordination").all_inner_texts() == pair_volumes
 
     await choose_tool(page, "#mode-lattice", True)
     await page.locator("#plane-add").tap()

@@ -1,3 +1,4 @@
+import { diffractionModule } from "./diffraction-engine.js";
 import { formatMillerIndices } from "./crystal-math.js";
 import { floatingDialog } from "./floating-dialog.js";
 import { powderProfile } from "./structure-analysis.js";
@@ -56,7 +57,7 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
     for (const field of $("analysis-powder-fields").querySelectorAll("input, select")) field.disabled = distance;
     $("analysis-note").textContent = distance
       ? "Geometric pairs per unit cell, counted once. Periodic neighbors are included automatically for the distance range."
-      : "Ideal X-ray powder pattern: neutral-atom form factors, occupancies and powder Lorentz–polarization correction. No thermal motion, anomalous scattering, texture or instrumental model.";
+      : "PhaseSmith X-ray powder pattern: neutral-atom form factors, occupancies and powder Lorentz–polarization correction. No thermal motion, anomalous scattering, texture or instrumental model.";
   }
   function calculate() {
     stop();
@@ -105,7 +106,7 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
       draw();
       highlightDetectorPeak();
     };
-    worker.postMessage({ structure, mode: options.mode, options });
+    worker.postMessage({ structure, mode: options.mode, options, diffractionModule: options.mode === "powder" ? diffractionModule : undefined });
   }
 
   function queue() {

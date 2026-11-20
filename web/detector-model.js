@@ -1,8 +1,9 @@
+import { maxScatteringVector, structureFactors } from "./diffraction-engine.js";
 // Laboratory +x is the incident beam. Use crystallographic reciprocal units
 // throughout (cycles/Å), so |k_in| = |k_out| = 1/λ.
 import { cross3, dot3, identity, transpose, unitAxis } from "./detector-orientation.js";
 import { matMul, matVec } from "./crystal-math.js";
-import { analysisCell, reflectionStrength } from "./structure-analysis.js";
+import { analysisCell } from "./structure-analysis.js";
 
 import { Matrix4, Quaternion } from "three";
 import { circularDetector } from "./detector-geometry.js";
@@ -96,7 +97,7 @@ export function detectorModel(
   const { atoms, inverse } = cell;
   const axis = unitAxis(spindle);
   let basis = matMul(mounting, cell.basis);
-  const elements = [...new Set(atoms.map((atom) => atom.element))];
+  const maxLength = 2 * maxScatteringVector;
   const reciprocal = (hkl) => [0, 1, 2].map((i) => inverse.reduce((sum, row, j) => sum + row[i] * hkl[j], 0));
   // Bring a requested vector into the rocking plane if the spindle alone
   // cannot reach it. This mounting tilt applies to the entire crystal.
@@ -105,17 +106,13 @@ export function detectorModel(
     const g = matVec(mounting, reciprocal(target));
     if (!crossings(g, wavelength, axis).angles.length) tilt = Math.atan2(g[2], g[0]) / rad;
   }
-  const points = [],
-    strengths = new Map();
+  const points = [];
   function addPoint(hkl, crystalG = reciprocal(hkl)) {
     const length = norm(crystalG),
       sinTheta = (wavelength * length) / 2;
     const twoTheta = sinTheta <= 1 ? (2 * Math.asin(sinTheta)) / rad : null;
     const radius = twoTheta !== null && twoTheta < 90 ? distance * Math.tan(twoTheta * rad) : Infinity;
-    const key = (hkl.find((v) => v !== 0) < 0 ? hkl.map((v) => -v) : hkl).join(" ");
-    if (!strengths.has(key))
-      strengths.set(key, length < 4 ? reflectionStrength(atoms, elements, hkl, length) : 0);
-    const point = { hkl, crystalG, length, twoTheta, radius, intensity: strengths.get(key) };
+    const point = { hkl, crystalG, length, twoTheta, radius, intensity: 0 };
     points.push(point);
     return point;
   }
@@ -123,7 +120,7 @@ export function detectorModel(
   // |h_i| = |a_i · g| ≤ |a_i| |g|, including oblique direct bases.
   const maxAngle = detector.maxAngle ?? Math.atan2(detector.radius, distance);
   const gMax = (2 * Math.sin(maxAngle / 2)) / wavelength;
-  const factorLimit = Math.min(gMax, 4);
+  const factorLimit = Math.min(gMax, maxLength);
   const limits = [0, 1, 2].map((i) =>
     Math.floor(Math.hypot(...cell.basis.map((row) => row[i])) * factorLimit + 1e-9),
   );
@@ -159,6 +156,14 @@ export function detectorModel(
       ? { point, y: (distance * y) / forward, z: (distance * z) / forward }
       : null;
   }
+  const supported = points.filter((p) => p.length <= maxLength);
+  const intensities = structureFactors(
+    cell,
+    supported.map((p) => p.hkl),
+  );
+  supported.forEach((point, i) => {
+    point.intensity = intensities[i];
+  });
   const allowed = points.filter((p) => p.intensity > 0);
   const maxIntensity = allowed.reduce((max, p) => Math.max(max, p.intensity), 0);
   for (const p of allowed) {

@@ -19,6 +19,7 @@ import { elementColor as defaultColor } from "./elements.js";
 import { estimatePairCutoff } from "./pair-defaults.js";
 import { angleAt, hullVolume } from "./crystal-math.js";
 import { createLatticeTools } from "./lattice-tools.js";
+import { numericKeys } from "./numeric-input.js";
 import { createAxisCompass } from "./axis-compass.js";
 import { createThemeSwitch } from "./theme.js";
 import { createFullscreenSwitch } from "./fullscreen.js";
@@ -30,6 +31,7 @@ import { rotatedView } from "./view-rotation.js";
 import { createTurnControls } from "./turn-controls.js";
 import { createStructureLibrary, libraryEntry, libraryFilename, entryForFilename } from "./structure-library.js";
 import { createToolWindows, TOOL_IDS } from "./tool-windows.js";
+import { setDiffractionModule } from "./diffraction-engine.js";
 import { createDetectorWindow } from "./detector-window.js";
 import { createAnalysisWindow } from "./analysis-window.js";
 import { createReflectionExplorer } from "./reflection-explorer.js";
@@ -286,12 +288,10 @@ function initialize() {
     specimenDragMoved = false;
     if (detectorLink && detectorLink.rotation.angleTo(camera.quaternion) > 1e-7) {
       detectorLink.rotation.copy(camera.quaternion);
-      const cameraFromCrystal = [[1,0,0],[0,1,0],[0,0,1]].map(axis =>
-        new THREE.Vector3(...axis).applyQuaternion(camera.quaternion).toArray());
       updatingFromMain = true;
       // Trackball maps the canvas width to two radians before rotateSpeed.
       const degreesPerPixel = THREE.MathUtils.radToDeg(2 * controls.rotateSpeed / controls.screen.width);
-      try { diffractionDetector.rotateSpecimen(cameraFromCrystal, sweepSpecimen ? degreesPerPixel : 0); }
+      try { diffractionDetector.rotateSpecimen(mainCameraRotation(), sweepSpecimen ? degreesPerPixel : 0); }
       finally { updatingFromMain = false; }
     }
     syncViewCamera();
@@ -674,19 +674,26 @@ function initialize() {
   renderer.domElement.addEventListener("pointermove", event => {
     if (detectorLink && event.buttons) specimenDragMoved = true;
   });
-  function linkDetectorView(pose) {
+  function mainCameraRotation() {
+    return [[1,0,0],[0,1,0],[0,0,1]].map(axis =>
+      new THREE.Vector3(...axis).applyQuaternion(camera.quaternion).toArray());
+  }
+  function linkDetectorView(pose, keepOrientation = false) {
     if (!pose && !detectorLink) return;
     latticeTools.setDetectorPlane(pose?.hkl ?? null);
     const distance = camera.position.distanceTo(controls.target);
     if (!pose) {
       stopMotion();
-      camera.position.copy(detectorLink.eye).multiplyScalar(distance).add(controls.target);
-      camera.up.copy(detectorLink.up);
-      const previousView = detectorLink.active;
+      if (!keepOrientation) {
+        camera.position.copy(detectorLink.eye).multiplyScalar(distance).add(controls.target);
+        camera.up.copy(detectorLink.up);
+      }
+      const previousView = keepOrientation ? null : detectorLink.active;
       controls.staticMoving = detectorLink.staticMoving;
       detectorLink = null;
       controls.update();
       setActiveView(previousView?.id ?? null, previousView?.dir);
+      if (keepOrientation) scheduleSave();
       invalidate();
       return;
     }
@@ -721,6 +728,7 @@ function initialize() {
     onExplain: (hkl, wavelength) => reflectionExplorer.open(hkl, wavelength),
     onPeak: peak => structureAnalysis.selectDetectorPeak(peak),
     onMainView: linkDetectorView,
+    getMainRotation: mainCameraRotation,
   });
   const latticeTools = createLatticeTools({
     THREE,
@@ -1720,6 +1728,7 @@ function initialize() {
     for (const stat of coordinationStats) {
       const p = $(`pair-count-${stat.id}`);
       if (!p) continue;
+      const groups = polyhedronGroups([stat]);
       const siteCounts = Object.entries(stat.siteCounts)
         .map(([label, counts]) => `${label}: ${counts.join(", ")}`)
         .join(" · ");
@@ -1731,7 +1740,16 @@ function initialize() {
           ? "Paused in asymmetric-unit view"
           : !(stat.bonds || stat.polyhedra)
           ? "Off · enable bonds or polyhedra"
-          : `CN ${stat.counts.join(", ") || "0"} · ${stat.centerCount || 0} centers · ${stat.polyhedronCount} poly · ${stat.bondCount} bonds`);
+          : `${groups.size ? "" : `CN ${stat.counts.join(", ") || "0"} · `}${stat.centerCount || 0} centers · ${stat.polyhedronCount} poly · ${stat.bondCount} bonds`);
+      const readouts = [...groups.values()].map((g) => {
+        const line = make("span", {
+          className: "pair-coordination",
+          textContent: `${g.label}: CN ${[...g.cn].sort((a, b) => a - b).join(", ")} · V ${polyhedronVolumeRange(g)} Å³`,
+          title: "Polyhedron volume from true neighbor positions; display scale does not change it.",
+        });
+        return line;
+      });
+      p.prepend(...readouts);
     }
     const note = $("isolation-note");
     note.textContent =
@@ -1776,12 +1794,10 @@ function initialize() {
     if (!Array.isArray(structure.independentSites))
       $("asym-note").textContent = "This engine build does not report independent sites; showing the first copy of each label.";
   }
-  function renderPolyTable() {
-    const body = $("poly-table")?.tBodies[0];
-    if (!body) return;
-    // Group by pair and central CIF site label: CN set and volume range.
+  // Shared by Pairs and Sites: CN set and physical volume range per site.
+  function polyhedronGroups(stats) {
     const groups = new Map();
-    for (const stat of coordinationStats)
+    for (const stat of stats)
       for (const env of stat.environments) {
         const key = `${pairName(stat)}|${env.centerLabel}`;
         if (!groups.has(key))
@@ -1790,12 +1806,20 @@ function initialize() {
         g.cn.add(env.coordination);
         g.volumes.push(env.volume);
       }
+    return groups;
+  }
+  function polyhedronVolumeRange(g) {
+    const lo = Math.min(...g.volumes), hi = Math.max(...g.volumes);
+    return hi - lo < 5e-4 ? lo.toFixed(3) : `${lo.toFixed(3)}–${hi.toFixed(3)}`;
+  }
+  function renderPolyTable() {
+    const body = $("poly-table")?.tBodies[0];
+    if (!body) return;
+    const groups = polyhedronGroups(coordinationStats);
     body.replaceChildren(
       ...[...groups.values()].map((g) => {
         const row = document.createElement("tr");
-        const lo = Math.min(...g.volumes),
-          hi = Math.max(...g.volumes);
-        const volume = hi - lo < 5e-4 ? lo.toFixed(3) : `${lo.toFixed(3)}–${hi.toFixed(3)}`;
+        const volume = polyhedronVolumeRange(g);
         for (const text of [g.label, g.pair, [...g.cn].sort((a, b) => a - b).join(", "), volume]) {
           const cell = document.createElement("td");
           cell.textContent = text;
@@ -1858,7 +1882,10 @@ function initialize() {
       stopMotion();
       camera.up.set(...up);
       camera.position.copy(target).addScaledVector(dir, zoomDistance);
-      controls.update();
+      // Touch pan and anchored pinch move the pivot. An explicit direction
+      // starts from the full structure again, fitted to this canvas aspect.
+      // Translating the pivot and camera together keeps [uvw] exact.
+      reset(true);
       setActiveView(viewId, dir);
       $("direction-error").textContent = "";
       invalidate();
@@ -1895,6 +1922,13 @@ function initialize() {
     }
     orient(fields.map(Number));
   };
+  $("direction-form").insertBefore(
+    numericKeys($("view-direction"), "[uvw]", true, {
+      inputMode: "decimal",
+      onDone: () => $("direction-form").requestSubmit(),
+    }),
+    $("direction-error"),
+  );
   // Fit uses the full canvas and fixed-size view controls, independently
   // of which overlay is open. Only explicit view actions refit the model.
   function overlayReserve() {
@@ -1942,13 +1976,16 @@ function initialize() {
     const basis = new THREE.Matrix4().lookAt(direction, new THREE.Vector3(), viewUp);
     const right = new THREE.Vector3().setFromMatrixColumn(basis, 0);
     const up = new THREE.Vector3().setFromMatrixColumn(basis, 1);
-    let halfRight = 0,
-      halfUp = 0;
+    let minRight = Infinity, maxRight = -Infinity,
+      minUp = Infinity, maxUp = -Infinity;
     const offset = new THREE.Vector3();
     const extend = (point, radius = 0) => {
       offset.copy(point).sub(target);
-      halfRight = Math.max(halfRight, Math.abs(offset.dot(right)) + radius);
-      halfUp = Math.max(halfUp, Math.abs(offset.dot(up)) + radius);
+      const x = offset.dot(right), y = offset.dot(up);
+      minRight = Math.min(minRight, x - radius);
+      maxRight = Math.max(maxRight, x + radius);
+      minUp = Math.min(minUp, y - radius);
+      maxUp = Math.max(maxUp, y + radius);
     };
     for (const corner of fitCorners) extend(corner);
     if (atoms.length <= 200000) for (const a of atoms) extend(a.position, a.radius ?? 0);
@@ -1961,8 +1998,13 @@ function initialize() {
     }
     extra.union(latticeTools.bounds());
     if (!extra.isEmpty()) for (const corner of boxCorners(extra)) extend(corner);
-    halfRight = Math.max(halfRight, 0.5);
-    halfUp = Math.max(halfUp, 0.5);
+    // A world-space bounding-box center can look off-center after rotation,
+    // especially with a skew cell or unequal atom sizes. Center the actual
+    // projected extent without tilting away from the requested lattice axis.
+    target.addScaledVector(right, (minRight + maxRight) / 2)
+      .addScaledVector(up, (minUp + maxUp) / 2);
+    const halfRight = Math.max((maxRight - minRight) / 2, 0.5);
+    const halfUp = Math.max((maxUp - minUp) / 2, 0.5);
     // Canvas toolbars sit along the top and bottom edges; fit the crystal
     // between them. Settings overlays never influence this fit.
     const height = viewport.clientHeight || 1;
@@ -2805,6 +2847,7 @@ function initialize() {
   let pending = [];
   let userIntent = 0;
   worker.onmessage = ({ data }) => {
+    if (data.diffractionModule) { setDiffractionModule(data.diffractionModule); return; }
     const task = pending.shift();
     if (!task || task.id !== request || task.intent !== userIntent) return;
     $("loading").hidden = true;
