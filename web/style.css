@@ -1945,9 +1945,20 @@ button.element[aria-pressed="false"] .dot {
   margin-bottom: 6px;
   font-size: 12px;
 }
+#radius-details {
+  margin-top: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line-strong);
+}
 #radius-details summary {
   cursor: pointer;
   padding: 5px 0;
+}
+.style-target {
+  display: block;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-strong);
 }
 .radius-field {
   display: grid;
