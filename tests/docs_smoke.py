@@ -92,7 +92,30 @@ async def main():
         await expect(toolbar.locator('[data-theme=dark]')).to_be_hidden()
         await page.emulate_media(media='screen')
 
+        # Worked-example checkpoints use lazy images. Verify that an image
+        # deep in the page loads on arrival and follows manual theme changes.
+        await page.goto(DOCS + 'tutorials.html#_3-broaden-the-pattern-and-export-the-lines')
+        checkpoint = page.locator('.viewer-figure').filter(has=page.locator('img[src$="tutorial-powder-broadened-dark.png"]'))
+        await checkpoint.scroll_into_view_if_needed()
+        dark_image = checkpoint.locator('img[data-theme=dark]')
+        light_image = checkpoint.locator('img[data-theme=light]')
+        await expect(dark_image).to_be_visible()
+        await expect(light_image).to_be_hidden()
+        await expect(dark_image).to_have_js_property('complete', True)
+        assert await dark_image.evaluate('img => img.naturalWidth > 0')
+        await page.get_by_role('switch').click()
+        await expect(light_image).to_be_visible()
+        await expect(dark_image).to_be_hidden()
+        await expect(light_image).to_have_js_property('complete', True)
+        assert await light_image.evaluate('img => img.naturalWidth > 0')
+        await checkpoint.get_by_role('link').filter(visible=True).click()
+        await expect(page).to_have_url(DOCS + 'images/tutorial-powder-broadened-light.png')
+        await page.go_back()
+
         await page.set_viewport_size({'width':390, 'height':844})
+        await checkpoint.scroll_into_view_if_needed()
+        await expect(light_image).to_be_in_viewport()
+        assert not await page.evaluate('document.documentElement.scrollWidth > innerWidth'), 'Tutorial mobile overflow'
         await page.goto(DOCS)
         await page.get_by_role('button', name='Menu', exact=True).click()
         await page.locator('#VPSidebarNav').get_by_role('link', name='Your first structure', exact=True).click()

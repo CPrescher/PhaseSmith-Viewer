@@ -47,9 +47,12 @@ With the production viewer served locally and Playwright installed, run:
 
 ```sh
 VIEWER_URL=http://127.0.0.1:4179 python3 scripts/capture-docs.py
+VIEWER_URL=http://127.0.0.1:4179 python3 scripts/capture-tutorials.py
 ```
 
 Set `BROWSER_CHANNEL=chrome` to use an installed Chrome. The script captures each scene in both themes on the same page, preserving camera, selections, and panel scroll. It measures the real button positions for the callout labels. Commit both theme images and the generated figure metadata together.
+
+The tutorial script follows the worked examples and checks coordination numbers, volumes, cell ranges, plane spacing, and a CSV export before finishing. Put a screenshot after each main step, showing the resulting scene or table, and explain what readers should compare in its caption. Keep the same camera for before-and-after comparisons unless rotation is the step being taught. Both capture scripts preserve the shared figure catalog.
 
 When documenting a control, explain **where it is**, show its actual icon or panel, and state **what opens or changes**. Include the phone route when it differs. Keep small icon controls large enough to recognize; a full-window screenshot alone is not enough. Use a `ViewerFigure` for every screenshot so manual theme switching also switches its image.
 

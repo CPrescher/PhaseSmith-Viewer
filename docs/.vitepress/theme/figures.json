@@ -199,5 +199,80 @@
     "width": 336,
     "height": 543,
     "display": 360
+  },
+  "tutorial-forsterite-start": {
+    "width": 1280,
+    "height": 800,
+    "display": 740
+  },
+  "tutorial-forsterite-silicon": {
+    "width": 1280,
+    "height": 800,
+    "display": 740
+  },
+  "tutorial-forsterite-magnesium": {
+    "width": 1280,
+    "height": 800,
+    "display": 740
+  },
+  "tutorial-forsterite-sites": {
+    "width": 1280,
+    "height": 800,
+    "display": 740
+  },
+  "tutorial-forsterite-short-cutoff": {
+    "width": 1280,
+    "height": 800,
+    "display": 740
+  },
+  "tutorial-forsterite-restored": {
+    "width": 1280,
+    "height": 800,
+    "display": 740
+  },
+  "tutorial-wollastonite-three-cells": {
+    "width": 1280,
+    "height": 800,
+    "display": 740
+  },
+  "tutorial-wollastonite-one-cell": {
+    "width": 1280,
+    "height": 800,
+    "display": 740
+  },
+  "tutorial-wollastonite-tilted": {
+    "width": 1280,
+    "height": 800,
+    "display": 740
+  },
+  "tutorial-rock-salt-start": {
+    "width": 1280,
+    "height": 800,
+    "display": 740
+  },
+  "tutorial-planes-111": {
+    "width": 1280,
+    "height": 800,
+    "display": 740
+  },
+  "tutorial-planes-222": {
+    "width": 1280,
+    "height": 800,
+    "display": 740
+  },
+  "tutorial-powder-settings": {
+    "width": 776,
+    "height": 784,
+    "display": 680
+  },
+  "tutorial-powder-sticks": {
+    "width": 776,
+    "height": 784,
+    "display": 680
+  },
+  "tutorial-powder-broadened": {
+    "width": 776,
+    "height": 784,
+    "display": 680
   }
 }

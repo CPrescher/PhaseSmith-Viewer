@@ -13,7 +13,7 @@ from playwright.async_api import async_playwright
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'docs/guide/public/images'
 URL = os.environ.get('VIEWER_URL', 'http://127.0.0.1:4193/PhaseSmith-Viewer').rstrip('/')
-figures = {}
+figures = json.loads((ROOT / 'docs/.vitepress/theme/figures.json').read_text())
 
 
 async def rect(page, selectors, pad=8):
@@ -26,7 +26,7 @@ async def rect(page, selectors, pad=8):
     return {'x': x, 'y': y, 'width': right - x, 'height': bottom - y}
 
 
-async def capture(page, name, selectors=None, labels=(), regions=(), display=740):
+async def capture(page, name, selectors=None, labels=(), regions=(), display=740, after_theme=None):
     clip = await rect(page, selectors) if selectors else {'x':0,'y':0,**page.viewport_size}
     meta = {'width':clip['width'], 'height':clip['height'], 'display':display}
     if labels:
@@ -54,6 +54,8 @@ async def capture(page, name, selectors=None, labels=(), regions=(), display=740
                 await page.wait_for_function("document.querySelector('#analysis-table tbody tr')")
             if menu_open and 'menu-open' not in (await page.locator('#tool-rail').get_attribute('class') or ''):
                 await page.locator('#tools-menu').click()
+        if after_theme:
+            await after_theme(page)
         await page.mouse.move(2, page.viewport_size['height'] - 2)
         await page.wait_for_timeout(300)
         assert await page.locator('html').get_attribute('data-theme') == theme

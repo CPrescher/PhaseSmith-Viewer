@@ -14,7 +14,15 @@ const badgeY = region => Math.max(14 * unit.value, region.y + 12 * unit.value);
 
 <template>
   <figure class="viewer-figure" :style="{ maxWidth: `${figure.display}px` }">
-    <svg :viewBox="`0 0 ${figure.width} ${figure.height + extra}`" role="img" :aria-label="alt" class="viewer-figure-image">
+    <div v-if="!figure.labels && !figure.regions" class="viewer-figure-image viewer-figure-photos">
+      <a :href="source('light')" class="figure-light" :aria-label="`Open full-size screenshot: ${alt}`">
+        <img :src="source('light')" :alt="alt" :width="figure.width" :height="figure.height" class="figure-light" data-theme="light" loading="lazy" decoding="async" />
+      </a>
+      <a :href="source('dark')" class="figure-dark" :aria-label="`Open full-size screenshot: ${alt}`">
+        <img :src="source('dark')" :alt="alt" :width="figure.width" :height="figure.height" class="figure-dark" data-theme="dark" loading="lazy" decoding="async" />
+      </a>
+    </div>
+    <svg v-else :viewBox="`0 0 ${figure.width} ${figure.height + extra}`" role="img" :aria-label="alt" class="viewer-figure-image">
       <image :href="source('light')" :width="figure.width" :height="figure.height" class="figure-light" data-theme="light" />
       <image :href="source('dark')" :width="figure.width" :height="figure.height" class="figure-dark" data-theme="dark" />
       <g v-for="(label, index) in figure.labels" :key="label.text" aria-hidden="true" class="figure-annotation">
