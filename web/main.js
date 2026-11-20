@@ -63,7 +63,13 @@ function initialize() {
     $("library-open").disabled = true;
     return;
   }
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  function watchDisplayDensity() {
+    matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener("change", () => {
+      watchDisplayDensity();
+      invalidate();
+    }, { once: true });
+  }
+  watchDisplayDensity();
   renderer.setClearColor(0, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.domElement.setAttribute(
@@ -264,6 +270,11 @@ function initialize() {
   scene.add(selectionGroup);
   function render(exportView) {
     frame = 0;
+    if (!exportView?.crop) {
+      // Supersample translucent face edges on standard-density displays.
+      const scale = THREE.MathUtils.clamp(window.devicePixelRatio, 1.5, 2);
+      if (renderer.getPixelRatio() !== scale) renderer.setPixelRatio(scale);
+    }
     // Trackball emits change while damping moves the camera. That event
     // schedules the next frame; once settled, no animation frames remain.
     controls.update();
