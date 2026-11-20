@@ -163,6 +163,19 @@ async def run(browser_type, touch):
         and d["coordination"]["polyhedronCount"] == 0
     ), d
     assert len(d["atoms"]) == 9 and not d["selectedIds"], d
+    # Use the same Pairs checkbox used for a tetrahedron. Every carbonate
+    # in the displayed extent should have one triangular face and three edges.
+    await page.goto(URL + "/?structure=calcite")
+    await page.wait_for_function("window.viewerDiagnostics?.().coordination.rules.some(r => r.center === 'C')")
+    await choose_tool(page, "#mode-pairs")
+    carbonate = page.locator(".pair-rule").filter(has=page.locator('[data-field="center"] option[value="C"]:checked'))
+    await click_control(page, carbonate.locator('[data-field="polyhedra"]'), touch)
+    rule = next(r for r in (await diagnostics(page))["coordination"]["rules"] if r["center"] == "C")
+    assert rule["counts"] == [3] and rule["polyhedronCount"] == rule["centerCount"] > 0
+    assert all(e["faceCount"] == 1 and e["edgeCount"] == 3 and e["volume"] == 0 for e in rule["environments"])
+    assert "(planar)" in await carbonate.inner_text()
+    await choose_tool(page, "#mode-sites")
+    assert "(planar)" in await page.locator("#poly-table").inner_text()
     assert not errors, errors
     await browser.close()
     return {"browser": browser_type.name, "touch": touch, "errors": errors}

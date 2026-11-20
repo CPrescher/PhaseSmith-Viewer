@@ -128,6 +128,18 @@ test("cube hull excludes coplanar diagonals and planar shells have no volume", (
     null,
   );
 });
+test("a planar coordination face surrounds its center and omits internal edges", () => {
+  const corners = [[0,0,1], [1,0,2], [1,1,2], [0,1,1]];
+  const square = convexHull([...corners, [0.5,0.5,1.5]], [0.5,0.5,1.5]);
+  assert.equal(square.planar, true);
+  assert.equal(square.faces.length, 2);
+  assert.equal(square.edges.length, 4);
+  assert.deepEqual(new Set(square.edges.flat()), new Set([0,1,2,3]));
+  assert.equal(convexHull(corners, [0.5,0.5,2.5]), null);
+  assert.equal(convexHull(corners, [2,0.5,3]), null);
+  assert.equal(convexHull(corners.slice(0,3), [0.65,0.4,1.65]).faces.length, 1);
+});
+
 test("huge periodic requests fail before allocation", () => {
   const c = atom("X", [0, 0, 0]);
   assert.throws(

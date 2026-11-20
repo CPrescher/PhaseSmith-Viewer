@@ -814,7 +814,7 @@ function initialize() {
   function resetRules() {
     nextRule = 0;
     const elements = [...new Set(structure.atoms.map((a) => a.element))];
-    const oxideCenters = new Set(["Si", "Mg", "Al", "Fe", "Ca", "Ti"]);
+    const oxideCenters = new Set(["Si", "Mg", "Al", "Fe", "Ca", "Ti", "C"]);
     rules = elements.includes("O")
       ? elements
           .filter((e) => oxideCenters.has(e))
@@ -1542,7 +1542,7 @@ function initialize() {
               stat.siteCounts[label].push(env.neighbors.length);
             const vertices = env.neighbors.map(ensure);
             const hull = rule.polyhedra
-              ? convexHull(vertices.map((a) => a.cartesian))
+              ? convexHull(vertices.map((a) => a.cartesian), env.center.cartesian)
               : null;
             // Physical volume from the true neighbor coordinates, computed
             // once; display scale and opacity never enter it.
@@ -1551,7 +1551,7 @@ function initialize() {
                 center: env.center,
                 vertices,
                 hull,
-                volume: hullVolume(hull.vertices, hull.faces),
+                volume: hull.planar ? 0 : hullVolume(hull.vertices, hull.faces),
               });
             if (rule.bonds)
               for (const atom of vertices) plan.bonds.push([env.center, atom]);
@@ -1753,7 +1753,7 @@ function initialize() {
       const readouts = [...groups.values()].map((g) => {
         const line = make("span", {
           className: "pair-coordination",
-          textContent: `${g.label}: CN ${[...g.cn].sort((a, b) => a - b).join(", ")} · V ${polyhedronVolumeRange(g)} Å³`,
+          textContent: `${g.label}: CN ${[...g.cn].sort((a, b) => a - b).join(", ")} · V ${polyhedronVolumeRange(g, " Å³")}`,
           title: "Polyhedron volume from true neighbor positions; display scale does not change it.",
         });
         return line;
@@ -1817,9 +1817,10 @@ function initialize() {
       }
     return groups;
   }
-  function polyhedronVolumeRange(g) {
+  function polyhedronVolumeRange(g, unit = "") {
     const lo = Math.min(...g.volumes), hi = Math.max(...g.volumes);
-    return hi - lo < 5e-4 ? lo.toFixed(3) : `${lo.toFixed(3)}–${hi.toFixed(3)}`;
+    const value = hi - lo < 5e-4 ? lo.toFixed(3) : `${lo.toFixed(3)}–${hi.toFixed(3)}`;
+    return value + unit + (hi === 0 ? " (planar)" : "");
   }
   function renderPolyTable() {
     const body = $("poly-table")?.tBodies[0];

@@ -8,6 +8,8 @@ Open **Pairs**, the top button on the right-hand tool rail. On a phone, tap **To
 
 Choose the central element, its neighboring element, and their maximum distance in ångströms. Bonds and polyhedra can be switched independently for each pair. A center inside the displayed cell can have neighbors in adjacent cells. The viewer includes these periodic images and measures distances to the actual image selected.
 
+For calcite (CaCO₃), enable **Polyhedra** on the **C–O** row to draw each carbonate group as a filled triangle. It has three oxygen vertices and zero enclosed volume. Use the pair’s **Opacity** slider to adjust the fill.
+
 ## Choose a cutoff
 
 New pairs start with an estimated cutoff from the structure's periodic first-neighbor distances, including the different independent central sites. Changing either element recalculates this starting value. A gap between distance groups helps separate the first shell; distorted shells get a small margin. These are editable starting estimates, not chemical bond assignments. Very large or extreme searches fall back to an element-specific covalent-radius estimate. Typed cutoffs and restored session values stay as entered.

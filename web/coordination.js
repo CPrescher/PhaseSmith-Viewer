@@ -155,9 +155,44 @@ export function buildCoordinationEnvironments({
   });
 }
 
+// Project a flat ligand shell onto its plane and trace its convex perimeter.
+// Require the central atom to lie in the polygon: three ligands on one side
+// of an incomplete octahedron do not form planar coordination.
+function planarHull(points, vectors, center, xAxis, normal, epsilon) {
+  if (!center) return null;
+  const origin = vectors[0];
+  const offset = new Vector3(...center).sub(origin);
+  if (Math.abs(offset.dot(normal)) > epsilon) return null;
+  const yAxis = normal.clone().cross(xAxis);
+  const projected = vectors.map((v, index) => {
+    const d = v.clone().sub(origin);
+    return { x: d.dot(xAxis), y: d.dot(yAxis), index };
+  }).sort((a, b) => a.x - b.x || a.y - b.y);
+  const turn = (a, b, p) => (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+  function halfHull(sequence) {
+    const chain = [];
+    for (const p of sequence) {
+      while (chain.length >= 2 && turn(chain.at(-2), chain.at(-1), p) <= 0) chain.pop();
+      chain.push(p);
+    }
+    chain.pop();
+    return chain;
+  }
+  const polygon = [...halfHull(projected), ...halfHull(projected.reverse())];
+  const c = { x: offset.dot(xAxis), y: offset.dot(yAxis) };
+  const edges = [];
+  for (const [i, a] of polygon.entries()) {
+    const b = polygon[(i + 1) % polygon.length];
+    if (turn(a, b, c) < -epsilon * Math.hypot(b.x - a.x, b.y - a.y)) return null;
+    edges.push([a.index, b.index]);
+  }
+  const faces = polygon.slice(2).map((p, i) => [polygon[0].index, polygon[i + 1].index, p.index]);
+  return { vertices: points, faces, edges, planar: true };
+}
+
 /** QuickHull of a coordination shell; omit coplanar triangulation seams. */
-export function convexHull(points) {
-  if (points.length < 4) return null;
+export function convexHull(points, center = null) {
+  if (points.length < 3) return null;
   const vectors = points.map((p) => new Vector3(...p));
   const origin = vectors[0];
   const scale = vectors.reduce((size, p) => Math.max(size, p.distanceTo(origin)), 1);
@@ -175,7 +210,7 @@ export function convexHull(points) {
   if (
     !vectors.some((p) => Math.abs(normal.dot(p.clone().sub(origin))) > epsilon)
   )
-    return null;
+    return planarHull(points, vectors, center, direction, normal, Math.max(epsilon, scale * 1e-4));
   const indices = new Map(vectors.map((p, i) => [p, i]));
   const hull = new ConvexHull().setFromPoints(vectors);
   const faces = [],
