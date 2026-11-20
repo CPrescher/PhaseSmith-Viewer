@@ -16,7 +16,7 @@ Each example uses a bundled structure. Save a project before opening an example 
 
 ### 2. Show only the silicon tetrahedra
 
-In the **Mg–O** card, clear **Polyhedra**. Keep it enabled for **Si–O**. Leave **Hide atoms outside polyhedra** enabled, as in the example.
+In the **Mg–O** card, clear **Polyhedra**. Keep it enabled for **Si–O**. Enable **Hide atoms outside polyhedra** to isolate the Si–O tetrahedra.
 
 <ViewerFigure name="tutorial-forsterite-silicon" alt="Forsterite with only the blue SiO4 tetrahedra visible and the Mg–O polyhedra checkbox cleared." caption="Four blue SiO₄ tetrahedra remain. The Si–O card reports CN 4: each silicon has four oxygen neighbors within 1.80 Å." />
 

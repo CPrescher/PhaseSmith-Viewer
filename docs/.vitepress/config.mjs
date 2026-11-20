@@ -17,6 +17,7 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/getting-started' },
       { text: 'Tutorials', link: '/tutorials' },
+      { text: 'Impressum · Privacy', link: '/#impressum' },
       { text: 'Open viewer ↗', link: `https://cprescher.github.io/PhaseSmith-Viewer/`, target: '_blank', rel: 'noopener' },
     ],
     sidebar: [

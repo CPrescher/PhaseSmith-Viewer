@@ -24,7 +24,7 @@ The **Opacity** slider controls each pair’s polyhedron faces. At 0% only the o
 
 Transparent faces from all pairs and lattice planes are composed in depth order at each pixel, including intersecting polyhedra. The renderer adapts up to 24 surface layers. Deeper stacks use an approximate remainder and show a status note: next to the atom count below the view, or on a phone at the end of the Pairs tool. The note clears once the view needs 24 layers or fewer. Exactly coincident faces share one layer. A small depth tolerance prevents surfaces from being drawn repeatedly because of floating-point rounding. PNG and movie exports use the same renderer with the full layer budget.
 
-Use **Hide atoms outside polyhedra** to show only the centers and vertices of enabled polyhedra. Turn it off to see the surrounding structure. Changing the cutoff changes which neighbors qualify for the display; the imported atom positions stay fixed.
+By default, surrounding atoms stay visible when you enable polyhedra. Select **Hide atoms outside polyhedra** to show only their centers and vertices. Changing the cutoff changes which neighbors qualify for the display; the imported atom positions stay fixed.
 
 ## Inspect all neighbors of one site
 

@@ -813,6 +813,7 @@ function initialize() {
   }
   function resetRules() {
     nextRule = 0;
+    $("polyhedra-only").checked = false;
     const elements = [...new Set(structure.atoms.map((a) => a.element))];
     const oxideCenters = new Set(["Si", "Mg", "Al", "Fe", "Ca", "Ti", "C"]);
     rules = elements.includes("O")
@@ -839,7 +840,6 @@ function initialize() {
         r.cutoff = r.center === "Si" ? 1.8 : 2.3;
         r.polyhedra = true;
       });
-      $("polyhedra-only").checked = true;
       $("boundary").checked = false;
     } else if (currentFilename === "Wollastonite example") {
       rules = rules.filter((r) => r.center === "Si");
@@ -847,9 +847,8 @@ function initialize() {
         r.cutoff = 1.8;
         r.polyhedra = true;
       });
-      $("polyhedra-only").checked = true;
       $("boundary").checked = false;
-    } else $("polyhedra-only").checked = false;
+    }
     renderRules();
   }
   const pairName = (rule) => `${rule.center}–${rule.neighbor}`;
@@ -1305,12 +1304,6 @@ function initialize() {
           input.dataset.field = field;
           toggles[field] = input;
           input.onchange = () => {
-            if (
-              field === "polyhedra" &&
-              input.checked &&
-              !rules.some((r) => r.polyhedra)
-            )
-              $("polyhedra-only").checked = true;
             rule[field] = input.checked;
             card.classList.toggle("no-faces", !rule.polyhedra);
             build();

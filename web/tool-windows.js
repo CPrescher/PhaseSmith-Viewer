@@ -322,7 +322,7 @@ export function createToolWindows(options) {
   }
   // Independent dialog launchers (e.g. Plots) also dismiss the phone list.
   rail.addEventListener("click", (event) => {
-    if (event.target.closest("button")) closeMenu();
+    if (event.target.closest("button, a[href]")) closeMenu();
   });
   menuButton?.addEventListener("click", () => setMenu(!rail.classList.contains("menu-open")));
   document.addEventListener(
@@ -336,7 +336,7 @@ export function createToolWindows(options) {
   );
   rail.addEventListener("keydown", (e) => {
     if (launcher === "menu" && rail.classList.contains("menu-open") && ["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
-      const choices = [...rail.querySelectorAll("button:not(:disabled)")].filter((b) => b.getClientRects().length);
+      const choices = [...rail.querySelectorAll("button:not(:disabled), a[href]")].filter((b) => b.getClientRects().length);
       const index = choices.indexOf(document.activeElement);
       const next = e.key === "Home" ? 0 : e.key === "End" ? choices.length - 1 : (index + (e.key === "ArrowDown" ? 1 : -1) + choices.length) % choices.length;
       e.preventDefault();

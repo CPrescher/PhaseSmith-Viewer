@@ -90,7 +90,9 @@ async def run(browser_type, touch):
     assert c["bondCount"] > si_bonds, c
     assert [r["counts"] for r in c["rules"]] == [[4], [6]], c
     c = await toggle(0, "polyhedra")
-    assert c["polyhedronCount"] > 0 and c["isolated"], c
+    assert c["polyhedronCount"] > 0 and not c["isolated"], c
+    assert "Mg" in {a["element"] for a in (await diagnostics(page))["atoms"]}
+    await click_control(page, page.locator("#polyhedra-only"), touch)
     d = await diagnostics(page)
     assert {a["element"] for a in d["atoms"]} == {"Si", "O"}, d["coordination"]
     assert d["coordination"]["outsideAtomCount"] > 0
