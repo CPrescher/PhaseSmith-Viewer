@@ -10,6 +10,10 @@ struct Atom {
     frac: [f64; 3],
     element: String,
     occupancy: f64,
+    #[serde(rename = "uIso")]
+    u_iso: Option<f64>,
+    #[serde(rename = "uStar")]
+    u_star: Option<[f64; 6]>,
 }
 
 #[derive(Deserialize)]
@@ -70,7 +74,26 @@ pub fn calculate(input: &[u8]) -> Result<Value, Box<dyn std::error::Error>> {
     for hkls in request.hkl.chunks((131_072 / count).max(1)) {
         let q2: Vec<_> = hkls.iter().map(|h| geometry.q_squared(*h)).collect();
         let s: Vec<_> = q2.iter().map(|q| q.sqrt() / 2.).collect();
-        let factors = scattering.evaluate(&s)?;
+        let mut factors = scattering.evaluate(&s)?;
+        // Fold displacement into each atomic amplitude before summing. The
+        // detailed view receives these same attenuated amplitudes.
+        for (row, hkl) in hkls.iter().enumerate() {
+            let [h, k, l] = hkl.map(f64::from);
+            for (site, atom) in request.atoms.iter().enumerate() {
+                let variance = match atom.u_star {
+                    Some([xx, yy, zz, yz, xz, xy]) => {
+                        h * h * xx
+                            + k * k * yy
+                            + l * l * zz
+                            + 2. * (k * l * yz + h * l * xz + h * k * xy)
+                    }
+                    None => atom.u_iso.unwrap_or_default() * q2[row],
+                };
+                let attenuation = (-2. * std::f64::consts::PI.powi(2) * variance.max(0.)).exp();
+                factors.real[row * count + site] *= attenuation;
+                factors.imag[row * count + site] *= attenuation;
+            }
+        }
         let values = calculate_p1_values(
             cell,
             P1BatchView {

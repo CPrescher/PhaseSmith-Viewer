@@ -35,7 +35,10 @@
           <span class="brand-name">PhaseSmith <b>Viewer</b></span></a
         >
         <div class="structure">
-          <h1 id="name">Loading example…</h1>
+          <h1><button id="structure-info-open" type="button" title="Structure info" aria-haspopup="dialog" aria-controls="structure-info" disabled>
+            <span id="name">Loading example…</span><span id="space-group-symbol"></span>
+            <svg aria-hidden="true" width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="8"/><path d="M10 9v5m0-8v1"/></svg>
+          </button></h1>
           <p id="source" class="muted">Local, private, in your browser.</p>
         </div>
         <div id="stats" class="stats"></div>
@@ -76,6 +79,16 @@
              The importer validates the selected file's contents. -->
         <input id="file" type="file" hidden />
       </header>
+      <dialog id="structure-info" aria-labelledby="structure-info-title">
+        <div class="library-head">
+          <div><h2 id="structure-info-title">Structure info</h2><p id="info-name"></p></div>
+          <button id="structure-info-close" class="view-button" aria-label="Close structure info" autofocus>✕</button>
+        </div>
+        <h3>Unit cell</h3><dl id="info-cell"></dl>
+        <h3>Crystal structure</h3><dl id="info-symmetry"></dl>
+        <h3>Source</h3><dl id="info-source"></dl>
+        <p id="info-warnings" hidden></p>
+      </dialog>
       <dialog id="structure-library" aria-labelledby="library-title" aria-describedby="library-intro">
         <div class="library-head">
           <div><h2 id="library-title">Structure library</h2><p id="library-intro">Crystal-chemistry types and rock-forming minerals, ready to explore.</p></div>
@@ -270,6 +283,7 @@
                   Details
                 </button>
                 <p id="selection">Tap an atom for its details.</p>
+                <button type="button" id="inspect-neighbors" hidden>Site neighbors</button>
               </div>
             </section>
           </div>
@@ -424,6 +438,8 @@
                     </select>
                   </label>
                   <p id="atomic-radius-note" class="style-size-hint" hidden></p>
+                  <label><input type="checkbox" id="adp-ellipsoids"> 50% displacement ellipsoids</label>
+                  <p id="adp-note" class="note" hidden>Sites without usable displacement data retain their sphere radius.</p>
                   <details id="radius-details" hidden>
                     <summary>Shannon radii by site</summary>
                     <label class="radius-field">Crystal site <select id="radius-site"></select></label>
@@ -636,6 +652,13 @@
                       </thead>
                       <tbody></tbody>
                     </table>
+                  </div>
+                  <h3 class="table-title">Site coordination</h3>
+                  <p class="note" id="shell-summary">Select a site to inspect its periodic neighbors.</p>
+                  <div id="shell-controls" hidden>
+                    <label>All-ligand cutoff (Å) <input id="shell-cutoff" type="number" min="0.01" max="30" step="any" placeholder="Automatic"></label>
+                    <label><input type="checkbox" id="shell-outline" checked> Outline selected shell</label>
+                    <div class="table-scroll"><table class="data-table"><thead><tr><th>Ligand</th><th>Element</th><th>Distance (Å)</th><th>Count</th></tr></thead><tbody id="shell-ligands"></tbody></table></div>
                   </div>
                   <h3 class="table-title">Polyhedra</h3>
                   <div class="table-scroll">
@@ -896,11 +919,19 @@
             <label class="analysis-pair-field">Peak FWHM (° 2θ; 0 = sticks)<input id="analysis-fwhm" type="number" min="0" max="2" step="any" value="0.15" required /></label>
           </div>
         </form>
+        <div id="analysis-observed" hidden>
+          <label>Measured powder trace (2θ in degrees, intensity) <input id="analysis-file" type="file" accept=".xy,.dat,.csv,.txt,.xye"></label>
+          <button type="button" id="analysis-remove" hidden>Remove trace</button>
+          <span id="analysis-file-status" role="status"></span>
+        </div>
         <p id="analysis-note" class="hint"></p>
         <p id="analysis-status" class="hint" role="status" aria-live="polite"></p>
         <div id="analysis-results" hidden>
           <svg id="analysis-chart" class="analysis-chart" role="img" aria-label="Structure plot; values are listed in the table below"></svg>
           <p id="analysis-detail" class="analysis-detail">Select a line or table row for details.</p>
+          <div class="analysis-actions" id="analysis-family" hidden>
+            <label>Reflection family <select id="analysis-hkl"></select></label><button type="button" id="analysis-explain">Explain this peak</button>
+          </div>
           <div class="table-scroll analysis-table-scroll" tabindex="0" aria-label="Calculated distances or diffraction lines">
             <table id="analysis-table" class="data-table"></table>
           </div>
@@ -946,10 +977,12 @@
         <div class="detector-actions"><label>Spot <select id="detector-spots"></select></label>
           <button type="button" id="detector-explain">Explain reflection</button>
           <button type="button" id="detector-save" title="Save the Ewald sphere and detector together" disabled>Save PNG</button>
+          <button type="button" id="detector-project">Save exercise</button>
           <span id="detector-save-error" role="status"></span></div>
         <p id="detector-status" role="status"></p>
         <p id="detector-detail"></p>
         <p class="hint" id="detector-scope"></p>
+
       </div>
       <span id="detector-resize-left" title="Resize from lower left"></span>
     </dialog>
@@ -969,6 +1002,16 @@
           <label id="detector-panel-field" hidden>Panel size (mm)<output id="detector-panel-size"></output></label>
         </div>
         <p id="detector-geometry-error" role="status"></p>
+        <details id="detector-wedge"><summary>Rotation-wedge coverage</summary>
+          <div class="detector-actions">
+            <label>From ω (°) <input id="detector-from" type="number" min="-180" max="180" step="any" value="-11"></label>
+            <label>To ω (°) <input id="detector-to" type="number" min="-180" max="180" step="any" value="11"></label>
+            <label>DAC half-opening (°) <input id="detector-cone" type="number" min="0" max="90" step="any" placeholder="No DAC"></label>
+          </div>
+          <p class="hint">Symmetric cones about the incident beam at ω = 0°, rotating with the spindle.</p>
+          <p id="detector-coverage" role="status"></p>
+          <button type="button" id="detector-coverage-csv">Save crossings CSV</button>
+        </details>
         <details id="detector-calibration"><summary>Detector calibration (.poni)</summary>
           <div class="detector-actions"><label>Load PONI <input type="file" id="detector-poni" accept=".poni"></label>
             <button type="button" id="detector-clear-poni" hidden>Use manual geometry</button></div>

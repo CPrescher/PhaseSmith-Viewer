@@ -12,6 +12,8 @@ Scroll inside Export until **Project file** is visible.
 
 Choose **Export → Project file → Save project** to download a `.psv` file. It embeds the complete original CIF (including all data blocks) and the current viewer settings: extent, pairs, styles, atom visibility, planes, directions, symmetry, labels, camera, measurement picks, tool windows, export preferences, and light/dark theme. Reopen it with **Open file** in the header or **Export → Project file → Open project**. The file works in a fresh browser or on another computer without the original CIF. Saving downloads a new file; it does not overwrite an earlier download automatically. Undo/redo history starts fresh when a project is opened.
 
+In **X-ray** or **Detector**, choose **Save exercise** to save a project at the current step. On reopening, the reflection exercise restores its indices, wavelength, phase-sum step, selection, and view. The detector restores its geometry (including an imported PONI), orientation, scan angle, and selected reflection. A measured powder trace is embedded with the project.
+
 The format is readable JSON with a format identifier and version, independent of the local browser session format. Unsupported versions and unreadable structures report an error and keep the current scene. Project contents stay local; nothing is uploaded.
 
 ## Browser autosave

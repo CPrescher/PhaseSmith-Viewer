@@ -124,6 +124,33 @@ async def check(browser, width, height, theme):
     await ready(page, column="2θ (°)", rows=3)
     assert await page.locator("#analysis-rMax").input_value() == "7"
     assert (await diagnostics(page))["windows"]["visible"] == ["pairs"]
+    if width == 1200:
+        await page.locator("#analysis-file").set_input_files(
+            {"name": "observed.xy", "mimeType": "text/plain", "buffer": b"43.2 130\n43.3 218\n43.4 -2\n"})
+        await page.wait_for_selector(".analysis-observed-line", state="attached")
+        await page.locator("#analysis-table tbody tr").first.click()
+        await page.locator("#analysis-explain").click()
+        await page.locator("#reflection-step-back").click()
+        step = await page.input_value("#reflection-step")
+        hkl = await page.input_value("#reflection-hkl")
+        async with page.expect_download() as exercise:
+            await page.locator("#reflection-project").click()
+        download = await exercise.value
+        fresh = await browser.new_page()
+        await fresh.goto(URL)
+        await fresh.wait_for_function("window.viewerDiagnostics?.().block")
+        await fresh.locator("#file").set_input_files({
+            "name": "lesson.psv", "mimeType": "application/json",
+            "buffer": Path(await download.path()).read_bytes(),
+        })
+        await fresh.wait_for_selector("#reflection-explorer[open]")
+        assert await fresh.input_value("#reflection-step") == step
+        assert await fresh.input_value("#reflection-hkl") == hkl
+        await fresh.locator("#reflection-close").click()
+        await fresh.wait_for_selector(".analysis-observed-line", state="attached")
+        assert "observed.xy" in await fresh.inner_text("#analysis-file-status")
+        await fresh.close()
+        await page.locator("#reflection-close").click()
     await page.locator("#analysis-mode").select_option("distances")
     await ready(page)
     # Range and element filter are rebuilt for a freshly loaded structure.

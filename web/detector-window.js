@@ -33,7 +33,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   let panel = null,
     pendingCalibration = null,
     calibrationVersion = 0,
-    previousGeometry;
+    previousGeometry, activeCalibration = null;
   let animationFrame = 0,
     animationGoal = null;
   $("animate").checked = !matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -243,8 +243,38 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       model.stops.map((e) => "M" + (signedAngle(e.angle) + 180).toFixed(3) + " 0v5").join(""),
     );
     $("crossings").replaceChildren(marks);
+    updateWedge();
     $("prev").disabled = $("next").disabled = !model.stops.length;
   }
+  function scanWedge() {
+    return model.wedge($("from").valueAsNumber, $("to").valueAsNumber,
+      $("cone").value === "" ? null : $("cone").valueAsNumber, azimuth);
+  }
+  function updateWedge() {
+    if (!$("wedge").open) return;
+    $("coverage-csv").disabled = true;
+    try {
+      if (!model || model.searchOnly) throw Error("A full detector search is required for wedge coverage.");
+      const {events, continuous} = scanWedge();
+      const unique = new Set(events.map(e => e.point.hkl.join()));
+      $("coverage").textContent = unique.size + " distinct hkl · " + events.length + " discrete crossings" +
+        (continuous ? ". " + continuous + " continuously excited indices excluded from the discrete count." : ".");
+      $("coverage-csv").disabled = !events.length;
+    } catch (error) { $("coverage").textContent = error.message; }
+  }
+  for (const id of ["from","to","cone"]) $(id).oninput = updateWedge;
+  $("wedge").ontoggle = updateWedge;
+  $("coverage-csv").onclick = () => {
+    const rows = ["h,k,l,omega_deg,two_theta_deg,d_A,F_squared"];
+    for (const {point,omega} of scanWedge())
+      rows.push([...point.hkl,omega,point.twoTheta,1/point.length,point.intensity].join(","));
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([rows.join("\n")], {type:"text/csv"}));
+    link.download = "phasesmith-rotation-wedge.csv";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  };
+  $("project").onclick = () => document.getElementById("project-save").click();
   function align(fitFromExplorer = false) {
     const hkl = parseMillerIndices($("hkl").value);
     configure(hkl);
@@ -558,7 +588,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       message = "";
       render();
     });
-  function applyCalibration() {
+  function applyCalibration(hkl = model?.requested?.hkl ?? chosen?.point.hkl ?? null, tilt = 0) {
     const { data, name } = pendingCalibration;
     const shape = [$("rows"), $("cols")].map((el) => Number(el.value));
     const detector = calibratedDetector(data, shape);
@@ -567,8 +597,8 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       getStructure(),
       wavelength,
       data.distance,
-      model?.requested?.hkl ?? chosen?.point.hkl ?? null,
-      0,
+      hkl,
+      tilt,
       mounting,
       spindle,
       detector,
@@ -580,6 +610,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
         wavelength: $("wavelength").value,
       };
     panel = detector;
+    activeCalibration = {text: pendingCalibration.text, name, shape};
     $("outline").value = "calibrated";
     $("outline").disabled = true;
     $("distance").value = data.distance;
@@ -602,9 +633,10 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
     $("shape").hidden = true;
     if (!file) return;
     try {
-      const data = readPoni(await file.text());
+      const text = await file.text();
+      const data = readPoni(text);
       if (version !== calibrationVersion) return;
-      pendingCalibration = { data, name: file.name };
+      pendingCalibration = { data, text, name: file.name };
       $("rows").value = data.shape?.[0] ?? "";
       $("cols").value = data.shape?.[1] ?? "";
       $("shape").hidden = false;
@@ -624,7 +656,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   };
   $("clear-poni").onclick = () =>
     safely(() => {
-      panel = pendingCalibration = null;
+      activeCalibration = panel = pendingCalibration = null;
       calibrationVersion++;
       $("poni").value = "";
       $("poni-status").textContent = "";
@@ -669,6 +701,77 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   };
   const api = {
     open,
+    exportState() {
+      if (!model) return null;
+      return {open:win.open, mounting, spindle, customMount, tilt:model.tilt, rock, azimuth,
+        hkl:model.requested?.hkl, selected:chosen?.point.hkl, tracked:tracked?.hkl, query:$("hkl").value,
+        calibration:activeCalibration, manual: panel ? previousGeometry : null,
+        outline:$("outline").value, wavelength:model.wavelength, distance:model.distance,
+        diameter:$("diameter").value, width:$("width").value, height:$("height").value,
+        camera:{...sphereCamera.view}, ring:$("ring").checked, link:$("link").checked,
+        pointSize:$("point-size").value, animate:$("animate").checked,
+        wedge:$("wedge").open, from:$("from").value, to:$("to").value, cone:$("cone").value};
+    },
+    restoreState(state) {
+      if (win.open) close();
+      stopStep();
+      resetMountForm();
+      closedRotation = null;
+      model = activeCalibration = pendingCalibration = panel = null;
+      calibrationVersion++;
+      $("shape").hidden = $("clear-poni").hidden = true;
+      $("poni").value = $("poni-status").textContent = "";
+      $("outline").disabled = $("distance").disabled = $("diameter").disabled = false;
+      $("outline").value = "circle";
+      $("link").checked = false;
+      for (const id of ["wavelength", "distance", "width", "height", "diameter", "from", "to", "cone"])
+        $(id).value = state?.[id] ?? $(id).defaultValue;
+      $("wedge").open = state?.wedge === true;
+      if (!state) {
+        $("point-size").value = $("point-size").defaultValue;
+        $("point-scale").value = $("point-size").value + "%";
+        $("ring").checked = $("ring").defaultChecked;
+        $("animate").checked = $("animate").defaultChecked;
+        showDimensions();
+        return;
+      }
+      if (state.open) show();
+      safely(() => {
+        // Saved mounting is already in the internal Cartesian frame.
+        mountingMatrix(state.mounting, "U", identity, identity);
+        mounting = state.mounting;
+        spindle = unitAxis(state.spindle);
+        customMount = Boolean(state.customMount);
+        $("matrix").value = mounting.map(row => row.join(" ")).join("\n");
+        $("axis").value = spindle.join(" ");
+        $("outline").value = state.outline === "rectangle" ? "rectangle" : "circle";
+        rock = Number.isFinite(state.rock) ? state.rock : 0;
+        azimuth = Number.isFinite(state.azimuth) ? state.azimuth : 0;
+        const hkl = state.hkl == null ? null : parseMillerIndices(state.hkl.join(" "));
+        const tilt = Number.isFinite(state.tilt) ? state.tilt : 0;
+        if (state.calibration) {
+          const {text,name,shape} = state.calibration;
+          pendingCalibration = {text,name,data:readPoni(text)};
+          $("rows").value = shape[0]; $("cols").value = shape[1];
+          $("shape").hidden = false;
+          applyCalibration(hkl, tilt);
+          previousGeometry = state.manual ?? previousGeometry;
+        } else configure(hkl, tilt);
+        $("hkl").value = state.query ?? "2 0 0";
+        $("point-size").value = state.pointSize ?? 100;
+        $("point-scale").value = $("point-size").value + "%";
+        $("ring").checked = state.ring !== false;
+        $("animate").checked = state.animate === true;
+        $("link").checked = state.link === true;
+        sphereCamera.restore(state.camera);
+        message = "";
+        updateCrossings();
+        const active = model.spots(rock,azimuth);
+        const selected = active.find(s => s.point.hkl.join() === state.selected?.join());
+        tracked = active.find(s => s.point.hkl.join() === state.tracked?.join())?.point ?? model.requested;
+        render(selected?.point);
+      });
+    },
     beginSpecimenDrag() {
       snapRemainder = null;
     },

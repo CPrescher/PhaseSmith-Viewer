@@ -33,7 +33,7 @@ export function structureFactors({ basis, atoms }, hkl, options = {}) {
   };
   return calculate({
     cell: [...lengths, angle(1, 2), angle(2, 0), angle(0, 1)],
-    atoms: atoms.map(({ frac, element, occupancy = 1 }) => ({ frac, element, occupancy })),
+    atoms: atoms.map(({ frac, element, occupancy = 1, uStar, uIso }) => ({ frac, element, occupancy, uStar, uIso })),
     hkl,
     detail: false,
     ...options,

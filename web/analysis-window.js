@@ -1,6 +1,7 @@
 import { diffractionModule } from "./diffraction-engine.js";
 import { formatMillerIndices } from "./crystal-math.js";
 import { floatingDialog } from "./floating-dialog.js";
+import { readPowderTrace, powderFamilies } from "./powder-comparison.js";
 import { powderProfile } from "./structure-analysis.js";
 import { pairName, normalizePair, pairColors, pairSegments } from "./pair-presentation.js";
 
@@ -15,7 +16,7 @@ const hklText = row => {
   return formatMillerIndices(sorted[0]);
 };
 
-export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
+export function createAnalysisWindow({ getStructure, onExplain, onChange = () => {} }) {
   const $ = id => document.getElementById(id);
   const win = $("analysis-window"), opener = $("mode-analysis"), form = $("analysis-form");
   const chart = $("analysis-chart"), status = $("analysis-status"), table = $("analysis-table");
@@ -31,6 +32,31 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
   let colors = new Map();
   const settings = () => Object.fromEntries(Object.entries(controls).map(([key, field]) => [key, key === "mode" || key === "pair" ? field.value : Number(field.value)]));
 
+  let observed = null, importVersion = 0;
+  function setObserved(trace) {
+    observed = trace;
+    $("analysis-remove").hidden = !trace;
+    $("analysis-file-status").textContent = trace ? trace.name + " · Orange shows measured intensity, scaled independently over the visible range." : "";
+    draw();
+  }
+  $("analysis-file").onchange = async event => {
+    const version = ++importVersion, file = event.target.files[0];
+    if (!file) return;
+    try {
+      if (file.size > 8 * 1024 * 1024) throw Error("The measured trace exceeds 8 MiB.");
+      const points = readPowderTrace(await file.text());
+      if (version !== importVersion) return;
+      setObserved({name:file.name, points});
+      onChange();
+    } catch (error) {
+      if (version === importVersion) $("analysis-file-status").textContent = error.message;
+    } finally { if (version === importVersion) event.target.value = ""; }
+  };
+  $("analysis-remove").onclick = () => { importVersion++; setObserved(null); onChange(); };
+  $("analysis-explain").onclick = () => {
+    if (resultMode === "powder" && selected >= 0)
+      onExplain($("analysis-hkl").value.split(",").map(Number), result.wavelength);
+  };
   function stop() {
     clearTimeout(timer);
     worker?.terminate();
@@ -45,6 +71,7 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
     legend.replaceChildren();
     table.replaceChildren();
     detail.textContent = "";
+    $("analysis-family").hidden = true;
     more.hidden = true;
     csv.disabled = true;
     $("analysis-results").hidden = true;
@@ -53,11 +80,12 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
     const distance = controls.mode.value === "distances";
     $("analysis-distance-fields").hidden = !distance;
     $("analysis-powder-fields").hidden = distance;
+    $("analysis-observed").hidden = distance;
     for (const field of $("analysis-distance-fields").querySelectorAll("input, select")) field.disabled = !distance;
     for (const field of $("analysis-powder-fields").querySelectorAll("input, select")) field.disabled = distance;
     $("analysis-note").textContent = distance
       ? "Geometric pairs per unit cell, counted once. Periodic neighbors are included automatically for the distance range."
-      : "PhaseSmith X-ray powder pattern: neutral-atom form factors, occupancies and powder Lorentz–polarization correction. No thermal motion, anomalous scattering, texture or instrumental model.";
+      : "PhaseSmith X-ray powder pattern: neutral-atom form factors, occupancies and powder Lorentz–polarization correction. CIF displacement parameters included where available. Anomalous scattering, texture and instrument response omitted.";
   }
   function calculate() {
     stop();
@@ -135,10 +163,16 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
   function select(index) {
     selected = index;
     detail.textContent = description(result.rows[index]);
+    $("analysis-family").hidden = resultMode !== "powder";
+    if (resultMode === "powder") {
+      const families = powderFamilies(result.rows[index].hkls, getStructure().symmetryOperations);
+      $("analysis-hkl").replaceChildren(...families.map(h => new Option("(" + formatMillerIndices(h) + ")", h.join())));
+    }
     for (const el of chart.querySelectorAll("[data-index]")) el.classList.toggle("selected", Number(el.dataset.index) === index);
     for (const row of table.querySelectorAll("tbody tr")) row.classList.toggle("selected", Number(row.dataset.index) === index);
   }
   function clearHighlight() {
+    $("analysis-family").hidden = true;
     selected = -1;
     chart.querySelectorAll(".selected").forEach(line => line.classList.remove("selected"));
     table.querySelectorAll(".selected").forEach(row => row.classList.remove("selected"));
@@ -178,7 +212,10 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
   }
   function draw() {
     chart.replaceChildren();
-    if (!result?.rows.length) return;
+    chart.onclick = null;
+    if (!result) return;
+    $("analysis-results").hidden = !result.rows.length && !(observed && resultMode === "powder");
+    if ($("analysis-results").hidden) return;
     const isDistance = resultMode === "distances";
     const width = Math.max(280, Math.round(chart.clientWidth)), height = 225;
     chart.setAttribute("viewBox", `0 0 ${width} ${height}`);
@@ -187,12 +224,15 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
     const max = isDistance ? result.rMax : result.twoThetaMax;
     const maximum = isDistance ? result.rows.reduce((n, row) => Math.max(n, row.count), 1) : 100;
     const yMax = isDistance ? Math.ceil(maximum / 4) * 4 : 100;
+    const measured = !isDistance && observed ? observed.points.filter(([a]) => min <= a && a <= max) : [];
+    const peak = measured.reduce((m,p) => Math.max(m, Math.abs(p[1])), 0);
+    const yMin = peak ? measured.reduce((m,p) => Math.min(m,100*p[1]/peak),0) : 0;
     const x = v => left + (v - min) / (max - min) * (right - left);
-    const y = v => bottom - v / yMax * (bottom - top);
+    const y = v => bottom - (v - yMin) / (yMax - yMin) * (bottom - top);
     for (let i = 0; i <= 4; i++) {
-      const v = yMax * i / 4;
+      const v = yMin + (yMax - yMin) * i / 4;
       svg("line", { x1: left, x2: right, y1: y(v), y2: y(v), class: "analysis-grid" });
-      svg("text", { x: left - 8, y: y(v) + 4, "text-anchor": "end" }, String(v));
+      svg("text", { x: left - 8, y: y(v) + 4, "text-anchor": "end" }, String(Number(v.toFixed(1))));
       const d = min + (max - min) * i / 4;
       svg("text", { x: x(d), y: bottom + 17, "text-anchor": "middle" }, Number(d.toFixed(2)).toString());
     }
@@ -218,13 +258,23 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
         line.append(title);
       }
     });
+    if (measured.length) {
+      const path = measured.map(([a,b],i) => (i ? "L" : "M") + x(a).toFixed(2) + "," + y(peak ? 100*b/peak : 0).toFixed(2)).join(" ");
+      svg("path", {d:path, class:"analysis-observed-line"});
+    }
     chart.onclick = event => {
       const rect = chart.getBoundingClientRect();
       const at = min + ((event.clientX - rect.left) / rect.width * width - left) / (right - left) * (max - min);
       let nearest = 0;
       const position = row => isDistance ? row.distance : row.twoTheta;
       result.rows.forEach((row, i) => { if (Math.abs(position(row) - at) < Math.abs(position(result.rows[nearest]) - at)) nearest = i; });
-      select(nearest);
+      if (result.rows.length) select(nearest);
+      if (measured.length) {
+        const sample = measured.reduce((best,p) => Math.abs(p[0]-at) < Math.abs(best[0]-at) ? p : best);
+        const info = "Measured " + sample[0].toFixed(4) + "° · intensity " + sample[1];
+        if (result.rows.length) detail.textContent += " · " + info + " · Δ2θ " + (sample[0] - result.rows[nearest].twoTheta).toFixed(4) + "°";
+        else detail.textContent = info + " · No calculated line in range.";
+      }
     };
   }
   function renderTable() {
@@ -329,6 +379,8 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
     },
     setStructure() {
       detectorPeak = null;
+      importVersion++;
+      setObserved(null);
       stop();
       clear();
       const elements = [...new Set(getStructure()?.atoms.map(a => a.element))].sort();
@@ -341,13 +393,17 @@ export function createAnalysisWindow({ getStructure, onChange = () => {} }) {
       [...colors.keys()].forEach(name => controls.pair.add(new Option(name, name)));
       if (win.open) calculate();
     },
-    exportState: () => ({ ...settings(), open: win.open }),
+    exportState: () => ({ ...settings(), open: win.open, observed }),
     restoreState(raw) {
       const state = raw && typeof raw === "object" ? raw : DEFAULTS;
       for (const [key, value] of Object.entries(DEFAULTS)) controls[key].value = String(value);
       for (const [key, [min, max]] of Object.entries(LIMITS))
         if (Number.isFinite(state[key]) && state[key] >= min && state[key] <= max) controls[key].value = state[key];
       if (["distances", "powder"].includes(state.mode)) controls.mode.value = state.mode;
+      importVersion++;
+      const trace = state.observed;
+      setObserved(trace && typeof trace.name === "string" && Array.isArray(trace.points) && trace.points.length >= 2 && trace.points.length <= 100000 &&
+        trace.points.every(p => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite) && p[0] >= 0 && p[0] <= 180) ? trace : null);
       const pair = normalizePair(state.pair);
       if ([...controls.pair.options].some(o => o.value === pair)) controls.pair.value = pair;
       updateMode();

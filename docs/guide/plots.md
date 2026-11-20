@@ -52,9 +52,15 @@ The table and CSV give **integrated line intensities**, scaled so the strongest 
 
 The table shows a representative Miller index for each line. The CSV retains the enumerated indices with opposite-sign Friedel mates implied. Select a line or row to see its d spacing, 2θ, relative intensity, and multiplicity.
 
+### Compare a measured trace
+
+Under **Measured powder trace**, open an XY, DAT, XYE, TXT, or CSV file with 2θ in degrees in the first column and intensity in the second. Separate columns with whitespace or commas. The viewer draws the measured trace in orange and scales its visible range independently. Select a position on the plot to read the nearest measured sample in its original units and the angular difference from the nearest calculated line.
+
+Select a calculated line, choose a **Reflection family**, and select **Explain this peak** to open the phase sum at the same wavelength. A line can contain distinct families with coincident spacings, such as cubic (511) and (333).
+
 ### Model limitations
 
-The calculation omits thermal motion, anomalous scattering, texture, absorption, and instrument-specific effects. The profile width is an illustrative Gaussian broadening. It is not a fit to measured data and does not represent crystallite size or strain.
+The calculation includes isotropic or anisotropic displacement parameters supplied by the CIF. It omits anomalous scattering, texture, absorption, and instrument-specific effects. The profile width is an illustrative Gaussian broadening. It is not a fit to measured data and does not represent crystallite size or strain.
 
 Form factors require **sin(θ)/λ ≤ 6 Å⁻¹**. If that limit is exceeded, decrease the maximum 2θ or increase the wavelength. If the browser work limit is reached, narrowing the angular range can help.
 
@@ -67,3 +73,5 @@ Open **X-ray** and enter the Miller indices and wavelength to inspect how the at
 In **Detector**, enter **2 0 0** for periclase and press **Enter** to rotate to the reflection. Step through other crossings with **Previous reflection** and **Next reflection**. Choose **Link main view** to turn the specimen from the crystal view. With the powder plot open, selecting a detector spot also highlights its powder line when it is in range.
 
 Open **Options** to change the wavelength, detector distance, or detector shape, import a PONI calibration, or set the specimen orientation and rotation axis.
+
+Under **Options → Rotation-wedge coverage**, set the start and end ω to count discrete crossings on the active detector and export their indices and angles. An optional DAC half-opening filters both incident and outgoing rays through a symmetric double cone aligned with the beam at ω = 0° and rotating with the spindle. Continuously excited indices are excluded from the discrete count.

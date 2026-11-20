@@ -78,7 +78,9 @@ function crossings(g, wavelength, axis) {
   if (Math.abs(target) > amplitude + eps) return { angles: [], continuous: false };
   const offset = Math.acos(Math.max(-1, Math.min(1, target / amplitude))) / rad;
   const phase = Math.atan2(sine, cosine) / rad;
-  return { angles: [wrap(phase + offset), wrap(phase - offset)], continuous: false };
+  const angles = [wrap(phase + offset)];
+  if (offset > 1e-8 && offset < 180 - 1e-8) angles.push(wrap(phase - offset));
+  return { angles, continuous: false };
 }
 
 export function detectorModel(
@@ -341,6 +343,28 @@ export function detectorModel(
     next,
     spots,
     scrub,
+    wedge(from, to, halfOpening, azimuth) {
+      if (![from,to].every(v => Number.isFinite(v) && Math.abs(v) <= 180) || from > to)
+        throw Error("Enter an increasing rotation interval between −180° and 180°.");
+      if (halfOpening != null && !(Number.isFinite(halfOpening) && halfOpening >= 0 && halfOpening <= 90))
+        throw Error("The DAC half-opening must be between 0° and 90°.");
+      setAzimuth(azimuth);
+      const cutoff = halfOpening == null ? 0 : Math.cos(halfOpening * rad);
+      const events = [];
+      for (const {point, angle} of observable) {
+        let omega = angle > 180 ? angle - 360 : angle;
+        if (Math.abs(omega - 180) < 1e-8 && to < 180) omega = -180;
+        if (omega < from - 1e-8 || omega > to + 1e-8) continue;
+        if (cutoff > 0) {
+          const cone = labVector([1,0,0], 0, omega, azimuth, axis);
+          const g = labVector(point.g, tilt, omega, azimuth, axis);
+          const ray = [1 + wavelength*g[0], wavelength*g[1], wavelength*g[2]];
+          if (Math.abs(cone[0]) + 1e-10 < cutoff || Math.abs(dot3(cone,ray)) + 1e-10 < cutoff) continue;
+        }
+        events.push({point, omega});
+      }
+      return { events, continuous: persistent.length };
+    },
     get stops() {
       return stops;
     },

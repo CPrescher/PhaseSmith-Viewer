@@ -271,23 +271,77 @@ fn structure(text: &str, requested: Option<&str>) -> Result<Value, String> {
         .space_group
         .expand_sites(&coords, 1e-4)
         .map_err(|err| err.to_string())?;
+    // The CIF tensor uses reciprocal-axis lengths. Store U* in fractional
+    // coordinates so both diffraction and Cartesian ellipsoids use the same
+    // rotated displacement tensor for each symmetry mate.
+    let reciprocal_lengths: [f64; 3] = std::array::from_fn(|i| {
+        geometry
+            .reciprocal_basis
+            .iter()
+            .map(|row| row[i].powi(2))
+            .sum::<f64>()
+            .sqrt()
+    });
+    let basis = nalgebra::Matrix3::from_fn(|i, j| geometry.direct_basis[i][j]);
+    let mut invalid_displacements = std::collections::BTreeSet::new();
+    let mut atom_record = |index: usize, xyz: [f64; 3], rotation: [[i32; 3]; 3]| {
+        let site = &structure.sites[index];
+        let mut atom = json!({"label":site.site_id, "element":site.element_symbol,
+            "charge":site.charge, "frac":xyz, "occupancy":site.occupancy, "siteIndex":index});
+        if let Some(u) = site.u_iso_angstrom2 {
+            if u >= 0. {
+                atom["uIso"] = json!(u);
+            } else {
+                invalid_displacements.insert(site.site_id.as_str());
+            }
+        }
+        if let Some(adp) = &site.anisotropic_displacement {
+            let [xx, yy, zz, yz, xz, xy] = adp.u_cif_angstrom2;
+            let cif = nalgebra::Matrix3::new(xx, xy, xz, xy, yy, yz, xz, yz, zz);
+            let transform = nalgebra::Matrix3::from_fn(|i, j| {
+                f64::from(rotation[i][j]) * reciprocal_lengths[j]
+            });
+            let u = transform * cif * transform.transpose();
+            let cartesian = basis * u * basis.transpose();
+            let eigen = cartesian.symmetric_eigen();
+            if eigen.eigenvalues.iter().all(|v| v.is_finite() && *v > 0.) {
+                atom["uStar"] = json!([
+                    u[(0, 0)],
+                    u[(1, 1)],
+                    u[(2, 2)],
+                    u[(1, 2)],
+                    u[(0, 2)],
+                    u[(0, 1)]
+                ]);
+                let mut axes = eigen.eigenvectors;
+                // A sphere is invariant under axis reversal. Keep the instance
+                // right-handed for correct front-face culling.
+                if axes.determinant() < 0. {
+                    axes.column_mut(0).neg_mut();
+                }
+                let axes =
+                    axes * nalgebra::Matrix3::from_diagonal(&eigen.eigenvalues.map(f64::sqrt));
+                let rows: [[f64; 3]; 3] =
+                    std::array::from_fn(|i| std::array::from_fn(|j| axes[(i, j)]));
+                atom["displacementAxes"] = json!(rows);
+            } else {
+                invalid_displacements.insert(site.site_id.as_str());
+            }
+        }
+        atom
+    };
     let atoms = expanded
         .fractional_xyz
         .iter()
         .zip(expanded.source_site)
-        .map(|(xyz, index)| {
-            let s = &structure.sites[index];
-            json!({"label":s.site_id,"element":s.element_symbol,"frac":xyz,"occupancy":s.occupancy,"siteIndex":index})
-        })
+        .zip(expanded.representative_rotation)
+        .map(|((xyz, index), rotation)| atom_record(index, *xyz, rotation))
         .collect::<Vec<_>>();
     let independent_sites = structure
         .sites
         .iter()
         .enumerate()
-        .map(|(index, site)| {
-            json!({"label":site.site_id,"element":site.element_symbol,
-                "charge":site.charge,"frac":site.fractional_xyz,"occupancy":site.occupancy,"siteIndex":index})
-        })
+        .map(|(index, s)| atom_record(index, s.fractional_xyz, [[1, 0, 0], [0, 1, 0], [0, 0, 1]]))
         .collect::<Vec<_>>();
     let symmetry_operations = structure
         .space_group
@@ -303,14 +357,40 @@ fn structure(text: &str, requested: Option<&str>) -> Result<Value, String> {
         .iter()
         .map(|d| d.message.clone())
         .collect::<Vec<_>>();
+    if !invalid_displacements.is_empty() {
+        warnings.push(format!("Unusable displacement parameters for {} site(s). Using valid isotropic values where available and zero displacement otherwise.", invalid_displacements.len()));
+    }
     if labels_adapted {
         warnings.push("PDBx atom IDs or atom names were used as site labels. This viewer shows crystallographic positions only; molecular assemblies are not constructed. All alternate conformers and all models are overlaid, not selected or combined.".into());
     }
     if !skipped.is_empty() {
         warnings.push(format!("Skipped earlier blocks: {}", skipped.join("; ")));
     }
+    let cell = &structure.cell;
+    // Fill missing identifiers only when the reference setting has exactly the
+    // operations used to expand this block. Keep the reported CIF tags intact.
+    let meta = &structure.metadata;
+    let matched_group = meta
+        .get("space_group_hall")
+        .and_then(|value| phasesmith_io::space_group_by_hall_symbol(value).ok())
+        .filter(|info| info.space_group == structure.space_group)
+        .or_else(|| {
+            meta.get("space_group_hm")
+                .and_then(|value| phasesmith_io::space_group_by_symbol(value).ok())
+                .filter(|info| info.space_group == structure.space_group)
+        })
+        .or_else(|| {
+            meta.get("space_group_number")
+                .and_then(|value| value.parse().ok())
+                .and_then(|number| phasesmith_io::space_group_by_number(number).ok())
+                .filter(|info| info.space_group == structure.space_group)
+        });
     Ok(
         json!({"name":structure.name,"block":result.selected_block,"blocks":result.available_blocks,
+        "cellParameters":[cell.a_angstrom,cell.b_angstrom,cell.c_angstrom,cell.alpha_deg,cell.beta_deg,cell.gamma_deg],
+        "cellUncertainties":structure.cell_standard_uncertainties,
+        "crystalSystem":format!("{:?}", structure.space_group.crystal_system()),
+        "matchedGroup":matched_group.map(|info| json!({"number":info.number,"symbol":info.hm_symbol})),
         "basis":geometry.direct_basis,"volume":geometry.volume_angstrom3,"atoms":atoms,
         "independentSites":independent_sites,"symmetryOperations":symmetry_operations,
         "metadata":structure.metadata,"warnings":warnings}),

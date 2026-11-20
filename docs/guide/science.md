@@ -48,7 +48,7 @@ Partially occupied sites are treated as whole geometric sites for this plot. The
 
 For fractional coordinates *(xⱼ, yⱼ, zⱼ)* and occupancy *oⱼ*, the X-ray structure factor is:
 
-<div class="equation">F(hkl) = Σⱼ oⱼ fⱼ(s) exp[2πi(hxⱼ + kyⱼ + lzⱼ)]</div>
+<div class="equation">F(hkl) = Σⱼ oⱼ fⱼ(s) Tⱼ(hkl) exp[2πi(hxⱼ + kyⱼ + lzⱼ)]</div>
 
 Here **s = sin(θ)/λ = 1/(2d)**. Neutral-atom Waasmaier–Kirfel form factors depend on *s*. The structure-factor intensity contribution is |F|², and Bragg's law gives the scattering angle:
 
@@ -58,7 +58,11 @@ The powder calculation sums contributions at the same spacing and includes Fried
 
 <div class="equation">LP = (1 + cos² 2θ) / (sin² θ cos θ)</div>
 
-Thermal motion, anomalous scattering, preferred orientation, absorption, and instrumental effects are omitted. Integrated line intensities are normalized to a maximum of 100; the displayed Gaussian profile is normalized separately. These are model values, not absolute measured intensities.
+The displacement factor **Tⱼ** is exp(−8π²Uᵢₛₒs²) for isotropic displacement and exp(−2π²hᵀU∗h) for a fractional displacement tensor. Symmetry-related positions use the rotated tensor. Where the CIF supplies no usable displacement value, Tⱼ = 1. Powder, single-reflection, and detector calculations use the same factors.
+
+In **Style**, enable **50% displacement ellipsoids** to show the probability ellipsoid from the CIF displacement parameters. Positive isotropic values draw a sphere at that probability. Sites without usable values retain their ordinary sphere.
+
+The intensity model omits anomalous scattering, preferred orientation, absorption, and instrumental effects. Integrated line intensities are normalized to a maximum of 100; the displayed Gaussian profile is normalized separately. These are model values, not absolute measured intensities.
 
 ## Symmetry and source data
 

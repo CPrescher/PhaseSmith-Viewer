@@ -17,6 +17,8 @@ import { createHistory } from "./history.js";
 import { buildCoordinationEnvironments, convexHull } from "./coordination.js";
 import { elementColor as defaultColor } from "./elements.js";
 import { createRadiusControls } from "./radius-controls.js";
+import { createStructureInfo } from "./structure-info.js";
+import { siteShell } from "./site-shell.js";
 import { estimatePairCutoff } from "./pair-defaults.js";
 import { angleAt, hullVolume } from "./crystal-math.js";
 import { createLatticeTools } from "./lattice-tools.js";
@@ -601,9 +603,8 @@ function initialize() {
       mesh.visible = atomVisible(list[0]);
       mesh.userData.atoms = list;
       list.forEach((a, i) => {
-        a.radius = atomRadius(a);
         a.color = styleOf(a).color;
-        matrix.compose(a.position, rotation, scale.setScalar(a.radius));
+        atomTransform(a, matrix, rotation, scale);
         mesh.setMatrixAt(i, matrix);
         mesh.setColorAt(i, tint.set(a.color));
       });
@@ -640,6 +641,21 @@ function initialize() {
     highlightSite(highlightedSite);
     invalidate();
   }
+  function atomTransform(a, matrix, rotation, scale) {
+    a.radius = atomRadius(a);
+    if ($("adp-ellipsoids").checked) {
+      // sqrt(chi-square quantile for 3 degrees of freedom, probability 0.5).
+      const probabilityScale = 1.538172254455;
+      if (a.displacementAxes) {
+        const axes = a.displacementAxes.map(row => row.map(v => v * probabilityScale));
+        a.radius = Math.max(...[0,1,2].map(i => Math.hypot(...axes.map(row => row[i]))));
+        matrix.set(...axes[0], a.position.x, ...axes[1], a.position.y, ...axes[2], a.position.z, 0,0,0,1);
+        return;
+      }
+      if (a.uIso > 0) a.radius = probabilityScale * Math.sqrt(a.uIso);
+    }
+    matrix.compose(a.position, rotation, scale.setScalar(a.radius));
+  }
   function updateSphereBounds() {
     fitBounds.setFromPoints(fitCorners);
     const corner = new THREE.Vector3();
@@ -654,7 +670,7 @@ function initialize() {
       fitBounds.union(faces.geometry.boundingBox);
     }
   }
-  const structureAnalysis = createAnalysisWindow({ getStructure: () => structure, onChange: () => scheduleSave() });
+  const structureAnalysis = createAnalysisWindow({ getStructure: () => structure, onExplain: (hkl, wavelength) => reflectionExplorer.open(hkl, wavelength), onChange: () => scheduleSave() });
   const reflectionExplorer = createReflectionExplorer({
     atomRadius,
     getStructure: () => structure,
@@ -1841,10 +1857,36 @@ function initialize() {
   let highlightedSite = null;
   const siteGroup = new THREE.Group();
   scene.add(siteGroup);
+  function inspectShell(center) {
+    $("shell-controls").hidden = !center;
+    const summary = $("shell-summary"), body = $("shell-ligands");
+    body.replaceChildren();
+    if (!center) { summary.textContent = "Select a site to inspect its periodic neighbors."; return; }
+    try {
+      const input = $("shell-cutoff");
+      if (!input.validity.valid) throw Error("Choose a cutoff from 0.01 to 30 Å.");
+      const shell = siteShell(structure, center, input.value ? input.valueAsNumber : null);
+      const stats = [center.label, "CN " + shell.count];
+      if (shell.count) stats.push("Mean " + shell.mean.toFixed(4) + " Å", "Baur D " + shell.distortion.toFixed(4));
+      if (shell.volume != null) stats.push("V " + shell.volume.toFixed(3) + " Å³");
+      if (shell.partial) stats.push("Includes partially occupied positions. CN counts geometric neighbors.");
+      summary.textContent = stats.join(" · ");
+      for (const group of shell.groups) {
+        const row = body.insertRow();
+        for (const value of [group.atom.label, group.atom.element, group.distance.toFixed(4), group.count]) row.insertCell().textContent = value;
+      }
+      if ($("shell-outline").checked && shell.edges.length && atoms.some(a => a === center)) {
+        const points = shell.edges.flatMap(edge => edge.map(i => new THREE.Vector3(...shell.points[i]).sub(modelCenter)));
+        siteGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({color: scenePalette().pick})));
+      }
+    } catch (error) { summary.textContent = error.message; }
+  }
+  for (const id of ["shell-cutoff","shell-outline"]) $(id).onchange = () => { highlightSite(highlightedSite); scheduleSave(); };
   function highlightSite(label) {
     highlightedSite = label;
     dispose(siteGroup);
     siteGroup.clear();
+    inspectShell(label && (atoms.find(a => a.label === label && atomVisible(a)) ?? independentSites().find(a => a.label === label)));
     for (const row of document.querySelectorAll("#site-table tbody tr, #poly-table tbody tr"))
       row.classList.toggle("selected", Boolean(label) && row.cells[0].textContent === label);
     if (label) {
@@ -2020,6 +2062,7 @@ function initialize() {
     invalidate();
   }
   function updateSelection() {
+    $("inspect-neighbors").hidden = true;
     dispose(selectionGroup);
     selectionGroup.clear();
     // Selection is a crisp back-face shell: from any direction it reads as
@@ -2210,11 +2253,18 @@ function initialize() {
   }
   function showAtomInfo() {
     const a = selection[0];
+    $("inspect-neighbors").hidden = !a;
     $("distance").replaceChildren(document.createTextNode(a ? a.label : "—"));
     const lines = a ? atomInfoLines(a) : [];
     $("selection").textContent = a ? lines.join("\n") : $("show-atoms").checked ? "Tap an atom for its details." : "Show atoms to inspect.";
   }
   // Distance (2 atoms) · Angle (3) · Info (1). Each mode starts a fresh selection.
+  $("inspect-neighbors").onclick = () => {
+    if (!selection[0]) return;
+    toolWindows.choose("sites");
+    highlightSite(selection[0].label);
+    $("shell-summary").scrollIntoView({block:"nearest"});
+  };
   function setMeasureMode(mode) {
     if (mode !== measureMode) selection = [];
     measureMode = mode;
@@ -2444,6 +2494,7 @@ function initialize() {
       if (measureMode === "info") selection = [];
       else if (selection.length === (measureMode === "angle" ? 3 : 2)) selection = [];
       if (!selection.includes(atom)) selection.push(atom);
+      if (measureMode === "info" && $("mode-sites").getAttribute("aria-pressed") === "true") highlightSite(atom.label);
       updateSelection();
     } else if (
       selection.length &&
@@ -2728,6 +2779,7 @@ function initialize() {
       });
     }
   }
+  const updateStructureInfo = createStructureInfo();
   function textStat(label, value) {
     const d = document.createElement("div");
     d.className = "stat";
@@ -2752,6 +2804,8 @@ function initialize() {
     asymmetric = false;
     $("asym-toggle").checked = false;
     highlightedSite = null;
+    $("shell-cutoff").value = "";
+    $("shell-outline").checked = true;
     structure = data;
     radiusControls.setSites(independentSites(), data);
     showSphereSize();
@@ -2773,6 +2827,7 @@ function initialize() {
       link.title = reference.source.citation;
       $("source").append(link);
     } else $("source").textContent = currentFilename || "Example structure · built in";
+    updateStructureInfo(data, $("name").textContent, currentFilename, reference);
     $("stats").replaceChildren(
       textStat("V", `${Number(data.volume).toFixed(2)} Å³`),
       textStat("Sites", data.atoms.length.toLocaleString()),
@@ -3123,8 +3178,7 @@ function initialize() {
       scale = new THREE.Vector3();
     for (const m of meshes) {
       m.userData.atoms.forEach((a, i) => {
-        a.radius = atomRadius(a);
-        matrix.compose(a.position, rotation, scale.setScalar(a.radius));
+        atomTransform(a, matrix, rotation, scale);
         m.setMatrixAt(i, matrix);
       });
       m.instanceMatrix.needsUpdate = true;
@@ -3136,6 +3190,11 @@ function initialize() {
     updatePickMarker();
     highlightSite(highlightedSite);
   }
+  $("adp-ellipsoids").onchange = () => {
+    $("adp-note").hidden = !$("adp-ellipsoids").checked;
+    updateSphereSizes();
+    scheduleSave();
+  };
   $("size").oninput = updateSphereSizes;
   window.viewerDiagnostics = () => {
     camera.updateMatrixWorld();
@@ -3537,6 +3596,7 @@ function initialize() {
         polyhedra: [...appearance.polyhedra].map(([k, v]) => [k, { ...v }]),
       },
       atoms: {
+        ellipsoids: $("adp-ellipsoids").checked,
         show: $("show-atoms").checked,
         hidden: [...hiddenElements],
         size: Number($("size").value),
@@ -3545,8 +3605,11 @@ function initialize() {
       },
       asymmetric,
       highlightedSite,
+      shellCutoff: $("shell-cutoff").value, shellOutline: $("shell-outline").checked,
       lattice: latticeTools.exportState(),
       analysis: structureAnalysis.exportState(),
+      reflection: reflectionExplorer.exportState(),
+      detector: diffractionDetector.exportState(),
       camera: {
         position: detectorLink ? detectorLink.eye.clone().multiplyScalar(camera.position.distanceTo(controls.target)).add(controls.target).toArray() : camera.position.toArray(),
         up: (detectorLink?.up ?? camera.up).toArray(),
@@ -3646,6 +3709,8 @@ function initialize() {
     // Atom display.
     const a = s.atoms && typeof s.atoms === "object" ? s.atoms : {};
     radiusControls.restore(a);
+    $("adp-ellipsoids").checked = a.ellipsoids === true;
+    $("adp-note").hidden = !a.ellipsoids;
     if (typeof a.show === "boolean") $("show-atoms").checked = a.show;
     hiddenElements.clear();
     for (const e of Array.isArray(a.hidden) ? a.hidden : []) if (elements.has(e)) hiddenElements.add(e);
@@ -3680,6 +3745,8 @@ function initialize() {
     }
     latticeTools.restoreState(s.lattice, { trusted });
     structureAnalysis.restoreState(s.analysis);
+    $("shell-cutoff").value = Number(s.shellCutoff) > 0 && Number(s.shellCutoff) <= 30 ? s.shellCutoff : "";
+    $("shell-outline").checked = s.shellOutline !== false;
     highlightSite(null);
     if (typeof s.highlightedSite === "string" && independentSites().some((x) => x.label === s.highlightedSite))
       highlightSite(s.highlightedSite);
@@ -3721,6 +3788,10 @@ function initialize() {
     updateExportInfo();
     // Camera last: nothing after this refits the view.
     restoreCameraState(s);
+    if (!historyApplying) {
+      diffractionDetector.restoreState(s.detector);
+      reflectionExplorer.restoreState(s.reflection);
+    }
     invalidate();
   }
   function restoreCameraState(s) {
@@ -3763,7 +3834,7 @@ function initialize() {
   // angle, unsubmitted direction text) are intentionally outside history.
   function exportHistoryState() {
     const s = exportViewerState();
-    const keys = ["ranges", "boundary", "cell", "polyhedraOnly", "polyhedraVisible", "rules", "appearance", "atoms", "asymmetric", "highlightedSite", "lattice", "camera", "activeView", "measure"];
+    const keys = ["ranges", "boundary", "cell", "polyhedraOnly", "polyhedraVisible", "rules", "appearance", "atoms", "asymmetric", "highlightedSite", "shellCutoff", "shellOutline", "lattice", "camera", "activeView", "measure"];
     return Object.fromEntries(keys.map((key) => [key, s[key]]));
   }
   const historyEqual = (a, b) => JSON.stringify(a, (key, value) =>

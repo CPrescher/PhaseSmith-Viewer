@@ -96,6 +96,12 @@ export function ewaldCamera(svg, onChange) {
     get view() {
       return view;
     },
+    restore(saved) {
+      view = initialCamera();
+      if (saved && [saved.yaw,saved.elevation,saved.zoom].every(Number.isFinite))
+        view = {yaw:saved.yaw, elevation:limit(saved.elevation,-Math.PI/2,Math.PI/2), zoom:limit(saved.zoom,0.45,4)};
+      onChange();
+    },
     zoom,
     alongBeam() {
       view.yaw = beamYaw;

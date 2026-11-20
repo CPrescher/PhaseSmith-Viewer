@@ -4,6 +4,10 @@ The viewer has three separate sets of controls: the header above the crystal, sm
 
 The images below are actual screenshots. Numbered outlines locate each group; enlarged views show buttons that are easy to miss. Images follow the guide's light or dark theme.
 
+## Identify the structure
+
+The header shows the structure name and space group. Select either to open **Structure info** on a computer or phone. The panel lists the six unit-cell parameters and their reported standard uncertainties, calculated cell volume, crystal system, symmetry operations count, independent sites, and positions per cell. It also identifies the active CIF block and links to the original reference for library structures. If the CIF supplies no symmetry, the header marks the assumed P 1 setting.
+
 ## On a computer or landscape tablet
 
 <ViewerFigure name="interface" alt="The full viewer with numbered outlines identifying the file buttons, view toolbar, measurement toolbar, right-hand tool rail and lower-left visibility strip." />

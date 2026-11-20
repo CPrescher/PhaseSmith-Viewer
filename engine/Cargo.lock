@@ -286,6 +286,7 @@ dependencies = [
 name = "phasesmith-viewer-engine"
 version = "0.1.0"
 dependencies = [
+ "nalgebra",
  "phasesmith-crystallography",
  "phasesmith-io",
  "serde",

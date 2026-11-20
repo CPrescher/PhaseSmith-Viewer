@@ -7,7 +7,8 @@ let enginePromise;
 async function engine() {
   if (!enginePromise) {
     enginePromise = (async () => {
-      const response = await fetch(engineURL);
+      // The engine has a stable URL but its output fields evolve with the viewer.
+      const response = await fetch(engineURL, { cache: "no-cache" });
       if (!response.ok) throw new Error(`Cannot load structure engine (${response.status})`);
       const bytes = await response.arrayBuffer();
       const { instance, module } = await WebAssembly.instantiate(bytes, {});

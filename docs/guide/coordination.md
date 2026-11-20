@@ -24,6 +24,12 @@ Transparent faces from all pairs and lattice planes are composed in depth order 
 
 Use **Hide atoms outside polyhedra** to show only the centers and vertices of enabled polyhedra. Turn it off to see the surrounding structure. Changing the cutoff changes which neighbors qualify for the display; the imported atom positions stay fixed.
 
+## Inspect all neighbors of one site
+
+Select an independent site in **Sites**, or pick an atom in the crystal and choose **Site neighbors**. The table groups periodic neighbors by ligand site and distance across all elements. Leave the cutoff blank for an estimated first shell, or enter a distance in Å. The outline follows the selected shell, including planar carbonate triangles.
+
+For fluorapatite, select **Ca2** and enter **2.8 Å** to see seven neighbors, including both O and F. The summary gives the mean distance and Baur distortion index D, the mean absolute deviation in bond length divided by the mean bond length. A three-dimensional shell also has a convex-hull volume. Partially occupied neighbors contribute whole positions to the geometric count.
+
 ## Try a worked example
 
 Open [the forsterite example](https://cprescher.github.io/PhaseSmith-Viewer/?example=forsterite) for a worked example using the Mg end member of olivine (Boström, 1987, *American Mineralogist* 72, 965–972, AMCSD 0001118). The Si–O and Mg–O cutoffs of 1.80 Å and 2.30 Å include the complete first coordination shells. Hide one rule to examine the other. Lower the Mg–O cutoff to 2.15 Å to retain all six neighbors around Mg1 and three around Mg2.

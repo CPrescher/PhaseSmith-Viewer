@@ -33,6 +33,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
       </div>
       <label>λ (Å)<input id="reflection-wavelength" type="number" value="1.5406" min="0.001" step="any" required aria-label="X-ray wavelength" /></label>
       <button id="reflection-detector" type="button">Show on detector</button>
+      <button id="reflection-project" type="button">Save exercise</button>
     </form>
     <p id="reflection-error" role="alert" hidden></p>
     <div id="reflection-content">
@@ -79,13 +80,13 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
         </section>
       </div>
       <p id="reflection-summary" class="hint"></p>
-      <p class="hint reflection-model-note">One symmetry-expanded cell · neutral-atom X-ray factors · occupancy included · thermal motion and anomalous scattering omitted. Boundary copies share a single contribution.</p>
+      <p class="hint reflection-model-note">One symmetry-expanded cell · neutral-atom X-ray factors · occupancy included · CIF displacement parameters included where available · anomalous scattering omitted. Boundary copies share a single contribution.</p>
     </div>
     <div class="reflection-intensity"><div><strong>Reflection intensity · I ∝ |F(hkl)|²</strong><p>Structure-factor contribution; experimental corrections are separate.</p></div><output id="reflection-intensity"></output></div>`;
   document.body.append(dialog);
   const $ = id => dialog.querySelector(`#${id}`), stage = $("reflection-stage");
   let structure = null, renderedStructure = null, result = null, selected = 0, reference = 0, count = 0;
-  let clickedPosition = null;
+  let clickedPosition = null, savedExercise = null;
   const rayMode = () => !$("reflection-rays-panel").hidden;
   const selectedGroup = () => result.atoms[selected].groupIndex;
   const selectedPosition = () => clickedPosition ?? result.atoms[selected].frac;
@@ -608,8 +609,15 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
       $("reflection-structure").textContent = `${structure.name || structure.block || "Crystal"} · ${result.atoms.length} atoms per cell · d = ${format(result.d)} Å`;
       buildPlanes();
       $("reflection-plane-note").textContent = `Blue planes mark integer m. ${planeTruncated ? "First 64 planes shown. " : ""}Highlighted positions belong to the same site and have the same phase.`;
-      $("reflection-summary").textContent = result.f2 <= result.scale ** 2 * 1e-12
-        ? "The atomic contributions cancel for this reflection within numerical precision."
+      const symmetryAbsent = structure.symmetryOperations?.some(({rotation,translation}) => {
+        const invariant = hkl.every((v,i) => v === hkl.reduce((sum,h,j) => sum + h * rotation[j][i], 0));
+        const shift = hkl.reduce((sum,h,i) => sum + h * translation[i], 0);
+        return invariant && Math.abs(shift - Math.round(shift)) > 1e-7;
+      });
+      $("reflection-summary").textContent = symmetryAbsent
+        ? "Systematic absence: a space-group operation preserves this reciprocal vector and shifts its phase. The contributions cancel."
+        : result.f2 <= result.scale ** 2 * 1e-12
+        ? "The atomic contributions cancel for this structure within numerical precision. The supplied space-group operations allow this reflection."
         : `Full-cell |F|² = ${format(result.f2)} e². Powder multiplicity and experimental intensity corrections are applied separately in Structure plots.`;
       $("reflection-intensity").textContent = `(${formatMillerIndices(hkl)}) · ${format(result.f2)} e²`;
       fillAtoms();
@@ -645,7 +653,11 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     }
     frame = requestAnimationFrame(tick);
   }
-  function open(hkl = [1, 1, 1], wavelength) {
+  function open(hkl, wavelength) {
+    const saved = hkl ? null : savedExercise ?? snapshot();
+    savedExercise = null;
+    hkl ??= saved?.hkl ?? result?.hkl ?? [1,1,1];
+    wavelength ??= saved?.wavelength;
     const nextStructure = getStructure();
     structure = nextStructure;
     if (wavelength !== undefined) $("reflection-wavelength").value = wavelength;
@@ -657,6 +669,22 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
       if (!renderer) initializeScene();
       controls.enabled = true;
       calculate();
+      if (saved && result && !$("reflection-content").hidden) {
+        const validIndex = i => Number.isInteger(i) && i >= 0 && i < result.atoms.length;
+        const triple = v => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
+        if (validIndex(saved.reference)) reference = saved.reference;
+        $("reflection-reference").value = reference;
+        $("reflection-colors").value = saved.colors === "phase" ? "phase" : "element";
+        dialog.querySelector('[data-panel="' + (saved.rays ? "rays" : "sum") + '"]').click();
+        if (validIndex(saved.selected)) selectAtom(saved.selected, triple(saved.position) ? saved.position : null);
+        count = Number.isInteger(saved.count) ? Math.max(0, Math.min(result.groups.length, saved.count)) : result.groups.length;
+        $("reflection-step").value = count;
+        drawSum();
+        if (triple(saved.eye) && triple(saved.up) && triple(saved.target)) {
+          camera.position.fromArray(saved.eye); camera.up.fromArray(saved.up);
+          controls.target.fromArray(saved.target); controls.update();
+        }
+      }
       cancelAnimationFrame(frame);
       tick();
     } catch (error) {
@@ -664,7 +692,8 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
       $("reflection-error").hidden = false;
     }
   }
-  opener?.addEventListener("click", () => open(result?.hkl));
+  opener?.addEventListener("click", () => open());
+  $("reflection-project").onclick = () => document.getElementById("project-save").click();
   $("reflection-detector").addEventListener("click", () => {
     try {
       const hkl = parseMillerIndices($("reflection-hkl").value);
@@ -679,6 +708,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
   });
   $("reflection-close").addEventListener("click", () => dialog.close());
   dialog.addEventListener("close", () => {
+    if (dialog.open) return;
     active = false;
     opener?.setAttribute("aria-expanded", "false");
     cancelAnimationFrame(frame);
@@ -722,8 +752,23 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
   $("reflection-step-next").addEventListener("click", () => stepTo(count + 1));
   $("reflection-all").addEventListener("click", () => stepTo(result.groups.length));
   new ResizeObserver(resize).observe(stage);
+  function snapshot() {
+    if (!result) return null;
+    return {
+      open: dialog.open, hkl: result.hkl, wavelength: result.wavelength,
+      selected, reference, position: clickedPosition, count, rays: rayMode(),
+      colors: $("reflection-colors").value, eye: camera.position.toArray(),
+      up: camera.up.toArray(), target: controls.target.toArray(),
+    };
+  }
   return {
     open,
-    setStructure() { if (dialog.open) dialog.close(); structure = null; result = null; },
+    exportState: () => savedExercise ?? snapshot(),
+    restoreState(state) {
+      if (dialog.open) dialog.close();
+      savedExercise = Array.isArray(state?.hkl) && state.hkl.length === 3 && state.hkl.every(Number.isSafeInteger) ? state : null;
+      if (savedExercise?.open) open();
+    },
+    setStructure() { savedExercise = null; if (dialog.open) dialog.close(); structure = null; result = null; },
   };
 }
