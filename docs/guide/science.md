@@ -2,6 +2,8 @@
 
 The viewer helps inspect and illustrate a supplied structure. Display choices such as sphere size, color, plotting extent, and polyhedron opacity do not refine or relax its atomic coordinates.
 
+See [Atomic and ionic radii](./radii.md) for the sphere-size conventions and their sources.
+
 ## Coordinates and periodic images
 
 A fractional position *(x, y, z)* is expressed in the direct lattice basis:

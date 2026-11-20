@@ -34,12 +34,13 @@ async def check(browser, width, height):
         assert current["camera"] == before["camera"]
 
     model = page.locator("#radius-model")
-    assert await model.input_value() == "ionic"
+    assert await model.input_value() == "crystal"
     assert await model.locator('option[value="classic"]').count() == 0
-    assert {a["element"]: a["radius"] for a in before["atoms"]} == {"Mg": 0.36, "Si": 0.13, "O": 0.70}
+    assert {a["element"]: a["radius"] for a in before["atoms"]} == {"Mg": 0.43, "Si": 0.20, "O": 0.63}
     await page.locator("#radius-details summary").tap()
     await page.locator("#radius-site").select_option("Mg1")
     entry = page.locator("#radius-entry")
+    await model.select_option("ionic")
     await entry.select_option("2/IV")
     customized = await diagnostics(page)
     check_crystal(customized)
@@ -62,7 +63,7 @@ async def check(browser, width, height):
     await model.select_option("covalent")
     assert not await entry.is_visible()
     assert {a["element"]: a["radius"] for a in (await diagnostics(page))["atoms"]}["O"] == 0.315
-    await model.select_option("ionic")
+    await model.select_option("crystal")
     assert await entry.input_value() == "2/IV"
     await entry.select_option("")
     await page.locator("#radius-details summary").tap()

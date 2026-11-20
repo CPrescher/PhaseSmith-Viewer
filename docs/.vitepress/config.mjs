@@ -36,6 +36,7 @@ export default defineConfig({
         { text: 'Saving and exporting', link: '/saving' },
       ] },
       { text: 'Reference', items: [
+        { text: 'Atomic and ionic radii', link: '/radii' },
         { text: 'Scientific conventions', link: '/science' },
         { text: 'Troubleshooting', link: '/troubleshooting' },
         { text: 'Development and documentation', link: '/development' },

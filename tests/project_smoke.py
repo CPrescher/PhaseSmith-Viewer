@@ -48,7 +48,7 @@ async def check(browser, phone):
     await page.locator("#radius-details summary").click()
     await page.locator("#radius-site").select_option("Na1")
     await page.locator("#radius-entry").select_option("1/VIII")
-    radius_model = "atomic" if phone else "crystal"
+    radius_model = "atomic" if phone else "ionic"
     await page.locator("#radius-model").select_option(radius_model)
     await choose_tool(page, "#mode-sites")
     await page.locator("#labels-toggle").check()
@@ -140,8 +140,8 @@ async def check(browser, phone):
     })
     await page.wait_for_function("document.getElementById('project-status').textContent === 'Opened legacy.psv.'")
     legacy = await diagnostics(page)
-    assert legacy["history"]["snapshot"]["atoms"]["radiusModel"] == "ionic"
-    assert {a["element"]: a["radius"] for a in legacy["atoms"]} == {"Na": 1.02, "Cl": 1.81}
+    assert legacy["history"]["snapshot"]["atoms"]["radiusModel"] == "crystal"
+    assert {a["element"]: a["radius"] for a in legacy["atoms"]} == {"Na": 1.16, "Cl": 1.67}
     assert not errors, errors
     await context.close()
     print(f"{'Phone' if phone else 'Desktop'}: portable roundtrip, multiblock CIF, invalid files and autosave passed", flush=True)
