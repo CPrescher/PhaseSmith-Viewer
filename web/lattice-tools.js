@@ -63,6 +63,9 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   const group = new THREE.Group();
   group.name = "lattice-tools";
   scene.add(group);
+  const detectorGroup = new THREE.Group();
+  scene.add(detectorGroup);
+  let detectorPlane = null;
   let planes = [],
     arrows = [],
     nextId = 0;
@@ -76,13 +79,13 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   };
 
   // ---- Rendering ----------------------------------------------------------
-  function disposeGroup() {
-    group.traverse((o) => {
+  function disposeGroup(destination = group) {
+    destination.traverse((o) => {
       if (o.isInstancedMesh) o.dispose();
       o.geometry?.dispose();
       o.material?.dispose?.();
     });
-    group.clear();
+    destination.clear();
   }
   const vec = (frac) => toScene(frac);
   function fan(polygons, positions, colors, color) {
@@ -130,8 +133,8 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     material.depthWrite = opaque;
     mesh.layers.set(opaque ? 0 : PEEL_LAYER);
   }
-  function renderPlanes(structure, ranges) {
-    for (const plane of planes) {
+  function renderPlanes(structure, ranges, items = planes, destination = group) {
+    for (const plane of items) {
       plane.faceMesh = null;
       plane.render = { offsets: [], polygons: [], truncated: false };
       if (plane.error) continue;
@@ -170,7 +173,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       mesh.userData.tool = "plane";
       plane.faceMesh = mesh;
       setFaceOpacity(mesh, plane.opacity);
-      group.add(
+      destination.add(
         mesh,
         new THREE.LineSegments(
           geometryOf(edges),
@@ -180,6 +183,16 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     }
   }
 
+  function drawDetectorPlane() {
+    disposeGroup(detectorGroup);
+    if (detectorPlane && getStructure()) renderPlanes(getStructure(), getRanges(), [detectorPlane], detectorGroup);
+  }
+  function setDetectorPlane(hkl) {
+    if ((hkl?.join(" ") ?? "") === (detectorPlane?.hkl.join(" ") ?? "")) return;
+    detectorPlane = hkl && { hkl, family:true, m:0, size:100, opacity:0.23, visible:true, color:"#db9b37" };
+    drawDetectorPlane();
+    invalidate();
+  }
   function renderArrows(structure) {
     const up = new THREE.Vector3(0, 1, 0);
     for (const arrow of arrows) {
@@ -308,6 +321,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     if (!structure) return;
     const ranges = getRanges();
     renderPlanes(structure, ranges);
+    drawDetectorPlane();
     renderArrows(structure);
     renderSymmetry(structure, ranges);
     refreshReadouts(structure, ranges);
@@ -1325,6 +1339,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
 
   return {
     rebuild,
+    setDetectorPlane,
     updateLabels,
     // Export frames use their own placement history and full canvas. Restore
     // the live history afterward so a movie never changes on-screen labels.
@@ -1463,6 +1478,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       const counts = {};
       for (const e of result?.elements ?? []) counts[elementCategory(e)] = (counts[elementCategory(e)] || 0) + 1;
       return {
+        detectorPlane: detectorPlane && {hkl:detectorPlane.hkl, polygons:detectorPlane.render.polygons.length},
         labels: {
           exporting: exportMode,
           obstacleCount: obstacles.length,

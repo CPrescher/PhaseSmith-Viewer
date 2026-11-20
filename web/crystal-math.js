@@ -41,6 +41,13 @@ const IDENTITY = [
 export const toCartesian = (basis, frac) => matVec(basis, frac);
 
 // ---- Index parsing ----------------------------------------------------------
+// Use crystallographic overbars in labels, including every digit of a negative index.
+export function formatMillerIndices(indices, separator = " ") {
+  return indices.map(value => value < 0
+    ? [...String(-value)].map(digit => digit + "\u0305").join("")
+    : String(value)).join(separator);
+}
+
 /** Miller indices accept signed decimal integers, with spaces required for
  *  multi-digit indices. Three compact single-digit indices are unambiguous. */
 export function parseMillerIndices(text) {

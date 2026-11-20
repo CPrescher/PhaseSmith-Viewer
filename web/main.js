@@ -30,6 +30,9 @@ import { rotatedView } from "./view-rotation.js";
 import { createTurnControls } from "./turn-controls.js";
 import { createStructureLibrary, libraryEntry, libraryFilename, entryForFilename } from "./structure-library.js";
 import { createToolWindows, TOOL_IDS } from "./tool-windows.js";
+import { createDetectorWindow } from "./detector-window.js";
+import { createAnalysisWindow } from "./analysis-window.js";
+import { createReflectionExplorer } from "./reflection-explorer.js";
 import {
   createAppearance,
   clearAppearance,
@@ -148,7 +151,7 @@ function initialize() {
   }
   let controls = createControls();
   function stopMotion() {
-    const { minDistance, maxDistance } = controls;
+    const { minDistance, maxDistance, staticMoving } = controls;
     const target = controls.target.clone();
     const orientation = camera.quaternion.clone();
     controls.dispose();
@@ -159,6 +162,7 @@ function initialize() {
     camera.quaternion.copy(orientation);
     controls.minDistance = minDistance;
     controls.maxDistance = maxDistance;
+    controls.staticMoving = staticMoving;
   }
   // Studio lighting fixed to the view: the lights live in a rig whose
   // orientation follows the rendered camera every frame, so the crystal
@@ -278,6 +282,18 @@ function initialize() {
     // Trackball emits change while damping moves the camera. That event
     // schedules the next frame; once settled, no animation frames remain.
     controls.update();
+    const sweepSpecimen = specimenDragMoved;
+    specimenDragMoved = false;
+    if (detectorLink && detectorLink.rotation.angleTo(camera.quaternion) > 1e-7) {
+      detectorLink.rotation.copy(camera.quaternion);
+      const cameraFromCrystal = [[1,0,0],[0,1,0],[0,0,1]].map(axis =>
+        new THREE.Vector3(...axis).applyQuaternion(camera.quaternion).toArray());
+      updatingFromMain = true;
+      // Trackball maps the canvas width to two radians before rotateSpeed.
+      const degreesPerPixel = THREE.MathUtils.radToDeg(2 * controls.rotateSpeed / controls.screen.width);
+      try { diffractionDetector.rotateSpecimen(cameraFromCrystal, sweepSpecimen ? degreesPerPixel : 0); }
+      finally { updatingFromMain = false; }
+    }
     syncViewCamera();
     syncStudio();
     faceSorter.sync([...faceMeshes.values()], viewCamera);
@@ -645,6 +661,67 @@ function initialize() {
     highlightSite(highlightedSite);
     invalidate();
   }
+  const structureAnalysis = createAnalysisWindow({ getStructure: () => structure, onChange: () => scheduleSave() });
+  const reflectionExplorer = createReflectionExplorer({
+    atomRadius,
+    getStructure: () => structure,
+    onDetector: (hkl, wavelength) => diffractionDetector.open(hkl, wavelength),
+  });
+  let detectorLink = null, updatingFromMain = false, specimenDragMoved = false;
+  renderer.domElement.addEventListener("pointerdown", () => {
+    if (detectorLink) diffractionDetector.beginSpecimenDrag();
+  });
+  renderer.domElement.addEventListener("pointermove", event => {
+    if (detectorLink && event.buttons) specimenDragMoved = true;
+  });
+  function linkDetectorView(pose) {
+    if (!pose && !detectorLink) return;
+    latticeTools.setDetectorPlane(pose?.hkl ?? null);
+    const distance = camera.position.distanceTo(controls.target);
+    if (!pose) {
+      stopMotion();
+      camera.position.copy(detectorLink.eye).multiplyScalar(distance).add(controls.target);
+      camera.up.copy(detectorLink.up);
+      const previousView = detectorLink.active;
+      controls.staticMoving = detectorLink.staticMoving;
+      detectorLink = null;
+      controls.update();
+      setActiveView(previousView?.id ?? null, previousView?.dir);
+      invalidate();
+      return;
+    }
+    const eye = new THREE.Vector3(...pose.eye).normalize();
+    const up = new THREE.Vector3(...pose.up).projectOnPlane(eye).normalize();
+    if (!updatingFromMain && detectorLink?.linkedEye.equals(eye) && detectorLink.linkedUp.equals(up)) return;
+    if (!detectorLink) {
+      stopMotion();
+      detectorLink = {
+        eye: camera.position.clone().sub(controls.target).normalize(),
+        up: camera.up.clone(), active: activeView, rotation: new THREE.Quaternion(),
+        staticMoving: controls.staticMoving,
+      };
+      // A manual specimen turn stops at the orientation where the user lets go.
+      controls.staticMoving = true;
+    }
+    detectorLink.linkedEye = eye;
+    detectorLink.linkedUp = up;
+    if (updatingFromMain) {
+      const currentEye = camera.position.clone().sub(controls.target).normalize();
+      if (currentEye.distanceToSquared(eye) < 1e-20 && camera.up.distanceToSquared(up) < 1e-20) return;
+    }
+    camera.position.copy(eye).multiplyScalar(distance).add(controls.target);
+    camera.up.copy(up);
+    controls.update();
+    detectorLink.rotation.copy(camera.quaternion);
+    setActiveView(null);
+    invalidate();
+  }
+  const diffractionDetector = createDetectorWindow({
+    getStructure: () => structure,
+    onExplain: (hkl, wavelength) => reflectionExplorer.open(hkl, wavelength),
+    onPeak: peak => structureAnalysis.selectDetectorPeak(peak),
+    onMainView: linkDetectorView,
+  });
   const latticeTools = createLatticeTools({
     THREE,
     scene,
@@ -2629,6 +2706,7 @@ function initialize() {
   function display(data) {
     // A new file or data block starts clean: queued rebuilds from the
     // previous document are cancelled and appearance overrides forgotten.
+    linkDetectorView(null);
     structureGeneration++;
     cancelScheduledBuild();
     clearAppearance(appearance);
@@ -2717,6 +2795,9 @@ function initialize() {
     styleEditor.clear();
     renderSiteTable();
     updateAsymmetricNote();
+    structureAnalysis.setStructure();
+    reflectionExplorer.setStructure();
+    diffractionDetector.setStructure();
   }
   const worker = new Worker(new URL("./import-worker.js", import.meta.url), {
     type: "module",
@@ -3419,9 +3500,10 @@ function initialize() {
       asymmetric,
       highlightedSite,
       lattice: latticeTools.exportState(),
+      analysis: structureAnalysis.exportState(),
       camera: {
-        position: camera.position.toArray(),
-        up: camera.up.toArray(),
+        position: detectorLink ? detectorLink.eye.clone().multiplyScalar(camera.position.distanceTo(controls.target)).add(controls.target).toArray() : camera.position.toArray(),
+        up: (detectorLink?.up ?? camera.up).toArray(),
         target: controls.target.toArray(),
         minDistance: controls.minDistance,
         maxDistance: controls.maxDistance,
@@ -3550,6 +3632,7 @@ function initialize() {
       if (atom) targetMeta.set(`poly:${key}`, { label: atom.label, frac: fracText(atom) });
     }
     latticeTools.restoreState(s.lattice, { trusted });
+    structureAnalysis.restoreState(s.analysis);
     highlightSite(null);
     if (typeof s.highlightedSite === "string" && independentSites().some((x) => x.label === s.highlightedSite))
       highlightSite(s.highlightedSite);
