@@ -229,10 +229,19 @@ async def check(browser, width, height, theme):
     await change(offset, 0)
     await choose_tool(page, "#mode-directions")
     await activate(page.locator("#arrow-add"))
+    uvw = page.locator("[data-arrow-id] [data-field=uvw]").first
     if not touch:
-        uvw = page.locator("[data-arrow-id] [data-field=uvw]").first
         await replace_triplet_with_mouse(uvw, "1 -2 0", "1 -2 0")
         assert (await state())["arrows"][0]["uvw"] == [1, -2, 0]
+    for entry, expected, components in [
+        ("110", "1 1 0", [1, 1, 0]),
+        ("1-10", "1 -1 0", [1, -1, 0]),
+        ("12 -0.5 0", "12 -0.5 0", [12, -0.5, 0]),
+    ]:
+        await uvw.fill(entry)
+        await uvw.press("Enter")
+        assert await uvw.input_value() == expected
+        assert (await state())["arrows"][0]["uvw"] == components
     await choose_tool(page, "#mode-lattice")
     before = await state()
     assert any("m=0" in text for text in before["labels"]["anchors"])

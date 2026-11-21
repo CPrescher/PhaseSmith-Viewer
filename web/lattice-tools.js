@@ -1179,6 +1179,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
             const v = parseTriple(text, { label: "components" });
             if (v.every((x) => x === 0)) throw Error("Direction [uvw] must not be zero.");
             arrow.uvw = v;
+            input.value = v.join(" ");
           }),
         );
         uvw.dataset.field = "uvw";
