@@ -22,12 +22,10 @@ npm run dev
 The compiled crystal reader ships in `public/engine.wasm`. To build and serve the viewer and documentation:
 
 ```sh
-npm run build
-npm run docs:build
-python3 -m http.server 4179 --bind 127.0.0.1 --directory dist
+npm run preview
 ```
 
-Open the viewer at `http://127.0.0.1:4179/` and the guide at `http://127.0.0.1:4179/docs/`.
+Open the viewer at `http://127.0.0.1:4216/` and the guide at `http://127.0.0.1:4216/docs/`. Use these server URLs for previews; opening `index.html` directly does not load the application correctly.
 
 ## Documentation
 
