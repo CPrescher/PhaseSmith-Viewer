@@ -10,6 +10,19 @@ from science_smoke import change
 OUT = Path("/tmp/psv-gui-assessment/plane-controls")
 
 
+async def replace_triplet_with_mouse(field, replacement, committed_text):
+    selected_text = "el => el.value.slice(el.selectionStart, el.selectionEnd)"
+    await field.click()
+    assert await field.evaluate(selected_text) == await field.input_value()
+    await field.press_sequentially(replacement)
+    await field.press("Tab")
+    await field.click()
+    await field.click()
+    assert await field.evaluate(selected_text) == ""
+    await field.dblclick()
+    assert await field.evaluate(selected_text) == committed_text
+
+
 async def check(browser, width, height, theme):
     touch = width < 1200
     page = await browser.new_page(
@@ -72,17 +85,8 @@ async def check(browser, width, height, theme):
         await activate(row.locator("button[aria-label^='Remove plane']"))
         await activate(page.locator("#plane-add"))
     else:
-        selected_text = "el => el.value.slice(el.selectionStart, el.selectionEnd)"
-        await hkl.click()
-        assert await hkl.evaluate(selected_text) == await hkl.input_value()
-        await page.keyboard.type("210")
-        await hkl.press("Tab")
+        await replace_triplet_with_mouse(hkl, "210", "2 1 0")
         assert (await state())["planes"][0]["hkl"] == [2, 1, 0]
-        await hkl.click()
-        await hkl.click()
-        assert await hkl.evaluate(selected_text) == ""
-        await hkl.dblclick()
-        assert await hkl.evaluate(selected_text) == "2 1 0"
         assert not await row.locator('.numeric-keys[data-for="hkl"]').is_visible()
     # Compact indices are expanded visibly; letters are rejected as whole edits,
     # including paste/fill paths where beforeinput may not contain the text.
@@ -225,6 +229,10 @@ async def check(browser, width, height, theme):
     await change(offset, 0)
     await choose_tool(page, "#mode-directions")
     await activate(page.locator("#arrow-add"))
+    if not touch:
+        uvw = page.locator("[data-arrow-id] [data-field=uvw]").first
+        await replace_triplet_with_mouse(uvw, "1 -2 0", "1 -2 0")
+        assert (await state())["arrows"][0]["uvw"] == [1, -2, 0]
     await choose_tool(page, "#mode-lattice")
     before = await state()
     assert any("m=0" in text for text in before["labels"]["anchors"])

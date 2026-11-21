@@ -943,6 +943,21 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     input.onchange = () => onCommit(input);
     return input;
   };
+  function enableTripletSelection(input) {
+    let firstMouseClick = false;
+    let mousePress = false;
+    input.addEventListener("pointerdown", (event) => {
+      mousePress = event.pointerType === "mouse" && event.button === 0;
+      firstMouseClick = mousePress && document.activeElement !== input;
+    });
+    input.addEventListener("click", () => {
+      if (firstMouseClick && input.selectionStart === input.selectionEnd) input.select();
+      firstMouseClick = false;
+    });
+    input.addEventListener("dblclick", () => {
+      if (mousePress) input.select();
+    });
+  }
   // Text inputs retain selection support and accept signed, spaced indices;
   // numericEdits enforces the allowed characters independently of the keyboard.
   const numericEdits = (input, pattern) => {
@@ -1045,19 +1060,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         );
         hkl.dataset.field = "hkl";
         hkl.title = "Three integer indices: 123 means 1 2 3. Separate multi-digit indices with spaces; use - for negative indices.";
-        let firstMouseClick = false;
-        let mousePress = false;
-        hkl.addEventListener("pointerdown", (event) => {
-          mousePress = event.pointerType === "mouse" && event.button === 0;
-          firstMouseClick = mousePress && document.activeElement !== hkl;
-        });
-        hkl.addEventListener("click", () => {
-          if (firstMouseClick && hkl.selectionStart === hkl.selectionEnd) hkl.select();
-          firstMouseClick = false;
-        });
-        hkl.addEventListener("dblclick", () => {
-          if (mousePress) hkl.select();
-        });
+        enableTripletSelection(hkl);
         const setHKL = numericEdits(hkl, /^[0-9 -]*$/);
         const m = textField(fmt(plane.m), "Offset m, fractional: plane h·x + k·y + l·z = m; with Parallel planes, planes at m + n", "offset", (input) =>
           commit(input, plane, (text) => {
@@ -1179,6 +1182,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           }),
         );
         uvw.dataset.field = "uvw";
+        enableTripletSelection(uvw);
         const origin = textField(arrow.origin.map(fmt).join(" "), "Arrow origin, fractional x y z", "origin", (input) =>
           commit(input, arrow, (text) => (arrow.origin = parseTriple(text, { label: "coordinates" }))),
         );
