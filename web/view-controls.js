@@ -75,6 +75,16 @@ export class ViewControls extends TrackballControls {
     up.crossVectors(this._eye, right).normalize();
   }
 
+  _rotateCamera() {
+    const dragging = !this._moveCurr.equals(this._movePrev);
+    super._rotateCamera();
+    // The crystal is centered at the scene origin. Rotate the panned camera
+    // target around it by the same step Three just applied to the eye and up.
+    // This preserves the crystal center in screen coordinates during damping too.
+    if (this._lastAngle && (dragging || !this.staticMoving))
+      this.target.applyAxisAngle(this._lastAxis, this._lastAngle);
+  }
+
   _panCamera() {
     const dx = this._panEnd.x - this._panStart.x;
     const dy = this._panEnd.y - this._panStart.y;

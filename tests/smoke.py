@@ -18,6 +18,17 @@ HERE = Path(__file__).resolve().parent
 async def diagnostics(page):
     return await page.evaluate('window.viewerDiagnostics()')
 
+def crystal_center(view):
+    """Project the plotting-range midpoint using two symmetry-related atom images."""
+    sums = [lo + hi for lo, hi in view["ranges"]]
+    atoms = {tuple(round(v, 6) for v in a["frac"]): a for a in view["atoms"]}
+    for a in atoms.values():
+        opposite = tuple(round(s - v, 6) for s, v in zip(sums, a["frac"]))
+        if b := atoms.get(opposite):
+            return [(a[key] + b[key]) / 2 for key in ("x", "y")]
+    raise AssertionError("Fixture needs an atom pair symmetric about the crystal center")
+
+
 async def settle(page):
     await page.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
 

@@ -1,10 +1,10 @@
-"""Right-dragging must keep the grabbed point under the mouse on every move."""
+"""Right-drag anchors the grabbed point, then rotation preserves the crystal center."""
 
 import asyncio
 import math
 from playwright.async_api import async_playwright
 
-from smoke import URL, diagnostics, settle
+from smoke import URL, crystal_center, diagnostics, settle
 
 
 async def run(browser, width, height, dpr):
@@ -22,7 +22,7 @@ async def run(browser, width, height, dpr):
         await page.mouse.move(x, y)
         await page.mouse.down(button="right")
         largest_error = 0
-        for dx, dy in [(17, -8), (78, 47), (112, 31), (-18, -24)]:
+        for dx, dy in [(17, -8), (78, 47), (112, 31), (93, -52)]:
             await page.mouse.move(x + dx, y + dy)
             await settle(page)
             atom = (await diagnostics(page))["atoms"][candidate["id"]]
@@ -42,8 +42,30 @@ async def run(browser, width, height, dpr):
     await page.mouse.wheel(0, -180)
     await page.wait_for_timeout(450)
     errors.append(await drag())
+    before = await diagnostics(page)
+    fixed = crystal_center(before)
+    rotation_drift = []
+    await page.mouse.move(*fixed)
+    await page.mouse.down()
+    for dx, dy in [(70, 10), (110, 80), (50, 110)]:
+        await page.mouse.move(fixed[0] + dx, fixed[1] + dy)
+        await settle(page)
+        rotation_drift.append(math.dist(fixed, crystal_center(await diagnostics(page))))
+    await page.mouse.up()
+    await page.wait_for_timeout(350)
+    after = await diagnostics(page)
+    rotation_drift.append(math.dist(fixed, crystal_center(after)))
+    assert after["camera"]["up"] != before["camera"]["up"], "Drag did not rotate the crystal"
+    await page.locator("#turn-open").click()
+    await settle(page)
+    fixed = crystal_center(await diagnostics(page))
+    for action in ("right", "clockwise"):
+        await page.locator("#turn-" + action).click()
+        await settle(page)
+        rotation_drift.append(math.dist(fixed, crystal_center(await diagnostics(page))))
+    assert max(rotation_drift) < 0.5, f"Crystal center drifted {max(rotation_drift):.2f} CSS pixels"
     await page.close()
-    print(f"{width}×{height} DPR {dpr}: maximum slip {max(errors):.4f} CSS px")
+    print(f"{width}×{height} DPR {dpr}: max pan slip {max(errors):.4f}, max rotation drift {max(rotation_drift):.4f} CSS px")
 
 
 async def main():

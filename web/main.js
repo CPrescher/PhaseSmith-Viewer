@@ -146,7 +146,7 @@ function initialize() {
     next.maxDistance = 1000;
     next.target.copy(target);
     // The constructor looks at its initial origin target. Restore the real
-    // pivot immediately so stopping motion after a pan cannot tilt the view.
+    // target immediately so stopping motion after a pan cannot tilt the view.
     next.update();
     next.addEventListener("change", invalidate);
     // Camera autosave once motion (including damping) has settled.
@@ -1919,9 +1919,9 @@ function initialize() {
       stopMotion();
       camera.up.set(...up);
       camera.position.copy(target).addScaledVector(dir, zoomDistance);
-      // Touch pan and anchored pinch move the pivot. An explicit direction
+      // Touch pan and anchored pinch move the view target. An explicit direction
       // starts from the full structure again, fitted to this canvas aspect.
-      // Translating the pivot and camera together keeps [uvw] exact.
+      // Translating the target and camera together keeps [uvw] exact.
       reset(true);
       setActiveView(viewId, dir);
       $("direction-error").textContent = "";
@@ -2416,7 +2416,7 @@ function initialize() {
       );
       factor = distanceNext / distanceNow;
       if (Math.abs(factor - 1) < 1e-9) return;
-      // Relative to the projected pivot, which sits at the stage centre.
+      // Relative to the view target at the center of the canvas.
       const nx = ((clientX - rect.left) / rect.width) * 2 - 1,
         ny = 1 - ((clientY - rect.top) / rect.height) * 2;
       const halfHeight = distanceNow * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
@@ -3063,8 +3063,7 @@ function initialize() {
   // Discrete step turns (Turn panel). Inertia is cancelled FIRST
   // (stopMotion replaces the controls, so the current `controls` is read
   // afterwards); then camera position/up come from the tested helper.
-  // The pivot (controls.target), zoom distance, atoms, selection and
-  // measurements stay untouched, and nothing keeps moving afterwards.
+  // Rotate the whole camera pose about the crystal center (scene origin).
   function turnView(action, degrees) {
     if (exporter.busy) return; // never touch camera/controls while exporting
     stopMotion();
@@ -3075,6 +3074,7 @@ function initialize() {
       action,
       degrees,
     );
+    controls.target.fromArray(next.target);
     camera.position.fromArray(next.position);
     camera.up.fromArray(next.up);
     controls.update();

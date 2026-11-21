@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from playwright.async_api import async_playwright
 from browser_test_config import QUICK
-from smoke import URL, HERE, diagnostics, settle
+from smoke import URL, HERE, crystal_center, diagnostics, settle
 
 OUT = Path("/tmp/psv-gui-assessment/turn-controls")
 
@@ -102,7 +102,7 @@ async def check(browser, w, h, theme):
         await settle(page)
         after = await diagnostics(page)
         assert math.isclose(angle(eye(before), eye(after)), degrees, abs_tol=1e-6)
-        close(before["camera"]["target"], after["camera"]["target"])
+        close(crystal_center(before), crystal_center(after))
         assert math.isclose(
             math.hypot(*eye(before)), math.hypot(*eye(after)), rel_tol=1e-10
         )

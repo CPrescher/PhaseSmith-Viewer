@@ -27,15 +27,15 @@ test("diagonal turns use exactly the selected angle and retain pivot/zoom", () =
     position = [-4, 3, 17];
   for (const angle of [45, 60, 90, 37.5]) {
     const next = rotatedView(position, start.up, pivot, "up-right", angle);
-    const eye = new Vector3(...next.position).sub(new Vector3(...pivot));
+    const eye = new Vector3(...next.position).sub(new Vector3(...next.target));
     assert.ok(Math.abs(eye.length() - 10) < 1e-10);
     assert.ok(
       Math.abs(MathUtils.radToDeg(eye.angleTo(new Vector3(0, 0, 10))) - angle) <
         1e-9,
     );
-    close(next.position.slice(0, 2), [
-      pivot[0] - (10 * Math.sin(MathUtils.degToRad(angle))) / Math.sqrt(2),
-      pivot[1] - (10 * Math.sin(MathUtils.degToRad(angle))) / Math.sqrt(2),
+    close(eye.toArray().slice(0, 2), [
+      -(10 * Math.sin(MathUtils.degToRad(angle))) / Math.sqrt(2),
+      -(10 * Math.sin(MathUtils.degToRad(angle))) / Math.sqrt(2),
     ]);
     assert.ok(Math.abs(eye.dot(new Vector3(...next.up))) < 1e-10);
   }
@@ -62,19 +62,21 @@ test("inverse turns and complete revolutions preserve arbitrary tilted views", (
     ["clockwise", "counterclockwise"],
   ]) {
     const first = rotatedView(position, up, pivot, forward, 37.5),
-      second = rotatedView(first.position, first.up, pivot, backward, 37.5);
+      second = rotatedView(first.position, first.up, first.target, backward, 37.5);
+    close(second.target, pivot);
     close(second.position, position);
     close(second.up, up);
     for (const angle of [45, 60, 90]) {
-      let current = { position, up };
+      let current = { position, up, target: pivot };
       for (let i = 0; i < 360 / angle; i++)
         current = rotatedView(
           current.position,
           current.up,
-          pivot,
+          current.target,
           forward,
           angle,
         );
+      close(current.target, pivot);
       close(current.position, position);
       close(current.up, up);
     }

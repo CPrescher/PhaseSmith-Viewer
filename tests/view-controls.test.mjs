@@ -100,7 +100,7 @@ test("one finger matches left-mouse rotation without changing pivot or zoom", ()
   const first = finger(1, 350, 280);
   start(touch.controls, first);
   mouse.controls._onMouseDown({ ...first, button: 0 });
-  const target = touch.controls.target.toArray();
+  const center = project(touch.controls, [0, 0, 0]);
   const distance = touch.camera.position.distanceTo(touch.controls.target);
   for (const [x, y] of [[365, 285], [390, 300], [380, 320], [340, 305]]) {
     const event = finger(1, x, y);
@@ -110,7 +110,7 @@ test("one finger matches left-mouse rotation without changing pivot or zoom", ()
     mouse.controls.update();
     close(touch.camera.position.toArray(), mouse.camera.position.toArray());
     close(touch.camera.up.toArray(), mouse.camera.up.toArray());
-    close(touch.controls.target.toArray(), target);
+    close(project(touch.controls, [0, 0, 0]), center);
     assert.ok(Math.abs(touch.camera.position.distanceTo(touch.controls.target) - distance) < 1e-10);
   }
 });
@@ -125,7 +125,7 @@ test("lifting one finger exits pinch and consumes its last movement before rotat
     // Release before the next animation frame, so the last pinch is pending.
     end(controls, finger(released, released === 1 ? 315 : 435, 300));
     const before = camera.position.toArray();
-    const target = controls.target.toArray();
+    const center = project(controls, [0, 0, 0]);
     const distance = camera.position.distanceTo(controls.target);
     controls.update();
     close(camera.position.toArray(), before);
@@ -138,7 +138,7 @@ test("lifting one finger exits pinch and consumes its last movement before rotat
     controls._onTouchMove(finger(remaining, x + 20, 310));
     controls.update();
     assert.notDeepEqual(camera.position.toArray(), before);
-    close(controls.target.toArray(), target);
+    close(project(controls, [0, 0, 0]), center);
     assert.ok(Math.abs(camera.position.distanceTo(controls.target) - distance) < 1e-10);
     assert.equal(controls.state, 3, "remaining finger must be in rotation mode");
     end(controls, finger(remaining, x + 20, 310));

@@ -25,8 +25,8 @@ export function rotatedView(position, up, target, action, degrees) {
   for (const v of [position, up, target])
     if (v.length !== 3 || v.some((x) => !Number.isFinite(x)))
       throw Error("Invalid view coordinates.");
-  const pivot = new Vector3(...target),
-    eye = new Vector3(...position).sub(pivot);
+  const viewTarget = new Vector3(...target),
+    eye = new Vector3(...position).sub(viewTarget);
   if (eye.lengthSq() < 1e-24)
     throw Error("The view needs a nonzero zoom distance.");
   const backward = eye.clone().normalize();
@@ -48,7 +48,8 @@ export function rotatedView(position, up, target, action, degrees) {
     MathUtils.degToRad(degrees),
   );
   return {
-    position: eye.applyQuaternion(turn).add(pivot).toArray(),
+    position: new Vector3(...position).applyQuaternion(turn).toArray(),
+    target: viewTarget.applyQuaternion(turn).toArray(),
     up: screenUp.applyQuaternion(turn).normalize().toArray(),
   };
 }

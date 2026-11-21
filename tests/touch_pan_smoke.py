@@ -4,7 +4,7 @@ import math
 import os
 from playwright.async_api import async_playwright
 from browser_test_config import QUICK
-from smoke import URL, HERE, diagnostics, settle
+from smoke import URL, HERE, crystal_center, diagnostics, settle
 
 
 async def check(browser, width, height, dpi):
@@ -34,9 +34,9 @@ async def check(browser, width, height, dpi):
     async def assert_rotation(before):
         after = await diagnostics(page)
         camera = after["camera"]
-        assert math.dist(camera["target"], before["target"]) < 1e-9, "One finger moved the rotation center"
+        assert math.dist(crystal_center(after), crystal_center(before)) < 0.5, "One finger moved the rotation center"
         distance = lambda c: math.dist(c["position"], c["target"])
-        assert math.isclose(distance(camera), distance(before), rel_tol=1e-9), "One finger changed zoom"
+        assert math.isclose(distance(camera), distance(before["camera"]), rel_tol=1e-9), "One finger changed zoom"
         assert not after["selectedIds"], "Rotation picked an atom"
         return camera
 
@@ -63,7 +63,7 @@ async def check(browser, width, height, dpi):
         # Off-center one-finger drags rotate without carrying the model along.
         # Repeat after a pan/pinch to catch stale samples crossing gestures.
         async def rotate():
-            before = (await diagnostics(page))["camera"]
+            before = await diagnostics(page)
             await send("touchStart", [{"x": cx, "y": cy, "id": 1}])
             for dx, dy in [(8, 4), (20, 10), (30, 18), (12, 8)]:
                 await send("touchMove", [{"x": cx + dx, "y": cy + dy, "id": 1}])
@@ -72,7 +72,7 @@ async def check(browser, width, height, dpi):
             await send("touchEnd", [])
             await page.wait_for_timeout(350)
             after = await assert_rotation(before)
-            assert math.dist(after["position"], before["position"]) > 1e-3, "One finger did not rotate"
+            assert math.dist(after["position"], before["camera"]["position"]) > 1e-3, "One finger did not rotate"
 
         await rotate()
         for pinch in (False, True):
@@ -164,7 +164,7 @@ async def check(browser, width, height, dpi):
     await send("touchMove", remaining)
     await settle(page)
     assert (await diagnostics(page))["camera"] != before["camera"]
-    await assert_rotation(before["camera"])
+    await assert_rotation(before)
     await send("touchEnd", [])
     assert not errors, errors
     print(f"{width}×{height}, DPI {dpi}: max pan/pinch/twist slip {largest_error:.4f} CSS px", flush=True)
