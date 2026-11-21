@@ -759,6 +759,15 @@ h2 {
   color: var(--faint);
   font-size: 13px;
 }
+.delete-button::before {
+  content: "";
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin-inline: auto;
+  background: currentColor;
+  mask: url("./trash.svg") center / contain no-repeat;
+}
 .chip-row:empty {
   display: none;
 }

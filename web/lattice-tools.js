@@ -1013,7 +1013,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     return wrap;
   };
   const removeButton = (label, onClick) => {
-    const b = make("button", { type: "button", className: "icon-button", textContent: "✕", title: label });
+    const b = make("button", { type: "button", className: "icon-button delete-button", title: label });
     b.setAttribute("aria-label", label);
     b.onclick = onClick;
     return b;

@@ -1045,8 +1045,7 @@ function initialize() {
         }
         const remove = make("button", {
           type: "button",
-          className: "icon-button",
-          textContent: "✕",
+          className: "icon-button delete-button",
         });
         remove.onclick = () => {
           rules = rules.filter((r) => r !== rule);
@@ -1431,7 +1430,7 @@ function initialize() {
           up.setAttribute("aria-label", `Increase ${name} cutoff by 0.1 Å`);
           done.setAttribute("aria-label", `Close ${name} cutoff slider`);
           remove.setAttribute("aria-label", `Delete ${name} pair`);
-          remove.title = `Delete ${name}`;
+          remove.title = `Delete ${name} pair`;
           toggles.bonds.setAttribute("aria-label", `${name} bonds`);
           toggles.polyhedra.setAttribute("aria-label", `${name} polyhedra`);
           opacityInput.setAttribute(
