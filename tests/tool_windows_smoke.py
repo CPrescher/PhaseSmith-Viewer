@@ -201,7 +201,7 @@ async def interaction_details(browser, phone=False):
   base=await diagnostics(page);head=await win.locator('.tool-window-title').bounding_box()
   await page.mouse.move(head['x']+20,head['y']+10);await page.mouse.down();await page.mouse.move(head['x']-100,head['y']+50,steps=6);await page.mouse.up();await settle(page)
   unchanged(base,await diagnostics(page))
-  grip=await win.locator('.window-grip').bounding_box();await page.mouse.move(grip['x']+grip['width']-4,grip['y']+grip['height']-4);await page.mouse.down();await page.mouse.move(grip['x']+grip['width']+20,grip['y']+grip['height']+20,steps=5);await page.mouse.up();await settle(page)
+  grip=await win.locator('.window-grip:not(.window-grip-left)').bounding_box();await page.mouse.move(grip['x']+grip['width']-4,grip['y']+grip['height']-4);await page.mouse.down();await page.mouse.move(grip['x']+grip['width']+20,grip['y']+grip['height']+20,steps=5);await page.mouse.up();await settle(page)
   unchanged(base,await diagnostics(page))
  # Lattice changes must retain row bounds and per-tool scroll on return.
  await choose_tool(page,'#mode-lattice',phone)

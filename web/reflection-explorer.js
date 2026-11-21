@@ -71,6 +71,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
             <label class="reflection-steps">Phase groups <output id="reflection-count"></output><input id="reflection-step" type="range" min="0" max="1" value="1" aria-label="Number of contributions in the sum" /></label>
             <div class="reflection-step-buttons"><button type="button" id="reflection-step-back">Previous group</button><button type="button" id="reflection-step-next">Next group</button><button type="button" id="reflection-all">Show all</button></div>
             <p id="reflection-total" aria-live="polite"></p>
+            <p class="hint" id="reflection-tag-note" hidden>Some ×N labels are hidden to avoid overlap. The table lists every phase group and its position count.</p>
             <p class="hint" id="reflection-sum-note"></p>
           </div>
           <div id="reflection-rays-panel" hidden>
@@ -400,6 +401,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     const chart = $("reflection-phasors"), width = chart.clientWidth, height = 245;
     if (!width) return;
     chart.replaceChildren();
+    $("reflection-tag-note").hidden = true;
     const realOnly = result.groups.every(contribution => Math.abs(contribution.imaginary) < Math.max(1, result.scale) * 1e-10);
     $("reflection-sum-note").textContent = realOnly
       ? "All imaginary components are zero. Rows separate the arrows for visibility; vertical spacing has no phase meaning. Every arrow uses the same length scale."
@@ -435,6 +437,12 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     // Draw the selected contribution last so exact overlapping arrows remain inspectable.
     const visible = result.groups.slice(0, count);
     const ordered = visible.filter(contribution => contribution.index !== selectedGroup()).concat(visible.filter(contribution => contribution.index === selectedGroup()));
+    const labels = [];
+    let hiddenLabels = 0;
+    const total = count ? result.groups[count - 1].end : [0, 0];
+    // Reserve the resultant label too: it can share an endpoint with a group.
+    text(axisLabels, Math.min(width - 10, Math.max(10, x(total[0]) + 9)), Math.max(28, y(total[1]) - 12), count === result.groups.length ? "F" : "Partial F", x(total[0]) > width - 80 ? "end" : "start");
+    const axisBounds = [...axisLabels.querySelectorAll("text")].map(label => label.getBBox());
     for (const contribution of ordered) {
       const color = $("reflection-colors").value === "phase" ? `#${phaseColor(contribution.cycles).getHexString()}` : elementColor(contribution.element);
       const start = [x(contribution.start[0]), y(contribution.start[1])], end = [x(contribution.end[0]), y(contribution.end[1])];
@@ -443,17 +451,21 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
       const hit = line(chart, ...start, ...end, "transparent", 13);
       hit.dataset.group = contribution.index;
       if (contribution.members.length > 1) {
-        const label = text(chart, (start[0] + end[0]) / 2, (start[1] + end[1]) / 2 - 6, `×${contribution.members.length}`);
-        label.dataset.group = contribution.index;
+        const lx = (start[0] + end[0]) / 2, ly = (start[1] + end[1]) / 2 - 6;
+        const touchesAxis = axisBounds.some(r => lx + 16 > r.x - 4 && lx - 16 < r.x + r.width + 4 && ly + 4 > r.y - 4 && ly - 12 < r.y + r.height + 4);
+        if (!touchesAxis && !labels.some(p => Math.abs(p[0] - lx) < 28 && Math.abs(p[1] - ly) < 16)) {
+          const label = text(chart, lx, ly, `×${contribution.members.length}`);
+          label.dataset.group = contribution.index;
+          labels.push([lx, ly]);
+        } else hiddenLabels++;
       }
       svg(hit, "title", {}, `${groupName(contribution)} · ${format(contribution.cycles * 360)}° · ${format(Math.hypot(contribution.real, contribution.imaginary))} e`);
     }
-    const total = count ? result.groups[count - 1].end : [0, 0];
+    $("reflection-tag-note").hidden = hiddenLabels === 0;
     // The resultant sits below the atomic arrows with a small endpoint marker.
     const resultant = line(chart, x(0), y(0), x(total[0]), y(total[1]), "var(--text)", 1.5, "4 3");
     resultant.style.pointerEvents = "none";
     svg(chart, "circle", { cx: x(total[0]), cy: y(total[1]), r: 4, fill: "var(--text)", "pointer-events": "none" });
-    text(chart, Math.min(width - 10, Math.max(10, x(total[0]) + 9)), Math.max(28, y(total[1]) - 12), count === result.groups.length ? "F" : "Partial F", x(total[0]) > width - 80 ? "end" : "start");
     chart.append(axisLabels);
     updateSumReadout(chart);
   }

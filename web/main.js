@@ -30,6 +30,7 @@ import { createExporter, validDpi } from "./export.js";
 import { sceneExportBounds } from "./export-framing.js";
 import { createFaceSorter } from "./face-sort.js";
 import { createDepthPeeler } from "./peel.js";
+import { createLiveAntialias } from "./live-antialias.js";
 import { rotatedView } from "./view-rotation.js";
 import { createTurnControls } from "./turn-controls.js";
 import { createStructureLibrary, libraryEntry, libraryFilename, entryForFilename } from "./structure-library.js";
@@ -56,6 +57,19 @@ for (const type of ["gesturestart", "gesturechange"])
   document.addEventListener(type, (event) => event.preventDefault(), {
     passive: false,
   });
+for (const input of document.querySelectorAll('#analysis-file, #detector-poni, #detector-orientation-file')) {
+  const picker = document.createElement("div"), button = document.createElement("button"), name = document.createElement("span");
+  picker.className = "file-picker";
+  button.type = "button";
+  button.textContent = "Choose file…";
+  button.setAttribute("aria-label", `Choose ${input.id === "analysis-file" ? "measured powder trace" : input.id === "detector-poni" ? "PONI calibration" : "PhaseSmith JSON"} file`);
+  button.onclick = () => input.click();
+  name.textContent = "No file chosen";
+  input.addEventListener("change", () => name.textContent = input.files?.[0]?.name || "No file chosen");
+  input.hidden = true;
+  input.after(picker);
+  picker.append(button, name);
+}
 function initialize() {
   let renderer;
   try {
@@ -277,11 +291,17 @@ function initialize() {
     angle = null,
     measureMode = "info";
   scene.add(selectionGroup);
+  const liveAntialias = createLiveAntialias(renderer);
+  const livePixelRatio = (width, height) => Math.min(window.devicePixelRatio || 1, 2,
+    Math.sqrt(4_000_000 / Math.max(1, width * height)));
   function render(exportView) {
     frame = 0;
     if (!exportView?.crop) {
-      // Supersample translucent face edges on standard-density displays.
-      const scale = THREE.MathUtils.clamp(window.devicePixelRatio, 1.5, 2);
+      // Keep native display detail within the live pixel budget; FXAA smooths
+      // translucent edges without forcing extra supersampling on low-DPI screens.
+      // Bound live pixels: each transparency layer otherwise multiplies the
+      // full-screen Retina workload. Export frames use their own resolution.
+      const scale = livePixelRatio(viewport.clientWidth, viewport.clientHeight);
       if (renderer.getPixelRatio() !== scale) renderer.setPixelRatio(scale);
     }
     // Trackball emits change while damping moves the camera. That event
@@ -319,7 +339,10 @@ function initialize() {
         // them into the cropped frame after drawing the rendered geometry.
         syncViewCamera();
       }
-    } else peeler.render(scene, viewCamera);
+    } else {
+      peeler.render(scene, viewCamera);
+      liveAntialias.render();
+    }
     updateViewReadout();
     if (labelsOn || shownLabels) updateLabels();
     latticeTools.updateLabels(viewCamera, renderer.domElement);
@@ -437,7 +460,9 @@ function initialize() {
   renderer.domElement.addEventListener("wheel", invalidate, { passive: true });
   const resize = new ResizeObserver(() => {
     const { width, height } = viewport.getBoundingClientRect();
-    renderer.setSize(width, height);
+    // Resize and set density together so entering full screen never allocates
+    // a transient, oversized buffer at the previous smaller view's density.
+    renderer.setDrawingBufferSize(width, height, livePixelRatio(width, height));
     controls.handleResize();
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
@@ -2878,7 +2903,9 @@ function initialize() {
     $("warnings").dataset.full = warnings.join(" ");
     $("warnings").dataset.summary = warnings.map(warning => listedSetting(warning)
       ? "Symmetry uses the operations listed in this CIF; its other space-group definitions differ."
-      : warning).join(" ");
+      : warning.startsWith("invalid space-group definition")
+        ? "One space-group description in this CIF could not be recognized. Check the original CIF messages and the reported symmetry before interpreting the structure."
+        : warning).join(" ");
     $("warnings").dataset.informational = String(warnings.length > 0 && warnings.every(listedSetting));
     $("warnings").textContent = $("warnings").dataset.summary;
     $("warnings").title = warnings.join(" ");
@@ -3131,7 +3158,7 @@ function initialize() {
   function applyRanges(next) {
     try {
       next = validateRanges(next);
-      // Blur-commit followed by Apply submits the same bounds twice; an
+      // Enter, change and blur may commit the same bounds more than once; an
       // unchanged extent needs no rebuild or refit.
       if (next.every((r, i) => r[0] === plotRanges[i][0] && r[1] === plotRanges[i][1])) {
         writeRanges();
@@ -3158,12 +3185,21 @@ function initialize() {
       ),
     );
   };
-  // Committing a bound (Enter, blur or stepper) applies the extent directly;
-  // the Apply button remains for explicit submission.
-  for (const input of document.querySelectorAll("#range-form input"))
-    input.addEventListener("change", () => {
-      if (structure) $("range-form").requestSubmit();
+  // Committing a bound (Enter, blur or stepper) applies the extent directly.
+  for (const input of document.querySelectorAll("#range-form input")) {
+    const commit = () => { if (structure) $("range-form").requestSubmit(); };
+    input.addEventListener("change", commit);
+    // Native change compares against the value when focus began. Enter can
+    // commit an intermediate value, so returning to that original value still
+    // needs an explicit blur commit to keep the scene in sync.
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        if (structure) $("range-form").requestSubmit();
+      }
     });
+  }
   $("range-reset").onclick = () => {
     if (structure) applyRanges(defaultRanges());
   };
@@ -3270,6 +3306,7 @@ function initialize() {
       })),
       translucentFaces: faceSorter.diagnostics(),
       transparency: peeler.diagnostics(),
+      rendering: { width: renderer.domElement.width, height: renderer.domElement.height, pixelRatio: renderer.getPixelRatio(), antialias: "FXAA" },
       appearance: {
         elements: Object.fromEntries(appearance.elements),
         atomOverrides: appearance.atoms.size,
@@ -3932,7 +3969,7 @@ function initialize() {
     if (control?.dataset.turn) return "Turn crystal";
     if (target.closest("#pair-rules") || id === "add-rule") return id === "add-rule" ? "Add pair" : control?.dataset.field === "cutoff" || target.closest(".cutoff-tuner") ? "Change pair cutoff" : "Edit pair";
     if (target.closest("#style-editor")) return id.startsWith("style-reset") ? "Reset style" : "Change style";
-    if (target.closest("#range-form") || id === "range-reset" || id === "range-apply") return "Change extent";
+    if (target.closest("#range-form") || id === "range-reset") return "Change extent";
     if (id.startsWith("plane-") || target.closest("#plane-list")) return "Edit plane";
     if (id.startsWith("arrow-") || target.closest("#arrow-list")) return "Edit arrow";
     if (id.startsWith("sym-") || target.closest("#sym-controls")) return "Change symmetry display";

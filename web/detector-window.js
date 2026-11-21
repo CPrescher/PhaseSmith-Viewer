@@ -16,7 +16,7 @@ import {
   transpose,
 } from "./detector-orientation.js";
 import { cameraAxes, ewaldCamera } from "./ewald-camera.js";
-import { floatingDialog, isFrontDialog, resizeFromLowerLeft } from "./floating-dialog.js";
+import { floatingDialog, isFrontDialog } from "./floating-dialog.js";
 
 const millimeters = (value) => (Math.abs(value) < 0.005 ? 0 : value).toFixed(2);
 
@@ -29,7 +29,6 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   const win = $("window"),
     opener = document.getElementById("mode-detector");
   const show = floatingDialog(win, opener, $("head"), close);
-  resizeFromLowerLeft(win, $("resize-left"));
   let panel = null,
     pendingCalibration = null,
     calibrationVersion = 0,
@@ -87,7 +86,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
     };
   }
   function revealCrystal(on) {
-    const controlsTop = document.querySelector(".view-bottom")?.getBoundingClientRect().top || innerHeight - 80;
+    const controlsTop = document.querySelector("#view-readout")?.getBoundingClientRect().top || document.querySelector(".view-bottom")?.getBoundingClientRect().top || innerHeight - 80;
     win.style.setProperty("--linked-bottom", `${innerHeight - controlsTop + 12}px`);
     win.classList.toggle("showing-crystal", on);
     $("reveal").textContent = on ? "Show detector" : "Show crystal";
@@ -440,12 +439,13 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   }
   opener.onclick = () => win.open ? (isFrontDialog(win) ? close() : show()) : open();
   $("close").onclick = close;
+  let optionsParentLayout = null;
   const showOptions = floatingDialog($("options"), $("open-options"), $("options").querySelector("header"), () => $("options").close());
   $("open-options").onclick = () => {
     if ($("options").open) return $("options").close();
     const placeAutomatically = $("options").dataset.userMoved !== "true";
     showOptions();
-    if (placeAutomatically && innerWidth >= 1100) {
+    if (placeAutomatically && innerWidth >= 1000) {
       // Keep most of the live detector visible while its geometry is edited.
       const rect = win.getBoundingClientRect(), right = rect.right + 12;
       const limit = document.getElementById("tool-rail").getBoundingClientRect().left - 8;
@@ -457,6 +457,17 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
         $("options").style.left = (rightSpace >= leftSpace ? right : rect.left - width - 12) + "px";
       } else $("options").style.left = "8px";
       $("options").style.top = Math.max(8, rect.top) + "px";
+    } else if (placeAutomatically && innerWidth >= 740 && innerHeight > 500) {
+      // Temporarily narrow the tablet inspector so both windows, including
+      // the diagram tabs and both headers, remain usable side by side.
+      const limit = document.getElementById("tool-rail").getBoundingClientRect().left - 12;
+      const width = Math.min(360, limit - 324);
+      optionsParentLayout = { left: win.style.left, width: win.style.width, temporaryWidth: width, viewport: innerWidth };
+      win.style.left = "12px";
+      win.style.width = width + "px";
+      $("options").style.width = "300px";
+      $("options").style.left = (width + 24) + "px";
+      $("options").style.top = win.getBoundingClientRect().top + "px";
     } else if (placeAutomatically) {
       $("options").style.left = "8px";
       $("options").style.top = "8px";
@@ -464,6 +475,15 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   };
   $("options-done").onclick = () => $("options").close();
   $("options").onclose = () => {
+    if (optionsParentLayout) {
+      const prior = optionsParentLayout;
+      // Respect a subsequent manual drag/resize, or a screen-size change.
+      if (innerWidth === prior.viewport && win.style.left === "12px" && win.style.width === prior.temporaryWidth + "px") {
+        win.style.left = prior.left;
+        win.style.width = prior.width;
+      }
+      optionsParentLayout = null;
+    }
     if (win.open) $("open-options").focus({ preventScroll: true });
   };
   $("form").onsubmit = (event) => {

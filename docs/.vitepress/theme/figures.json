@@ -5,12 +5,12 @@
     "display": 740,
     "regions": [
       {
-        "x": 1083,
+        "x": 1006,
         "y": 3,
-        "width": 184,
+        "width": 261,
         "height": 50,
         "number": 1,
-        "text": "Library and File"
+        "text": "Library, Open file and project menu"
       },
       {
         "x": 9,
@@ -29,10 +29,10 @@
         "text": "Info, Distance, Angle and Clear"
       },
       {
-        "x": 1191,
-        "y": 120,
-        "width": 72,
-        "height": 567,
+        "x": 1195,
+        "y": 194,
+        "width": 68,
+        "height": 469,
         "number": 4,
         "text": "Tool rail"
       },
@@ -79,19 +79,24 @@
     "display": 600
   },
   "file-controls": {
-    "width": 194,
+    "width": 271,
     "height": 58,
     "display": 420,
     "labels": [
       {
-        "x": 54.3671875,
+        "x": 54.2890625,
         "y": 46,
         "text": "Library"
       },
       {
-        "x": 151.9375,
+        "x": 165.3984375,
+        "y": 46,
+        "text": "Open file"
+      },
+      {
+        "x": 241.0,
         "y": 50,
-        "text": "File"
+        "text": "Project menu"
       }
     ]
   },
@@ -159,17 +164,17 @@
   },
   "project": {
     "width": 376,
-    "height": 309,
+    "height": 265,
     "display": 420
   },
   "pair-distances": {
-    "width": 776,
-    "height": 784,
+    "width": 426,
+    "height": 552,
     "display": 680
   },
   "powder": {
-    "width": 776,
-    "height": 784,
+    "width": 426,
+    "height": 552,
     "display": 680
   },
   "phone": {
@@ -261,18 +266,18 @@
     "display": 740
   },
   "tutorial-powder-settings": {
-    "width": 776,
-    "height": 784,
+    "width": 426,
+    "height": 552,
     "display": 680
   },
   "tutorial-powder-sticks": {
-    "width": 776,
-    "height": 784,
+    "width": 426,
+    "height": 552,
     "display": 680
   },
   "tutorial-powder-broadened": {
-    "width": 776,
-    "height": 784,
+    "width": 426,
+    "height": 552,
     "display": 680
   }
 }

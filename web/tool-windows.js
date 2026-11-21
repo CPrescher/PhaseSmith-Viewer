@@ -205,6 +205,8 @@ export function validateState(raw) {
 // ---- DOM window manager -----------------------------------------------------
 
 const ICONS = {
+  fold: '<path d="M4 5h16M7 14l5-5 5 5M12 9v11"/>',
+  expand: '<path d="M4 5h16M7 14l5 5 5-5M12 9v10"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
 };
 const svg = (paths) =>
@@ -266,15 +268,7 @@ export function createToolWindows(options) {
       head.append(add);
     }
     if (tool.id === "style") head.append(document.getElementById("style-pick"));
-    if (tool.id === "extent") {
-      const apply = document.querySelector("#range-form button[type=submit]");
-      apply.setAttribute("form", "range-form");
-      apply.textContent = "Apply axes";
-      apply.title = "Apply all three fractional cell ranges";
-      apply.id = "range-apply";
-      head.append(apply);
-    }
-    const compact = button("compact", "Compact", "Compact", "compact-button");
+    const compact = button("compact", "Compact", svg(ICONS.fold), "compact-button");
     compact.hidden = true;
     compact.onclick = () => {
       if (compactHeights.has(tool.id)) compactHeights.delete(tool.id);
@@ -292,14 +286,22 @@ export function createToolWindows(options) {
     grip.setAttribute("aria-hidden", "true");
     grip.title = "Resize";
     el.append(grip);
+    const gripLeft = grip.cloneNode();
+    gripLeft.classList.add("window-grip-left");
+    gripLeft.title = "Resize from bottom left";
+    el.append(gripLeft);
     el.setAttribute("aria-labelledby", title.id);
     el.setAttribute("role", "region");
-    windows.set(tool.id, { tool, el, body, head, title, buttons: { tune, compact, close }, grip, scroll: 0, tuneScroll: null });
+    windows.set(tool.id, { tool, el, body, head, title, buttons: { tune, compact, close }, grip, gripLeft, scroll: 0, tuneScroll: null });
 
     tune.onclick = () => toggleTune(tool.id);
     close.onclick = () => closeWindow(tool.id, true);
     head.addEventListener("pointerdown", (e) => startDrag(e, tool.id, "move"));
     grip.addEventListener("pointerdown", (e) => startDrag(e, tool.id, "resize"));
+    gripLeft.addEventListener("pointerdown", (e) => startDrag(e, tool.id, "resize-left"));
+    body.addEventListener("click", e => {
+      if (!e.target.closest("input, select, textarea, button, a, summary, [tabindex]")) title.focus({ preventScroll: true });
+    });
     head.addEventListener("dblclick", (e) => {
       if (profile !== "float" || e.target.closest("button")) return;
       commit(moveTool(state, tool.id, null)); // back to its default place
@@ -456,7 +458,7 @@ export function createToolWindows(options) {
     const win = windows.get(tool);
     e.preventDefault();
     const r = currentRect(tool);
-    if (kind === "resize") compactHeights.delete(tool);
+    if (kind.startsWith("resize")) compactHeights.delete(tool);
     drag = { tool, kind, id: e.pointerId, x: e.clientX, y: e.clientY, r, next: r, target: e.currentTarget };
     e.currentTarget.setPointerCapture?.(e.pointerId);
     win.el.classList.add(kind === "move" ? "moving" : "resizing");
@@ -466,6 +468,12 @@ export function createToolWindows(options) {
     const dx = e.clientX - drag.x,
       dy = e.clientY - drag.y;
     const r = drag.r;
+    if (drag.kind === "resize-left") {
+      const w = Math.max(MIN_W, Math.min(r.x + r.w - MARGIN, r.w - dx));
+      drag.next = { x: r.x + r.w - w, y: r.y, w, h: Math.max(MIN_H, Math.min(ws.height - MARGIN - r.y, r.h + dy)) };
+      place(windows.get(drag.tool).el, drag.next);
+      return;
+    }
     let next =
       drag.kind === "move"
         ? { ...r, x: r.x + dx, y: r.y + dy }
@@ -488,8 +496,8 @@ export function createToolWindows(options) {
     windows.get(tool).el.classList.remove("moving", "resizing");
     commit(moveTool(state, tool, anchorRect(clampRect(next, ws), ws)));
   }
-  for (const { head, grip } of windows.values())
-    for (const el of [head, grip]) {
+  for (const { head, grip, gripLeft } of windows.values())
+    for (const el of [head, grip, gripLeft]) {
       el.addEventListener("pointermove", dragMove);
       el.addEventListener("pointerup", dragEnd);
       el.addEventListener("pointercancel", dragEnd);
@@ -522,7 +530,9 @@ export function createToolWindows(options) {
       const view = viewport.getBoundingClientRect();
       const top = document.querySelector(".measure-row").getBoundingClientRect().bottom - view.top + 8;
       const bottom = view.bottom - document.querySelector(".axis-compass").getBoundingClientRect().top + 8;
-      rail.style.maxHeight = `${Math.max(80, ws.height - top - bottom)}px`;
+      const available = Math.max(80, ws.height - top - bottom);
+      rail.classList.toggle("rail-dense", available < 680);
+      rail.style.maxHeight = `${available}px`;
       const height = rail.getBoundingClientRect().height;
       rail.style.top = `${Math.max(top, Math.min((ws.height - height) / 2, ws.height - bottom - height))}px`;
     } else {
@@ -578,7 +588,8 @@ export function createToolWindows(options) {
       const fold = naturalHeight(win) >= r.h - 48;
       const action = compacted ? "Expand" : fold ? "Fold" : "Compact";
       win.buttons.compact.hidden = tuning;
-      win.buttons.compact.textContent = action;
+      win.buttons.compact.innerHTML = svg(compacted ? ICONS.expand : ICONS.fold);
+      win.buttons.compact.setAttribute("aria-expanded", String(!compacted));
       win.buttons.compact.title = compacted ? "Restore the full panel height" : fold
         ? "Fold controls into the header to reveal the crystal" : "Fit this panel to its content; keep the crystal stationary";
       win.buttons.compact.setAttribute("aria-label", `${action} ${win.tool.title} panel`);

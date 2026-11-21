@@ -28,7 +28,7 @@ On a touchscreen, one finger rotates the crystal. Two fingers can also twist to 
 
 ## Plotting extent
 
-Open **Extent** on the right-hand tool rail, or **Tools → Extent** on a phone. Edit the lower and upper coordinate fields, then click **Apply axes** in the panel header.
+Open **Extent** on the right-hand tool rail, or **Tools → Extent** on a phone. Edit the lower and upper coordinate fields. Changes apply when you press Enter or leave a field.
 
 <ViewerFigure name="extent" alt="Extent window with a, b and c plotting-range fields and the Apply button." />
 

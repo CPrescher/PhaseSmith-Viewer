@@ -6,7 +6,7 @@ Both calculations use the **full symmetry-expanded unit cell**. The displayed ex
 
 ## Pair distances
 
-In the **Plot dropdown at the top of the window**, choose **Pair distances**, set the lower and upper distance limits, and optionally select an element pair. On compact screens, expand **Plot settings · range and appearance** to edit the limits. The defaults are **0–6 Å**, all atom pairs, and a grouping tolerance of **0.001 Å**.
+Choose **Distances** from the tools, set the lower and upper distance limits, and optionally select an element pair. On compact screens, expand **Plot settings · range and appearance** to edit the limits. The defaults are **0–6 Å**, all atom pairs, and a grouping tolerance of **0.001 Å**.
 
 Each line represents a distance group. Its position is the mean distance, and its height counts **unordered geometric pairs per unit cell**. Periodic neighbors are included automatically, including pairs across cell faces and nonzero translations of a site onto itself.
 
@@ -32,7 +32,7 @@ The maximum distance is **30 Å**. A large structure or range can exceed the wor
 
 ## Powder diffraction (X-ray)
 
-Choose **Powder** from the tools, or use the **Plot dropdown** to choose **Powder diffraction (X-ray)**, then set:
+Choose **Powder** from the tools, then set:
 
 | Setting | Default | Meaning |
 | --- | --- | --- |

@@ -16,7 +16,7 @@ The right-hand rail is vertically centered where it fits, shifting upward only t
 
 | Group | Location | What to do there |
 | --- | --- | --- |
-| **1 · Files** | Upper-right header, above the crystal | Open the Library or use File to load a structure or save/open a project. |
+| **1 · Files** | Upper-right header, above the crystal | Open the Library or use Open file to load a structure and the adjacent three-dot menu to save/open a project. |
 | **2 · View** | Upper left inside the crystal | Look along a, b, c or [uvw]; open Turn for exact rotations. |
 | **3 · Measurements** | Upper right inside the crystal, below the header | Choose Info, Distance, or Angle, then select atoms. |
 | **4 · Tools** | Vertical rail at the right edge | Grouped structure, analysis, appearance/output and Help tools. |
@@ -57,8 +57,10 @@ Tap **Tools** to reveal the labeled menu shown below, then choose the tool. Its 
 
 ## When a control is out of sight
 
-Scroll **inside the open settings window** to see its lower sections. Export, for example, has movie controls below the PNG settings. Project files and local saves are in the header’s File menu. Use **Compact** when a panel has unused space; **Expand** restores its full height. This changes only the panel, not the camera. A **Tune** view shows only the last edited item; choose **All settings** to restore the full editor. Close or switch the tool from the rail/menu to reach another set of settings. Choosing a settings tool closes the science windows while retaining their values, so the selected controls are immediately reachable. Close a panel temporarily to reach atoms behind it, then reopen it to continue editing.
+Scroll **inside the open settings window** to see its lower sections. Export, for example, has movie controls below the PNG settings. Project files and local saves are in the header’s three-dot menu. Use **Compact** when a panel has unused space; the **Expand** icon restores its full height. This changes only the panel, not the camera. A **Tune** view shows only the last edited item; choose **All settings** to restore the full editor. Close or switch the tool from the rail/menu to reach another set of settings. Choosing a settings tool closes the science windows while retaining their values, so the selected controls are immediately reachable. Close a panel temporarily to reach atoms behind it, then reopen it to continue editing.
 
 The crystal stays in place while you open and switch tools. Drag on the crystal to rotate it; drag inside a scrollable panel to scroll its settings on touch screens.
 
-Dense panels offer **Fold** to leave only their header visible while you inspect or measure the crystal. **Expand** restores the panel without moving the structure. In a phone science window, **Tools** moves into its header so it cannot cover results.
+Dense panels offer a **Fold** icon to leave only their header visible while you inspect or measure the crystal. The **Expand** icon restores the panel without moving the structure. In a phone science window, **Tools** moves into its header so it cannot cover results.
+
+Floating tool windows can be resized from either bottom corner. Phone sheets adapt to the available space automatically.

@@ -72,12 +72,10 @@
         </button>
         <button id="library-open" class="view-button" aria-label="Structure library" title="Structure library" aria-haspopup="dialog" aria-controls="structure-library"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M12 7c-3-3-6-3-9-2v14c3-1 6-1 9 2 3-3 6-3 9-2V5c-3-1-6-1-9 2Z"/><path d="M12 7v14"/></svg><span>Library</span></button>
 
-        <button id="file-menu-button" class="primary" popovertarget="file-menu" title="Open a structure, save a project, or manage this device">File ▾</button>
+        <button id="open" class="primary" aria-label="Open structure or project file" title="Open a CIF structure or a saved .psv project">Open<span class="open-kind"> file</span></button>
+        <button id="file-menu-button" class="view-button" popovertarget="file-menu" aria-label="Project and session menu" title="Project and session menu">⋯</button>
         <div id="file-menu" class="file-menu" popover aria-label="Structure and project files">
           <section>
-        <button id="open" class="secondary" aria-label="Open structure or project file" title="Open a CIF structure or a saved .psv project">
-          Open structure…</button
-        >
                   <div class="section-title session-title">
               <h2 id="project-title">Project file</h2>
             </div>
@@ -775,8 +773,7 @@
                       />
                     </div>
                     <div class="range-actions">
-                      <button type="submit" class="primary">Apply all axes</button
-                      ><button
+                      <button
                         type="button"
                         id="range-reset"
                         class="secondary"
@@ -910,9 +907,7 @@
       </header>
       <div class="analysis-body">
         <form id="analysis-form">
-          <label class="analysis-view">Plot
-            <select id="analysis-mode"><option value="distances">Pair distances</option><option value="powder">Powder diffraction (X-ray)</option></select>
-          </label>
+          <input id="analysis-mode" type="hidden" value="distances" />
           <details id="analysis-settings" class="tool-options" open><summary>Plot settings · range and appearance</summary>
           <div id="analysis-distance-fields" class="analysis-fields">
             <label>From (Å)<input id="analysis-rMin" type="number" min="0" max="30" step="any" value="0" required /></label>
@@ -925,6 +920,7 @@
             <label>From 2θ (°)<input id="analysis-twoThetaMin" type="number" min="0.1" max="170" step="any" value="5" required /></label>
             <label>To 2θ (°)<input id="analysis-twoThetaMax" type="number" min="0.1" max="170" step="any" value="90" required /></label>
             <label class="analysis-pair-field">Peak FWHM (° 2θ; 0 = sticks)<input id="analysis-fwhm" type="number" min="0" max="2" step="any" value="0.15" required /></label>
+            <p class="hint" style="grid-column: 1 / -1; margin: 0">Selecting a reflection in Detector synchronizes the wavelength and extends this plot’s range to include it.</p>
           </div>
           </details>
         </form>

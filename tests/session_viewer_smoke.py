@@ -106,7 +106,7 @@ async def run(profile):
         # Repeated cells, customized plane, arrow, labels and symmetry.
         await page.locator("#mode-extent").click()
         await page.locator("#range-c-max").fill("2")
-        await page.locator("#range-apply").click()
+        await page.locator("#range-c-max").press("Enter")
         await page.locator("#mode-lattice").click()
         await page.locator("#plane-add").click()
         row = page.locator("[data-plane-id]").first

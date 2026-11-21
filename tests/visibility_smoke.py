@@ -40,7 +40,7 @@ async def run(browser_type, touch):
     await settle(page)
     await click_control(page, page.locator("#mode-extent"), touch)
     await page.locator("#range-b-max").fill("2")
-    await click_control(page, page.locator('#range-apply'), touch)
+    await page.locator('#range-b-max').press('Tab')
     await click_control(page, page.locator("#mode-pairs"), touch)
     # Start from a deliberately changed zoom, so a silent refit is detectable.
     canvas = page.locator("canvas").first

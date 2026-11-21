@@ -23,8 +23,7 @@ async def check(browser, width, height):
     )
     await page.wait_for_function("window.viewerDiagnostics().block==='1000053'")
     if width > 500:
-        await choose_tool(page, "#mode-analysis")
-        await page.select_option("#analysis-mode", "powder")
+        await choose_tool(page, "#mode-powder")
         await page.wait_for_selector(
             "#analysis-chart .analysis-stick", state="attached"
         )
@@ -164,6 +163,13 @@ async def check(browser, width, height):
         gap = await page.evaluate("""() => document.querySelector('#detector-window').getBoundingClientRect().bottom
           - document.querySelector('#detector-scope').getBoundingClientRect().bottom""")
         assert gap < 36, gap
+        # The laptop inspector starts beside the crystal at the left edge.
+        # Move it inward so a leftward resize has actual viewport space.
+        title = await page.locator("#detector-title").bounding_box()
+        await page.mouse.move(title["x"] + 8, title["y"] + 8)
+        await page.mouse.down()
+        await page.mouse.move(title["x"] + 88, title["y"] + 8, steps=4)
+        await page.mouse.up()
         box = await win.bounding_box()
         handle = await page.locator("#detector-resize-left").bounding_box()
         x, y = handle["x"] + 6, handle["y"] + handle["height"] - 6
@@ -202,10 +208,10 @@ async def check(browser, width, height):
     await page.click("#reflection-close")
     await page.click("#detector-next")
     assert await page.locator("#detector-image .detector-hit").count()
-    if width < 500:
+    if await page.locator('[data-detector-view="image"]').is_visible():
         await page.locator('[data-detector-view="image"]').click()
     await page.locator("#detector-image .detector-hit").first.click()
-    if width < 500:
+    if await page.locator('[data-detector-view="ewald"]').is_visible():
         await page.locator('[data-detector-view="ewald"]').click()
     await page.fill("#detector-hkl", "1 0 0")
     await page.locator("#detector-hkl").press("Enter")

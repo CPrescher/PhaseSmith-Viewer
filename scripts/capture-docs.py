@@ -80,7 +80,7 @@ async def main():
             return page
         page = await scene()
         await capture(page, 'interface', regions=[
-            (['#library-open','#file-menu-button'],'Library and File'),
+            (['#library-open','#open','#file-menu-button'],'Library, Open file and project menu'),
             (['.view-directions'],'View directions and Turn'),
             (['.measure-row'],'Info, Distance, Angle and Clear'),
             (['#tool-rail'],'Tool rail'),
@@ -88,7 +88,7 @@ async def main():
         ])
         await capture(page, 'measurements', ['.measure-row'], labels=[('#measure-info','Info'),('#measure-distance','Distance'),('#measure-angle','Angle'),('#clear','Clear')], display=520)
         await capture(page, 'view-controls', ['.view-directions'], display=600)
-        await capture(page, 'file-controls', ['#library-open','#file-menu-button'], labels=[('#library-open','Library'),('#file-menu-button','File')], display=420)
+        await capture(page, 'file-controls', ['#library-open','#open','#file-menu-button'], labels=[('#library-open','Library'),('#open','Open file'),('#file-menu-button','Project menu')], display=420)
         await capture(page, 'visibility', ['.atoms-bar'], labels=[('label:has(#show-atoms)','Atoms'),('label:has(#show-polyhedra)','Polyhedra'),('#elements','Elements'),('#size','Size')], display=620)
         await page.locator('#mode-pairs').click()
         await capture(page,'forsterite')
@@ -108,7 +108,7 @@ async def main():
         await page.locator('#mode-analysis').click()
         await page.wait_for_function("document.querySelector('#analysis-table tbody tr')")
         await capture(page,'pair-distances',['#analysis-window'],display=680)
-        await page.locator('#analysis-mode').select_option('powder')
+        await page.locator('#mode-powder').click()
         await page.wait_for_function("document.querySelector('#analysis-table th')?.textContent === '2θ (°)'")
         await capture(page,'powder',['#analysis-window'],display=680)
         await page.close()

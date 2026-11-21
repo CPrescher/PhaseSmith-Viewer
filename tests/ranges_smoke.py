@@ -74,9 +74,7 @@ async def run(browser_type, touch):
     async def bound(axis, end, value):
         control = page.locator(f"#range-{axis}-{end}")
         await control.fill(str(value))
-        await click_control(
-            page, page.locator('#range-apply'), touch
-        )
+        await control.press('Enter')
         await settle(page)
 
     await bound("b", "max", 3)

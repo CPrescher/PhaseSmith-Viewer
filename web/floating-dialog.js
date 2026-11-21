@@ -26,10 +26,20 @@ export function floatingDialog(win, opener, handle, close) {
   const files = document.createElement("button");
   files.type = "button";
   files.className = "window-button science-file";
-  files.textContent = "File";
-  files.title = "Save or open a project";
+  files.textContent = "⋯";
+  files.title = "Project and session menu";
+  files.setAttribute("aria-label", files.title);
   files.setAttribute("popovertarget", "file-menu");
   handle.insertBefore(files, handle.lastElementChild);
+  let grip = win.querySelector("#detector-resize-left");
+  if (!grip) {
+    grip = document.createElement("div");
+    win.append(grip);
+  }
+  grip.classList.add("science-resize-left");
+  grip.title = "Resize from bottom left";
+  grip.setAttribute("aria-hidden", "true");
+  resizeFromLowerLeft(win, grip);
   const front = () => {
     const index = windows.indexOf(win);
     if (index >= 0) windows.splice(index, 1);
@@ -43,7 +53,10 @@ export function floatingDialog(win, opener, handle, close) {
     const right = document.getElementById("app")?.dataset.launcher === "rail"
       ? rail.getBoundingClientRect().left - 8 : innerWidth - 8;
     win.style.left = Math.max(8, Math.min(r.left, right - r.width)) + "px";
-    win.style.top = Math.max(8, Math.min(r.top, innerHeight - r.height - 8)) + "px";
+    const headerBottom = innerWidth >= 1000 && innerHeight > 600
+      ? document.querySelector("#app > header").getBoundingClientRect().bottom + 8 : 8;
+    win.style.maxHeight = `${innerHeight - headerBottom - 8}px`;
+    win.style.top = Math.max(headerBottom, Math.min(r.top, innerHeight - win.offsetHeight - 8)) + "px";
   }
   let drag = null;
   handle.onpointerdown = (event) => {
@@ -101,10 +114,10 @@ export function floatingDialog(win, opener, handle, close) {
     front();
     opener.setAttribute("aria-expanded", "true");
     if (!win.style.left) {
-      if (innerWidth >= 1360 && innerHeight >= 700 && ["analysis-window", "detector-window"].includes(win.id)) {
+      if (innerWidth >= 1000 && innerHeight > 600 && ["analysis-window", "detector-window"].includes(win.id)) {
         // Wide screens have room for a scientific inspector beside the
         // centered crystal. Only the window changes; the camera stays fixed.
-        win.style.width = Math.min(520, Math.round(innerWidth * 0.32)) + "px";
+        win.style.width = Math.max(360, Math.min(520, Math.round(innerWidth * 0.32))) + "px";
         const controlsTop = document.querySelector(".view-bottom")?.getBoundingClientRect().top || innerHeight - 80;
         win.style.height = Math.min(win.offsetHeight, Math.max(300, controlsTop - 196)) + "px";
         win.style.left = "12px";
@@ -134,6 +147,7 @@ export function resizeFromLowerLeft(win, handle) {
   };
   handle.onpointermove = (e) => {
     if (!start || !handle.hasPointerCapture(e.pointerId)) return;
+    win.dataset.userMoved = "true";
     const { rect, x, y } = start;
     win.style.width = Math.max(0, Math.min(rect.right - 8, rect.width + x - e.clientX)) + "px";
     win.style.height = Math.max(0, Math.min(innerHeight - rect.top - 8, rect.height + e.clientY - y)) + "px";

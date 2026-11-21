@@ -97,7 +97,7 @@ async def check(browser, width, height, theme):
     assert not await page.locator("#analysis-results").is_visible(), "invalid settings must clear stale results"
     await page.locator("#analysis-rMin").fill("0")
     await ready(page, rows=3)
-    await page.locator("#analysis-mode").select_option("powder")
+    await choose_tool(page, "#mode-powder")
     await page.locator("#file").set_input_files(HERE.parent / "public/structures/copper-fcc.cif")
     await page.wait_for_function("window.viewerDiagnostics().block !== 'analysis_cube'")
     await ready(page, column="2θ (°)", rows=3)
@@ -153,7 +153,7 @@ async def check(browser, width, height, theme):
         assert "observed.xy" in await fresh.inner_text("#analysis-file-status")
         await fresh.close()
         await page.locator("#reflection-close").click()
-    await page.locator("#analysis-mode").select_option("distances")
+    await choose_tool(page, "#mode-analysis")
     await ready(page)
     # Range and element filter are rebuilt for a freshly loaded structure.
     await page.locator("#file").set_input_files(HERE.parent / "public/examples/forsterite.cif")

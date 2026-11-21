@@ -6,9 +6,9 @@ This short walkthrough uses forsterite, Mg₂SiO₄, to introduce the main contr
 
 [Open forsterite in the viewer](https://cprescher.github.io/PhaseSmith-Viewer/?example=forsterite). This address loads the bundled structure with Si–O and Mg–O pairs already configured. It starts the example even if the browser has a different saved session.
 
-The **Library** and **File** controls are in the **header at the upper right**, above the crystal. Library browses bundled structures. Choose **File → Open structure…** to load a CIF, or **File → Open project** for a saved `.psv` scene.
+The **Library** and **Open file** controls are in the **header at the upper right**, above the crystal. Library browses bundled structures. Choose **Open file** to load a CIF, or **⋯ → Open project** for a saved `.psv` scene.
 
-<ViewerFigure name="file-controls" alt="Library and File controls in the upper-right header." />
+<ViewerFigure name="file-controls" alt="Library, Open file and project menu controls in the upper-right header." />
 
 ## 2. Look around
 
@@ -44,11 +44,11 @@ The measurement uses the particular displayed copies you select. Rotate the crys
 
 ## 5. Save your work
 
-Choose **File → Save project** in the header.
+Choose **⋯ → Save project** in the header.
 
-<ViewerFigure name="project" alt="Header File menu with Save project and Open project." caption="Projects preserve the editable scene. Export contains image and movie output." />
+<ViewerFigure name="project" alt="Header project menu with Save project and Open project." caption="Projects preserve the editable scene. Export contains image and movie output." />
 
-Keep the downloaded `.psv` file: it contains the original CIF and the viewer settings. Open it later with **File → Open project**, including on another device.
+Keep the downloaded `.psv` file: it contains the original CIF and the viewer settings. Open it later with **⋯ → Open project**, including on another device.
 
 For an image, use the PNG controls in **Export**. A picture preserves the appearance; a project preserves the interactive scene.
 

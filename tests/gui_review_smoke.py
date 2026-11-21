@@ -59,7 +59,12 @@ async def check(browser,w,h,theme):
         restored=await page.locator('#tool-window-lattice').bounding_box()
         assert restored==before
     await choose_tool(page,'#mode-extent')
-    assert await hit(page.locator('#range-apply'))
+    assert await page.locator('#range-apply').count() == 0
+    field = page.locator('#range-a-max')
+    await field.fill('2'); await field.press('Enter')
+    assert len((await diagnostics(page))['atoms']) == 92
+    await field.fill('1'); await field.press('Tab')
+    assert len((await diagnostics(page))['atoms']) == 51, 'blur after returning to the original focus value must update the scene'
     if h<500 or w<500:
         for axis in 'abc':
             for bound in ['min','max']:
@@ -70,6 +75,7 @@ async def check(browser,w,h,theme):
     assert await hit(page.locator('#export-png'))
     await page.locator('#tool-window-export [data-action=close]').click()
     await choose_tool(page,'#mode-analysis')
+    assert not await page.locator('#analysis-mode').is_visible(), 'mode is chosen from the tool launcher, without a duplicate selector'
     await page.wait_for_selector('#analysis-chart .analysis-stick',state='attached')
     if w==1440:
         assert await hit(page.locator('#show-atoms')) and await hit(page.locator('#size')), 'wide inspectors must leave bottom controls reachable'

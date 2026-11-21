@@ -1,12 +1,12 @@
 # Files and structure library
 
-Use **Library** or the **File** menu in the upper-right header, above the crystal view. Choose **File → Open structure…** for a CIF or **File → Open project** for a saved scene.
+Use **Library** or the **Open file** button in the upper-right header, above the crystal view. Choose **Open file** for a CIF or **⋯ → Open project** for a saved scene.
 
-<ViewerFigure name="file-controls" alt="Library and File controls in the header." />
+<ViewerFigure name="file-controls" alt="Library, Open file and project menu controls in the header." />
 
 ## Open a structure
 
-Choose **File → Open structure…** in the header and select a CIF. The file is read on your device, parsed by the PhaseSmith WebAssembly engine, and expanded using its crystallographic symmetry. If the file contains several data blocks, use the block selector in the header to choose the structure.
+Choose **Open file** in the header and select a CIF. The file is read on your device, parsed by the PhaseSmith WebAssembly engine, and expanded using its crystallographic symmetry. If the file contains several data blocks, use the block selector in the header to choose the structure.
 
 A CIF must contain atomic coordinates and a usable cell. A file containing only measured diffraction intensities has no atomic structure to display. Import errors leave the current scene in place.
 

@@ -46,7 +46,7 @@ async def main():
                 assert await page.locator("#analysis-chart .analysis-stick").count() > 0
                 assert await page.locator("#analysis-legend [data-pair]").count() > 0
                 assert await page.locator('#analysis-pair option[value="Na–Cl"]').count() == 1
-                await page.locator("#analysis-mode").select_option("powder")
+                await page.locator("#mode-powder").click()
                 await page.wait_for_function("document.querySelector('#analysis-table th')?.textContent === '2θ (°)'")
                 await page.locator("#analysis-close").click()
             if example == "forsterite":

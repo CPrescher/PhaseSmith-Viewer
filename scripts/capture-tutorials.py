@@ -110,8 +110,7 @@ async def main():
         assert abs(second['d']*2-first['d']) < 1e-9
         await capture(page,'planes-222')
         await page.locator('#mode-lattice').click()
-        await page.locator('#mode-analysis').click()
-        await page.locator('#analysis-mode').select_option('powder')
+        await page.locator('#mode-powder').click()
         await page.wait_for_function("document.querySelector('#analysis-table th')?.textContent === '2θ (°)' && document.querySelector('#analysis-chart .analysis-profile')")
         await capture(page,'powder-settings',selectors=['#analysis-window'],display=680)
         await page.locator('#analysis-fwhm').fill('0')

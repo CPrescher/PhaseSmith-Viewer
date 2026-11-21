@@ -76,6 +76,8 @@ export function createStructureInfo() {
       const summary = document.createElement("p");
       summary.textContent = structure.warnings.map(warning => warning.startsWith("space-group definitions disagree:") && warning.includes("explicit_operations")
         ? "Symmetry uses the operations listed in this CIF; its other space-group definitions differ."
+        : warning.startsWith("invalid space-group definition")
+        ? "One space-group description in this CIF could not be recognized. Check the original CIF messages and the reported symmetry before interpreting the structure."
         : warning).join(" ");
       const original = document.createElement("details"), label = document.createElement("summary"), messages = document.createElement("p");
       label.textContent = "Original CIF messages";

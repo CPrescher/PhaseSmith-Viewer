@@ -65,10 +65,10 @@ async def check(browser, width, height):
         assert [float(await fields.nth(i).input_value()) for i in (0, 1)] == [1.8, 2.3]
     await page.locator(".cutoff-tuner:visible .done-button").tap()
     await choose_tool(page, "#mode-extent", True)
-    for selector in ["#range-b-max", "#range-c-max", '#range-apply']:
+    for selector in ["#range-b-max", "#range-c-max"]:
         assert await on_screen(page.locator(selector)), (width, height, selector)
     await page.locator("#range-b-max").fill("2")
-    await page.locator('#range-apply').tap()
+    await page.locator('#range-b-max').press('Enter')
     await settle(page)
     assert (await diagnostics(page))["ranges"][1] == [0, 2]
     assert await page.evaluate("window.scrollY") == 0

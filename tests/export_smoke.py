@@ -167,8 +167,8 @@ async def check(browser):
             """()=>{const c=document.querySelector('#viewport canvas');const r=c.getBoundingClientRect();
             return {w:c.width,h:c.height,cw:r.width,ch:r.height};}"""
         )
-        assert abs(canvas["w"] - canvas["cw"] * 1.5) <= 1, canvas
-        assert abs(canvas["h"] - canvas["ch"] * 1.5) <= 1, canvas
+        assert abs(canvas["w"] - canvas["cw"]) <= 1, canvas
+        assert abs(canvas["h"] - canvas["ch"]) <= 1, canvas
         assert await page.locator("#export-video").is_enabled()
         print("Movie decoded", metadata)
     else:

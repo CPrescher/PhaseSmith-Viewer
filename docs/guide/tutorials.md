@@ -76,7 +76,7 @@ Restore the upper **b** limit to **3** and press **Enter**. Choose **Turn** in t
 
 ### 1. Load the rock-salt model
 
-Download the [ideal rock-salt CIF](https://cprescher.github.io/PhaseSmith-Viewer/example.cif), then load it with **File → Open structure…** in the upper-right header of the [viewer](https://cprescher.github.io/PhaseSmith-Viewer/).
+Download the [ideal rock-salt CIF](https://cprescher.github.io/PhaseSmith-Viewer/example.cif), then load it with **Open file** in the upper-right header of the [viewer](https://cprescher.github.io/PhaseSmith-Viewer/).
 
 <ViewerFigure name="tutorial-rock-salt-start" alt="The ideal sodium chloride structure loaded in the viewer before adding lattice planes." caption="Start with the NaCl model and its cubic unit-cell outline. No plane family has been added yet." />
 
