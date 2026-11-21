@@ -35,6 +35,9 @@ async def main():
             await expect(page.locator('#name')).to_have_text('NaCl')
             await expect(page.locator('#space-group-symbol')).to_have_text('Fm3\u0305m')
             await page.locator('#library-open').click()
+            if phone:
+                await expect(page.locator('#library-close')).to_be_focused()
+                await page.locator('#library-search').tap()
             await expect(page.locator('#library-search')).to_be_focused()
             await expect(page.locator('.library-select')).to_have_count(52)
             await page.locator('#library-search').fill('zinc blende')

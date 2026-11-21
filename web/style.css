@@ -3649,7 +3649,8 @@ body:fullscreen, body:-webkit-full-screen { width: 100%; height: 100%; backgroun
 
 .launcher-choices:not([popover]) { display: contents; }
 .launcher-choices[popover]:popover-open {
-  display: grid; position: fixed; inset: auto; margin: 0; padding: 3px; gap: 2px;
+  display: flex; flex-direction: column; position: fixed; inset: auto; margin: 0; padding: 3px; gap: 2px;
+  height: max-content;
   width: 68px; overflow: visible; border: 1px solid var(--overlay-line); border-radius: 10px;
   background: var(--popover-bg); color: var(--overlay-text); box-shadow: 0 4px 14px var(--shadow);
 }

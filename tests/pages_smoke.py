@@ -10,6 +10,28 @@ URL = os.environ.get("VIEWER_URL", "http://127.0.0.1:4181/PhaseSmith-Viewer").rs
 )
 
 
+async def check_tablet_library(page):
+    await page.set_viewport_size({"width": 1024, "height": 700})
+    for group in ("overlay", "analysis"):
+        trigger = page.locator(f"#{group}-menu")
+        await trigger.tap()
+        choices = page.locator(f"#{group}-choices")
+        box = await choices.bounding_box()
+        assert box and box["height"] <= 8 + 54 * await choices.locator("button").count()
+        await trigger.tap()
+
+    await page.locator("#library-open").tap()
+    assert await page.locator("#library-close").evaluate("b => b === document.activeElement")
+    await page.get_by_role("button", name="Open Aragonite", exact=True).tap()
+    await page.wait_for_function("window.viewerDiagnostics().coordination.rules.some(r => r.center === 'C')")
+    await choose_tool(page, "#mode-pairs")
+    row = page.locator('.pair-rule').filter(has=page.locator('[data-field="center"] option[value="C"]:checked'))
+    await row.locator('[data-field="polyhedra"]').tap()
+    rule = await page.evaluate("window.viewerDiagnostics().coordination.rules.find(r => r.center === 'C')")
+    assert rule["counts"] == [3] and rule["polyhedronCount"] == rule["centerCount"] > 0
+    assert all(shell["faceCount"] == 1 and shell["edgeCount"] == 3 for shell in rule["environments"])
+
+
 async def main():
     async with async_playwright() as p:
         options = {"args": ["--enable-unsafe-swiftshader"]}
@@ -79,6 +101,7 @@ async def main():
                 assert not await page.evaluate(
                     "document.scrollingElement.scrollWidth>innerWidth"
                 )
+                await check_tablet_library(page)
             assert not errors, errors
             print(
                 f"{example or 'NaCl'}: production assets, PhaseSmith WASM and viewer passed",

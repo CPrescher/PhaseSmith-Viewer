@@ -21,6 +21,7 @@ export function createStructureLibrary({ onSelect, isBusy }) {
   const dialog = document.getElementById('structure-library');
   const opener = document.getElementById('library-open');
   const search = document.getElementById('library-search');
+  const close = document.getElementById('library-close');
   const collection = document.getElementById('library-collection');
   const results = document.getElementById('library-results');
   const count = document.getElementById('library-count');
@@ -78,10 +79,13 @@ export function createStructureLibrary({ onSelect, isBusy }) {
   opener.onclick = () => {
     if (isBusy()) return;
     render();
+    // Choose initial focus before opening so touch browsers never focus a
+    // text field until the user taps Search.
+    close.autofocus = navigator.maxTouchPoints > 0;
+    search.autofocus = !close.autofocus;
     dialog.showModal();
-    search.focus();
   };
-  document.getElementById('library-close').onclick = () => dialog.close();
+  close.onclick = () => dialog.close();
   dialog.addEventListener('click', (event) => {
     if (event.target !== dialog) return;
     const r = dialog.getBoundingClientRect();
