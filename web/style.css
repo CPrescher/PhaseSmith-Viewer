@@ -3139,6 +3139,15 @@ button.element[aria-pressed="false"] .dot {
 .reflection-options[open] { flex-basis: 100%; }
 .reflection-options[open] > summary { width: fit-content; }
 .reflection-options:not([open]) #reflection-wavelength { visibility: hidden; }
+@media (max-width: 640px) and (min-height: 501px) {
+  /* Keep harmonic navigation and the closed options disclosure on one
+     row, leaving the phase-step buttons above the fixed result footer. */
+  .reflection-toolbar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .reflection-toolbar > button { justify-self: start; }
+  .reflection-harmonics { margin-right: 0; }
+  .reflection-options[open] { grid-column: 1 / -1; }
+  .reflection-options:not([open]) > summary { font-size: 12px; padding-inline: 6px; }
+}
 /* Keep the desktop setup row open and in place. */
 @media (min-width: 901px) and (min-height: 501px) {
   .reflection-options { display: contents; }

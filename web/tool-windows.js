@@ -384,7 +384,8 @@ export function createToolWindows(options) {
     }
   });
 
-  function choose(tool, { focus = false } = {}) {
+  function choose(tool, { focus = false, expand = false } = {}) {
+    if (expand) compactHeights.delete(tool);
     commit(chooseTool(state, tool));
     if (focus) windows.get(tool)?.title.focus({ preventScroll: true });
   }
@@ -584,6 +585,9 @@ export function createToolWindows(options) {
         r = { ...r, y: profile === "sheet" ? r.y + r.h - h : r.y, h };
       }
       place(win.el, r);
+      // A header-only folded panel has no free corner for resizing: the
+      // grips would intercept Close and the title. Expand restores them.
+      win.grip.hidden = win.gripLeft.hidden = r.h <= win.head.getBoundingClientRect().height + 2;
       const compacted = compactHeights.has(id);
       const fold = naturalHeight(win) >= r.h - 48;
       const action = compacted ? "Expand" : fold ? "Fold" : "Compact";

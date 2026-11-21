@@ -2286,7 +2286,7 @@ function initialize() {
   // Distance (2 atoms) · Angle (3) · Info (1). Each mode starts a fresh selection.
   $("inspect-neighbors").onclick = () => {
     if (!selection[0]) return;
-    toolWindows.choose("sites");
+    toolWindows.choose("sites", { expand: true });
     highlightSite(selection[0].label);
     $("shell-summary").scrollIntoView({block:"nearest"});
   };
@@ -3536,6 +3536,7 @@ function initialize() {
       // compass keep the right edge; sheets stay below the rail.
       const view = viewport.getBoundingClientRect();
       const row = document.querySelector(".measure-row").getBoundingClientRect();
+      const details = document.querySelector(".measure-details").getBoundingClientRect();
       const rail = $("tool-rail").getBoundingClientRect();
       const bottomControls = [".view-bottom", "#view-readout", ".axis-compass", "#tools-menu"]
         .map(selector => document.querySelector(selector)).filter(element => !element.classList.contains("in-science"))
@@ -3547,7 +3548,7 @@ function initialize() {
         paletteTop: row.bottom - view.top + 6 + cardMax + 10,
         railColumn: 92,
         railBottom: $("app").dataset.launcher === "rail" && rail.height ? rail.bottom - view.top : 0,
-        sheetTop: row.bottom - view.top + 6 + 88 + 8,
+        sheetTop: Math.max(row.bottom + 6 + 88, details.bottom) - view.top + 8,
         sideTop: row.bottom - view.top + 6,
         bottomGap: 40,
         sheetBottomGap: bottomGap,
@@ -3561,6 +3562,11 @@ function initialize() {
     },
     onChange: () => scheduleSave(),
   });
+  // Picking an atom can add the neighbor shortcut while a phone sheet is
+  // already open. Keep its header below the actual card, including after
+  // a label wraps or the selection is cleared; never move the camera.
+  const measurementResize = new ResizeObserver(() => toolWindows.layout());
+  measurementResize.observe(document.querySelector(".measure-details"));
 
   // Choosing a settings tool reveals its controls even when a science
   // window covers that area. Closing a window preserves its values.

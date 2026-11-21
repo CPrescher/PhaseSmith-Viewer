@@ -63,8 +63,16 @@ async def check(browser, w, h, touch):
     camera = (await diagnostics(page))["camera"]
     await act(neighbors)
     assert await page.locator("#tool-window-sites").is_visible()
+    expanded = await page.locator("#tool-window-sites").bounding_box()
+    await act(page.locator('#tool-window-sites [data-action=compact]'))
+    await act(neighbors)
+    assert await page.locator("#tool-window-sites").bounding_box() == expanded, 'View neighbors must reveal the data even if Sites was folded'
     assert (await page.locator("#shell-summary").inner_text()).startswith("A · CN")
     assert (await diagnostics(page))["camera"] == camera
+    assert await hit(page.locator('#tool-window-sites [data-action=compact]'))
+    assert await hit(page.locator('#tool-window-sites [data-action=close]'))
+    await act(neighbors)
+    assert await page.locator("#tool-window-sites").is_visible()
     await act(page.locator('#tool-window-sites [data-action=close]'))
     await blank()
     await count(0)
@@ -158,7 +166,7 @@ async def main():
                     )
                 )[-1]
                 browser = await p.webkit.launch(executable_path=str(exe))
-            for w, h, touch in [(1440, 900, False), (390, 844, True)]:
+            for w, h, touch in [(1440, 900, False), (390, 844, True), (375, 667, True)]:
                 await check(browser, w, h, touch)
             await browser.close()
 

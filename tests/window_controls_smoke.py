@@ -41,6 +41,18 @@ async def main():
      await resize_left(page,'#tool-window-'+tool,'#tool-window-'+tool+' .window-grip-left')
      # Each test starts at the default rectangle, through the documented reset.
      await page.locator('#tool-window-'+tool+' .tool-window-title').dblclick()
+     panel=page.locator('#tool-window-'+tool)
+     box=await panel.bounding_box();grip=await panel.locator('.window-grip:not(.window-grip-left)').bounding_box()
+     await page.mouse.move(grip['x']+grip['width']-4,grip['y']+grip['height']-4);await page.mouse.down()
+     await page.mouse.move(grip['x']+grip['width']-4,box['y']+180,steps=8);await page.mouse.up()
+     await panel.locator('[data-action=compact]').click()
+     assert (await panel.bounding_box())['height'] <= (await panel.locator('.tool-window-head').bounding_box())['height']+3
+     assert await hit(panel.locator('[data-action=close]')), 'Folded panel grips must not cover Close'
+     await panel.locator('[data-action=close]').click();assert not await panel.is_visible()
+     await choose_tool(page,'#style-open' if tool=='style' else '#mode-'+tool)
+     await panel.locator('[data-action=compact]').click()
+     assert await panel.locator('.window-grip-left').is_visible(), 'Expand must restore corner resizing'
+     await panel.locator('.tool-window-title').dblclick()
     await page.locator('#tool-window-style [data-action=close]').click()
     await choose_tool(page,'#mode-sites')
     body=await page.locator('#tool-window-sites .tool-window-body').bounding_box()

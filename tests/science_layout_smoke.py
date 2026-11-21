@@ -52,6 +52,12 @@ async def check(browser, w, h):
         assert await page.locator('#reflection-tag-note').is_visible()
         slider=page.locator('#reflection-step')
         assert await hit(slider), 'Phase slider must fit before the explanation note'
+        footer=await page.locator('.reflection-intensity').bounding_box()
+        for selector in ['#reflection-step-back','#reflection-step-next','#reflection-all']:
+            button=page.locator(selector)
+            box=await button.bounding_box()
+            assert box['y']+box['height']<=footer['y'], 'Whole phase-step buttons must fit above the footer'
+            assert await hit(button)
         original=await slider.bounding_box()
         await slider.press('Home'); await settle(page)
         assert not await page.locator('#reflection-tag-note').is_visible()
