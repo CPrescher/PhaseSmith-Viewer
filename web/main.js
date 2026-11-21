@@ -1416,7 +1416,6 @@ function initialize() {
         function label() {
           const name = pairName(rule);
           card.setAttribute("aria-label", `${name} pair`);
-          card.dataset.tuneName = `${name} pair`;
           inputs.center.setAttribute("aria-label", `${name} center element`);
           inputs.neighbor.setAttribute("aria-label", `${name} neighbor element`);
           inputs.cutoff.setAttribute(
@@ -1446,7 +1445,6 @@ function initialize() {
         // moves and the counts stay visible while the cutoff changes.
         const slot = make("div", { className: "pair-slot" });
         slot.append(sub, tuner);
-        card.dataset.tuneItem = `rule:${rule.id}`;
         card.append(main, cutoffMessage, slot, counts);
         return card;
       }),

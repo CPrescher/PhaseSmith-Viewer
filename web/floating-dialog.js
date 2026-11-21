@@ -1,3 +1,5 @@
+import { addResizeEdges, resizedRect } from "./panel-resize.js";
+
 // Modeless science windows share focus order, dragging, and Escape.
 const windows = [];
 export function isFrontDialog(win) {
@@ -37,15 +39,6 @@ export function floatingDialog(win, opener, handle, close) {
   files.setAttribute("aria-label", files.title);
   files.setAttribute("popovertarget", "file-menu");
   handle.insertBefore(files, handle.lastElementChild);
-  let grip = win.querySelector("#detector-resize-left");
-  if (!grip) {
-    grip = document.createElement("div");
-    win.append(grip);
-  }
-  grip.classList.add("science-resize-left");
-  grip.title = "Resize from bottom left";
-  grip.setAttribute("aria-hidden", "true");
-  resizeFromLowerLeft(win, grip);
   const front = () => {
     const index = windows.indexOf(win);
     if (index >= 0) windows.splice(index, 1);
@@ -53,25 +46,61 @@ export function floatingDialog(win, opener, handle, close) {
     windows.forEach((dialog, i) => (dialog.style.zIndex = 1000 + i));
     placeToolsMenu();
   };
+  function windowBounds() {
+    const rail = document.getElementById("tool-rail");
+    return {
+      left: 8,
+      top: innerWidth >= 1000 && innerHeight > 600
+        ? document.querySelector("#app > header").getBoundingClientRect().bottom + 8 : 8,
+      right: document.getElementById("app").dataset.launcher === "rail"
+        ? rail.getBoundingClientRect().left - 8 : innerWidth - 8,
+      bottom: innerHeight - 8,
+    };
+  }
   function clamp() {
     const r = win.getBoundingClientRect();
-    const rail = document.getElementById("tool-rail");
-    const right = document.getElementById("app")?.dataset.launcher === "rail"
-      ? rail.getBoundingClientRect().left - 8 : innerWidth - 8;
-    win.style.left = Math.max(8, Math.min(r.left, right - r.width)) + "px";
-    const headerBottom = innerWidth >= 1000 && innerHeight > 600
-      ? document.querySelector("#app > header").getBoundingClientRect().bottom + 8 : 8;
-    let maxHeight = innerHeight - headerBottom - 8;
+    const bounds = windowBounds();
+    win.style.left = Math.max(bounds.left, Math.min(r.left, bounds.right - r.width)) + "px";
+    let maxHeight = bounds.bottom - bounds.top;
     if (innerWidth >= 1000 && innerHeight > 600 && !win.style.height && !win.dataset.userMoved && win.id !== "detector-options") {
       const bottom = document.querySelector(".view-bottom").getBoundingClientRect().top;
       maxHeight = Math.min(maxHeight, Math.max(300, bottom - r.top - 12));
     }
     win.style.maxHeight = `${maxHeight}px`;
-    win.style.top = Math.max(headerBottom, Math.min(r.top, innerHeight - win.offsetHeight - 8)) + "px";
+    win.style.top = Math.max(bounds.top, Math.min(r.top, bounds.bottom - win.offsetHeight)) + "px";
   }
+  let resize = null;
   let drag = null;
+  addResizeEdges(win, (event, edge) => {
+    if (resize || drag) return;
+    event.preventDefault();
+    const r = win.getBoundingClientRect();
+    const style = getComputedStyle(win);
+    resize = {
+      edge, rect: { x: r.x, y: r.y, w: r.width, h: r.height }, bounds: windowBounds(),
+      x: event.clientX, y: event.clientY, id: event.pointerId,
+      minWidth: parseFloat(style.minWidth) || 240,
+      minHeight: Math.max(handle.offsetHeight + 40, parseFloat(style.minHeight) || 0),
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  });
+  win.addEventListener("pointermove", event => {
+    if (resize?.id !== event.pointerId) return;
+    const r = resizedRect(resize.rect, resize.edge, event.clientX - resize.x, event.clientY - resize.y, resize.bounds, resize.minWidth, resize.minHeight);
+    if (win.classList.contains("showing-crystal")) {
+      win.dataset.linkedResized = "true";
+      for (const [key, value] of Object.entries(r)) win.style.setProperty(`--linked-${key}`, `${value}px`);
+    } else {
+      win.dataset.userMoved = "true";
+      win.style.maxHeight = `${resize.bounds.bottom - resize.bounds.top}px`;
+      Object.assign(win.style, { left: r.x + "px", top: r.y + "px", width: r.w + "px", height: r.h + "px" });
+    }
+  });
+  win.addEventListener("lostpointercapture", event => {
+    if (resize?.id === event.pointerId) resize = null;
+  });
   handle.onpointerdown = (event) => {
-    if (event.button !== 0 || event.target.closest("button")) return;
+    if (drag || resize || !event.isPrimary || event.button !== 0 || event.target.closest("button")) return;
     const r = win.getBoundingClientRect();
     drag = { x: event.clientX - r.left, y: event.clientY - r.top };
     handle.setPointerCapture(event.pointerId);
@@ -141,26 +170,5 @@ export function floatingDialog(win, opener, handle, close) {
       }
     }
     clamp();
-  };
-}
-
-export function resizeFromLowerLeft(win, handle) {
-  let start;
-  handle.onpointerdown = (e) => {
-    if (e.button !== 0 || !e.isPrimary) return;
-    e.preventDefault();
-    start = { rect: win.getBoundingClientRect(), x: e.clientX, y: e.clientY };
-    handle.setPointerCapture(e.pointerId);
-  };
-  handle.onpointermove = (e) => {
-    if (!start || !handle.hasPointerCapture(e.pointerId)) return;
-    win.dataset.userMoved = "true";
-    const { rect, x, y } = start;
-    win.style.width = Math.max(0, Math.min(rect.right - 8, rect.width + x - e.clientX)) + "px";
-    win.style.height = Math.max(0, Math.min(innerHeight - rect.top - 8, rect.height + e.clientY - y)) + "px";
-    win.style.left = rect.right - win.getBoundingClientRect().width + "px";
-  };
-  handle.onlostpointercapture = () => {
-    start = null;
   };
 }

@@ -150,7 +150,8 @@ async def check(browser, width, height):
         sizes = await grids.evaluate_all(
             "els => els.map(e=>e.getBoundingClientRect().width)"
         )
-        x, y = box["x"] + box["width"] - 3, box["y"] + box["height"] - 3
+        corner = await win.locator("[data-edge=se]").bounding_box()
+        x, y = corner["x"] + corner["width"] / 2, corner["y"] + corner["height"] / 2
         await page.mouse.move(x, y)
         await page.mouse.down()
         await page.mouse.move(x + 65, y + 54, steps=6)
@@ -171,7 +172,7 @@ async def check(browser, width, height):
         await page.mouse.move(title["x"] + 88, title["y"] + 8, steps=4)
         await page.mouse.up()
         box = await win.bounding_box()
-        handle = await page.locator("#detector-resize-left").bounding_box()
+        handle = await page.locator("#detector-window [data-edge=sw]").bounding_box()
         x, y = handle["x"] + 6, handle["y"] + handle["height"] - 6
         await page.mouse.move(x, y)
         await page.mouse.down()

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, chooseTool, toggleTool, closeTool, moveTool, setTune, validateState, layoutProfile, launcherFor, defaultRect, clampRect, anchorRect, resolveRect } from '../web/tool-windows.js';
+import { resizedRect } from '../web/panel-resize.js';
+import { initialState, chooseTool, toggleTool, closeTool, moveTool, validateState, layoutProfile, launcherFor, defaultRect, clampRect, anchorRect, resolveRect } from '../web/tool-windows.js';
 
 test('one tool opens, switches, and toggles closed without changing palette bounds',()=>{
  let s=initialState(); assert.equal(s.main,null);
@@ -13,17 +14,10 @@ test('one tool opens, switches, and toggles closed without changing palette boun
  assert.equal(toggleTool(s,'unknown'),s);
  assert.equal(closeTool(s,'lattice'),s);
 });
-test('Tune belongs to the active tool and ends on close/switch',()=>{
- let s=setTune(initialState(),true);assert.equal(s.tune,false);
- s=setTune(chooseTool(s,'pairs'),true);assert.equal(s.tune,true);
- assert.equal(chooseTool(s,'pairs').tune,true);
- assert.equal(chooseTool(s,'lattice').tune,false);
- assert.equal(toggleTool(s,'pairs').tune,false);
-});
 test('legacy pinned layouts restore just their front tool and its position',()=>{
  const r={ax:'left',ay:'top',dx:42,dy:130,w:300,h:400};
  const raw={main:'pairs',pinned:['lattice'],minimized:['pairs'],order:['pairs','lattice'],rects:{lattice:r},tune:true};
- const s=validateState(raw);assert.deepEqual(s,{main:'lattice',rects:{main:r},tune:true});
+ const s=validateState(raw);assert.deepEqual(s,{main:'lattice',rects:{main:r}});
  assert.deepEqual(validateState(s),s);
  assert.deepEqual(validateState({main:null,pinned:[],rects:{}}),initialState());
  assert.equal(validateState(null),null);
@@ -39,4 +33,17 @@ test('responsive palettes remain bounded and desktop anchors survive orientation
  const ws={width:1440,height:844},r={x:988,y:242,w:360,h:562};
  assert.deepEqual(resolveRect(anchorRect(r,ws),ws),r);
  const c=clampRect(r,{width:960,height:600});assert.ok(c.x+c.w<=960&&c.y+c.h<=600);
+});
+
+test('dragging each border or corner moves only its own sides and respects limits',()=>{
+ const r={x:20,y:30,w:180,h:120}, bounds={left:8,top:12,right:220,bottom:170};
+ for(const edge of ['n','s','e','w','ne','nw','se','sw']){
+  const next=resizedRect(r,edge,5,6,bounds,100,70);
+  assert.equal(next.x, edge.includes('w')?25:20);
+  assert.equal(next.y, edge.includes('n')?36:30);
+  assert.equal(next.x+next.w, edge.includes('e')?205:200);
+  assert.equal(next.y+next.h, edge.includes('s')?156:150);
+ }
+ assert.deepEqual(resizedRect(r,'nw',-200,-200,bounds,100,70),{x:8,y:12,w:192,h:138});
+ assert.deepEqual(resizedRect(r,'nw',200,200,bounds,100,70),{x:100,y:80,w:100,h:70});
 });

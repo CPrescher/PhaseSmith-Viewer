@@ -434,7 +434,7 @@
             </div>
           </nav>
           <!-- One bounded palette per tool; tool-windows.js adds the title
-               bar (Tune · Close) and places them. -->
+               bar and places them. -->
           <div id="tool-layer" class="tool-layer">
             <section id="tool-window-pairs" class="tool-window" data-tool="pairs" hidden>
               <div class="tool-window-body">
@@ -591,8 +591,10 @@
                         <option value="center">Center</option>
                       </select></label>
                   </div>
-                  <div id="plane-list" class="tool-list"></div>
-                  <button id="plane-add" type="button" class="secondary add-overlay" aria-label="Add lattice plane (hkl)">+ Plane</button>
+                  <div class="tool-list">
+                    <div id="plane-list" class="overlay-rows"></div>
+                    <button id="plane-add" type="button" class="secondary add-overlay" aria-label="Add lattice plane (hkl)">+ Plane</button>
+                  </div>
                 </section>
               </div>
             </section>
@@ -603,8 +605,10 @@
                     <h2 id="arrow-title">Directions <span class="scientific-notation">[uvw]</span></h2>
                     <label class="chip small" title="Labels on drawn planes and direction arrows"><input id="direction-labels-toggle" type="checkbox" checked aria-label="Plane and direction labels"><span>Labels</span></label>
                   </div>
-                  <div id="arrow-list" class="tool-list"></div>
-                  <button id="arrow-add" type="button" class="secondary add-overlay" aria-label="Add direction arrow [uvw]">+ Arrow</button>
+                  <div class="tool-list">
+                    <div id="arrow-list" class="overlay-rows"></div>
+                    <button id="arrow-add" type="button" class="secondary add-overlay" aria-label="Add direction arrow [uvw]">+ Arrow</button>
+                  </div>
                 </section>
               </div>
             </section>
@@ -994,7 +998,6 @@
         </div>
         </div>
       </div>
-      <span id="detector-resize-left" title="Resize from lower left"></span>
     </dialog>
     <dialog id="detector-options" class="analysis-window" aria-labelledby="detector-options-title">
       <header class="analysis-head">

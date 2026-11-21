@@ -1,4 +1,4 @@
-"""Native full-screen header, laptop rail, and both-corner palette resizing."""
+"""Native full-screen header, laptop rail, and border and corner resizing."""
 import asyncio,json,os
 from playwright.async_api import async_playwright
 from smoke import URL,choose_tool,diagnostics,settle
@@ -34,7 +34,7 @@ async def check_overlay_height(page, tool, item):
  button=await add.bounding_box()
  box=await row.bounding_box()
  assert button['y']>=box['y']+box['height']-1 and abs(button['width']-box['width'])<2
- await resize_left(page,'#tool-window-'+tool,'#tool-window-'+tool+' .window-grip-left')
+ await resize_left(page,'#tool-window-'+tool,'#tool-window-'+tool+' [data-edge=sw]')
  manual=(await panel.bounding_box())['height']
  await add.click()
  await settle(page)
@@ -69,11 +69,11 @@ async def main():
     await check_overlay_height(page,'directions','arrow')
     for tool in ['pairs','sites','lattice','directions','symmetry','extent','export','style']:
      await choose_tool(page,'#style-open' if tool=='style' else '#mode-'+tool)
-     await resize_left(page,'#tool-window-'+tool,'#tool-window-'+tool+' .window-grip-left')
+     await resize_left(page,'#tool-window-'+tool,'#tool-window-'+tool+' [data-edge=sw]')
      # Each test starts at the default rectangle, through the documented reset.
      await page.locator('#tool-window-'+tool+' .tool-window-title').dblclick()
      panel=page.locator('#tool-window-'+tool)
-     box=await panel.bounding_box();grip=await panel.locator('.window-grip:not(.window-grip-left)').bounding_box()
+     box=await panel.bounding_box();grip=await panel.locator('[data-edge=se]').bounding_box()
      await page.mouse.move(grip['x']+grip['width']-4,grip['y']+grip['height']-4);await page.mouse.down()
      await page.mouse.move(grip['x']+grip['width']-4,box['y']+180,steps=8);await page.mouse.up()
      compact=panel.locator('[data-action=compact]')
@@ -87,11 +87,11 @@ async def main():
      await panel.locator('[data-action=close]').click();assert not await panel.is_visible()
      await choose_tool(page,'#style-open' if tool=='style' else '#mode-'+tool)
      await panel.locator('[data-action=compact]').click()
-     assert await panel.locator('.window-grip-left').is_visible(), 'Expand must restore corner resizing'
+     assert await panel.locator('[data-edge=sw]').is_visible(), 'Expand must restore corner resizing'
      await panel.locator('.tool-window-title').dblclick()
      # Resizing right into the permanent launcher must stop before its
      # buttons can cover the palette header (and leave both usable).
-     grip=await panel.locator('.window-grip:not(.window-grip-left)').bounding_box()
+     grip=await panel.locator('[data-edge=se]').bounding_box()
      await page.mouse.move(grip['x']+grip['width']-4,grip['y']+4);await page.mouse.down()
      await page.mouse.move(w-1,grip['y']+4,steps=8);await page.mouse.up()
      assert await hit(panel.locator('[data-action=close]')), 'The launcher must not cover Close after right resize'
@@ -120,8 +120,23 @@ async def main():
     if w==1440:
      # Move away from the left edge before expanding to the left.
      head=await page.locator('#'+dialog+' header h2').bounding_box();await page.mouse.move(head['x']+10,head['y']+10);await page.mouse.down();await page.mouse.move(head['x']+150,head['y']+10,steps=8);await page.mouse.up()
-     await resize_left(page,'#'+dialog,'#'+dialog+' .science-resize-left')
+     await resize_left(page,'#'+dialog,'#'+dialog+' [data-edge=sw]')
     await page.locator('#'+close).click()
    await page.close();print(f'{w}x{h}: header, rail, resize and exposed crystal passed',flush=True)
+  phone=await b.new_page(viewport={'width':390,'height':844},has_touch=True,is_mobile=True)
+  await phone.goto(URL+'/?example=forsterite')
+  await phone.wait_for_function('window.viewerDiagnostics?.().atoms.length>0')
+  await choose_tool(phone,'#mode-sites')
+  panel=phone.locator('#tool-window-sites')
+  before=await panel.bounding_box()
+  edge=await panel.locator('[data-edge=w]').bounding_box()
+  x,y=edge['x']+edge['width']/2,edge['y']+edge['height']/2
+  cdp=await phone.context.new_cdp_session(phone)
+  for kind,points in [('touchStart',[{'x':x,'y':y}]),('touchMove',[{'x':x+24,'y':y}]),('touchEnd',[])]:
+   await cdp.send('Input.dispatchTouchEvent',{'type':kind,'touchPoints':points})
+  await settle(phone)
+  after=await panel.bounding_box()
+  assert abs(after['x']-before['x']-24)<1 and abs(after['width']-before['width']+24)<1
+  assert (after['y'],after['height'])==(before['y'],before['height'])
   await b.close()
 asyncio.run(main())

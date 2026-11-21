@@ -88,6 +88,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   function revealCrystal(on) {
     const controlsTop = document.querySelector("#view-readout")?.getBoundingClientRect().top || document.querySelector(".view-bottom")?.getBoundingClientRect().top || innerHeight - 80;
     win.style.setProperty("--linked-bottom", `${innerHeight - controlsTop + 12}px`);
+    delete win.dataset.linkedResized;
     win.classList.toggle("showing-crystal", on);
     $("reveal").textContent = on ? "Show detector" : "Show crystal";
     $("reveal").setAttribute("aria-pressed", String(on));

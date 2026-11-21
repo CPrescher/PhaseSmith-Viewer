@@ -76,6 +76,22 @@ async def check(browser,w,h,theme):
         await compact_button.click()
         restored=await page.locator('#tool-window-lattice').bounding_box()
         assert restored==before
+    if w == 768:
+        for tool,item in [('lattice','plane'), ('directions','arrow')]:
+            if tool != 'lattice':
+                await choose_tool(page,'#mode-'+tool)
+            add = page.locator('#'+item+'-add')
+            for _ in range(3):
+                await add.tap()
+            await settle(page)
+            last = page.locator('[data-'+item+'-id]').last
+            card, button = await last.bounding_box(), await add.bounding_box()
+            assert button['x'] >= card['x']+card['width'] and abs(button['y']-card['y']) < 1
+            assert abs(card['height']-button['height']) < 1
+            await add.tap()
+            await settle(page)
+            card, button = await last.bounding_box(), await add.bounding_box()
+            assert button['x'] < card['x'] and button['y'] >= card['y']+card['height']-1
     if w < 500:
         await choose_tool(page,'#mode-directions')
         panel = page.locator('#tool-window-directions')

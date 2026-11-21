@@ -1309,9 +1309,8 @@ button.element[aria-pressed="false"] .dot {
     display: none;
   }
 }
-/* Wide bottom sheets lay pair cards and tool rows out side by side. */
-.tool-window[data-place="sheet"] #pair-rules,
-.tool-window[data-place="sheet"] .tool-list {
+/* Wide bottom sheets lay pair cards side by side. */
+.tool-window[data-place="sheet"] #pair-rules {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 @media (max-width: 640px) {
@@ -1407,9 +1406,11 @@ button.element[aria-pressed="false"] .dot {
 }
 
 /* Lattice tools: plane and arrow rows. */
-.add-overlay { width: 100%; margin-top: 6px; }
+.overlay-rows { display: contents; }
+.add-overlay { width: 100%; }
 .tool-list {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   gap: 6px;
 }
 .tool-row {
@@ -1737,7 +1738,7 @@ button.element[aria-pressed="false"] .dot {
   min-width: min(300px, calc(100vw - 16px));
   min-height: min(300px, calc(100dvh - 16px));
   overflow: hidden;
-  resize: both;
+  resize: none;
   border: 1px solid var(--line-strong);
   border-radius: 12px;
   background: var(--panel);
@@ -2552,13 +2553,6 @@ button.element[aria-pressed="false"] .dot {
 .tool-name {
   flex: none;
 }
-.tool-sub {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-weight: 500;
-  color: var(--muted);
-}
 .window-button {
   flex: none;
   display: grid;
@@ -2603,19 +2597,34 @@ button.element[aria-pressed="false"] .dot {
   min-width: 0;
   max-width: 100%;
 }
-.window-grip {
+/* Thin edge strips and larger corners provide cursors on desktop and
+   dedicated touch targets without drawing over the panel contents. */
+.panel-resize-edges {
+  --edge: 6px;
+  --corner: 16px;
   position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 22px;
-  height: 22px;
-  cursor: nwse-resize;
-  touch-action: none;
-  background:
-    linear-gradient(135deg, transparent 55%, var(--line-strong) 55% 61%, transparent 61% 72%, var(--line-strong) 72% 78%, transparent 78%);
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
 }
-.tool-window:not([data-place="float"]) .window-grip {
-  display: none;
+.panel-resize-edges > span { position: absolute; pointer-events: auto; touch-action: none; }
+.panel-resize-edges :is([data-edge="n"], [data-edge="s"]) {
+  left: var(--corner); right: var(--corner); height: var(--edge); cursor: ns-resize;
+}
+.panel-resize-edges :is([data-edge="e"], [data-edge="w"]) {
+  top: var(--corner); bottom: var(--corner); width: var(--edge); cursor: ew-resize;
+}
+.panel-resize-edges :is([data-edge="nw"], [data-edge="se"], [data-edge="ne"], [data-edge="sw"]) {
+  width: var(--corner); height: var(--corner);
+}
+.panel-resize-edges :is([data-edge="nw"], [data-edge="se"]) { cursor: nwse-resize; }
+.panel-resize-edges :is([data-edge="ne"], [data-edge="sw"]) { cursor: nesw-resize; }
+.panel-resize-edges [data-edge*="n"] { top: 0; }
+.panel-resize-edges [data-edge*="s"] { bottom: 0; }
+.panel-resize-edges [data-edge*="w"] { left: 0; }
+.panel-resize-edges [data-edge*="e"] { right: 0; }
+@media (pointer: coarse) {
+  .panel-resize-edges { --edge: 9px; --corner: 20px; }
 }
 .tool-window[data-place="sheet"] {
   border-width: 1px 0 0;
@@ -2626,15 +2635,6 @@ button.element[aria-pressed="false"] .dot {
   border-width: 1px 0 0 1px;
   border-radius: 14px 0 0 0;
   box-shadow: -8px 0 28px var(--shadow);
-}
-/* Tune: only the named entry (pair, plane or arrow) with its exact field
-   and slider; everything else of the tool waits under "All settings". */
-.tool-window[data-tune="true"] .tune-path > :not(.tune-path):not(.tune-item) {
-  display: none !important;
-}
-.tool-window[data-tune="true"] .tool-window-body {
-  padding-top: 8px;
-  padding-bottom: 10px;
 }
 /* The window title names the tool; section headings that would repeat it
    stay for screen readers only. */
@@ -2762,14 +2762,6 @@ button.element[aria-pressed="false"] .dot {
   #library-open span, #open .open-kind { display: none; }
 }
 
-@media (pointer: coarse) {
-  .tool-window[data-place="float"] .window-grip {
-    width: 44px; height: 44px;
-    background-size: 22px 22px; background-position: right bottom; background-repeat: no-repeat;
-  }
-  .tool-window[data-place="float"] .tool-window-body { padding-bottom: 44px; }
-}
-
 /* The modes and their info readout share one right-aligned column. The
    settings rail stays alongside it; neither card changes the canvas. */
 #app[data-profile="side"] .measure-details { max-height: 94px; }
@@ -2853,7 +2845,7 @@ button.element[aria-pressed="false"] .dot {
   max-width: calc(100vw - 24px);
   min-width: min(350px, calc(100vw - 24px));
   min-height: min(360px, calc(100dvh - 24px));
-  resize: both;
+  resize: none;
   container-type: inline-size;
   height: min(1080px, calc(100dvh - 24px));
   max-height: calc(100dvh - 24px);
@@ -3048,8 +3040,6 @@ button.element[aria-pressed="false"] .dot {
 #detector-calibration .detector-actions, #detector-shape { margin-top: 6px; }
 #detector-calibration input[type=number] { width: 6em; }
 #detector-poni-status:empty { display: none; }
-#detector-resize-left { position: absolute; bottom: 0; left: 0; width: 21px; height: 21px; touch-action: none; cursor: nesw-resize; }
-#detector-resize-left::after { content: ""; position: absolute; left: 2px; bottom: 2px; width: 11px; height: 11px; background: repeating-linear-gradient(45deg, transparent 0 2px, var(--muted) 2px 3px); clip-path: polygon(0 0,100% 100%,0 100%); }
 
 
 #detector-open-options { margin-left: auto; }
@@ -3474,7 +3464,6 @@ input[type="file"]::file-selector-button { min-height: 36px; border: 1px solid v
   #app[data-launcher="menu"] :is(.rail-group + .rail-group > .rail-button:first-child, #analysis-choices:not([popover]) > .rail-button:first-child)::before { top: -2px; width: calc(200% + 2px); left: 0; right: auto; border-color: var(--line); }
   #app[data-launcher="menu"] .tool-rail.menu-open { row-gap: 4px; }
 }
-#detector-window.showing-crystal #detector-resize-left { display: none; }
 #detector-options { position: fixed; inset: auto; margin: 0; width: min(420px, calc(100vw - 16px)); }
 #detector-options .analysis-head { cursor: move; }
 #detector-options input[type="file"] { width: 100%; min-width: 0; }
@@ -3541,10 +3530,6 @@ body:has(#app[data-launcher="rail"]) :is(.analysis-window, #reflection-explorer)
 body:fullscreen, body:-webkit-full-screen { width: 100%; height: 100%; background: var(--bg); }
 #file-menu-button { width: 44px; margin-left: -12px; font-size: 24px; }
 .science-file { font-size: 22px; }
-.window-grip-left { left: 0; right: auto; cursor: nesw-resize; transform: scaleX(-1); }
-.science-resize-left { position: absolute; bottom: 0; left: 0; width: 22px; height: 22px; touch-action: none; cursor: nesw-resize; z-index: 3; }
-.science-resize-left::after { content: ""; position: absolute; left: 2px; bottom: 2px; width: 11px; height: 11px; background: repeating-linear-gradient(45deg, transparent 0 2px, var(--muted) 2px 3px); clip-path: polygon(0 0,100% 100%,0 100%); }
-#detector-options { resize: both; }
 #detector-window.showing-crystal .analysis-head { flex-wrap: wrap; gap: 4px; padding-inline: 8px; }
 #detector-window.showing-crystal #detector-title { flex: 1 1 0; min-width: 0; font-size: 14px; }
 #detector-window.showing-crystal #detector-reveal { order: 2; width: 100%; }
@@ -3658,4 +3643,13 @@ body:has(#app[data-launcher="menu"]) #detector-window.showing-crystal {
 }
 @media (max-width: 540px) and (min-height: 501px) {
   #detector-options { max-height: 270px; }
+}
+
+body:has(#app) #detector-window.showing-crystal[data-linked-resized] {
+  left: clamp(0px, var(--linked-x), calc(100vw - min(var(--linked-w), 100vw))) !important;
+  top: clamp(0px, var(--linked-y), calc(100dvh - min(var(--linked-h), 100dvh))) !important;
+  bottom: auto;
+  width: var(--linked-w) !important;
+  height: var(--linked-h) !important;
+  max-height: calc(100dvh - 16px) !important;
 }

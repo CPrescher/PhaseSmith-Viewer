@@ -1026,8 +1026,6 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       ...planes.map((plane) => {
         const row = make("div", { className: "tool-row" });
         row.dataset.planeId = plane.id;
-        row.dataset.tuneItem = `plane:${plane.id}`;
-        row.dataset.tuneName = `plane (${formatMillerIndices(plane.hkl)})`;
         row.style.setProperty("--tool-color", plane.color);
         const name = () => `(${formatMillerIndices(plane.hkl)})`;
         const hkl = textField(plane.hkl.join(" "), "Miller indices (h k l), integers", "hkl", (input) =>
@@ -1035,7 +1033,6 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
             const v = parseMillerIndices(text);
             plane.hkl = v;
             setHKL(v.join(" "));
-            row.dataset.tuneName = `plane (${formatMillerIndices(v)})`;
             // Until m is edited by hand, it follows the indices so the
             // plane cuts through the middle of the displayed range.
             if (plane.autoOffset) {
@@ -1158,15 +1155,12 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       ...arrows.map((arrow) => {
         const row = make("div", { className: "tool-row" });
         row.dataset.arrowId = arrow.id;
-        row.dataset.tuneItem = `arrow:${arrow.id}`;
-        row.dataset.tuneName = `arrow [${arrow.uvw.join(" ")}]`;
         row.style.setProperty("--tool-color", arrow.color);
         const uvw = textField(arrow.uvw.join(" "), "Direct lattice direction [u v w]", "uvw", (input) =>
           commit(input, arrow, (text) => {
             const v = parseTriple(text, { label: "components" });
             if (v.every((x) => x === 0)) throw Error("Direction [uvw] must not be zero.");
             arrow.uvw = v;
-            row.dataset.tuneName = `arrow [${v.join(" ")}]`;
           }),
         );
         uvw.dataset.field = "uvw";

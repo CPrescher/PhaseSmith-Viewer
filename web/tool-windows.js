@@ -1,6 +1,8 @@
+import { addResizeEdges, resizedRect } from "./panel-resize.js";
+
 // One settings palette over the canvas. The rail toggles its active tool;
 // switching tools keeps the camera fixed and the palette anchored.
-// Desktop palettes can move/resize; touch layouts use a sheet and Tune.
+// Desktop palettes can move/resize; touch layouts use a docked panel.
 export const TOOLS = [
   { id: "pairs", label: "Bonds & polyhedra", title: "Bonds & polyhedra", button: "mode-pairs", hint: "Bonds and polyhedra: cutoffs and face opacity" },
   { id: "style", label: "Style", title: "Style", button: "style-open", hint: "Appearance: colors and sizes of elements, pairs and single copies" },
@@ -167,18 +169,18 @@ export function clearFraction(ws, rects) {
 
 // ---- One active tool -------------------------------------------------------
 export function initialState(main = null) {
-  return { main, rects: {}, tune: false };
+  return { main, rects: {} };
 }
-const copy = (s) => ({ main: s.main, rects: Object.fromEntries(Object.entries(s.rects).map(([k,v]) => [k,{...v}])), tune: s.tune });
+const copy = (s) => ({ main: s.main, rects: Object.fromEntries(Object.entries(s.rects).map(([k,v]) => [k,{...v}])) });
 export const openTools = (s) => s.main ? [s.main] : [];
 export const frontTool = (s) => s.main;
 export const stacking = openTools;
 export function chooseTool(state, tool) {
   if (!TOOL_IDS.includes(tool)) return state;
-  return { ...copy(state), main: tool, tune: state.main === tool && state.tune };
+  return { ...copy(state), main: tool };
 }
 export function closeTool(state, tool) {
-  return state.main === tool ? { ...copy(state), main: null, tune: false } : state;
+  return state.main === tool ? { ...copy(state), main: null } : state;
 }
 export function toggleTool(state, tool) {
   return state.main === tool ? closeTool(state, tool) : chooseTool(state, tool);
@@ -190,9 +192,6 @@ export function moveTool(state, tool, anchored) {
   else delete next.rects.main;
   return next;
 }
-export function setTune(state, on) {
-  return { ...copy(state), tune: Boolean(on) && Boolean(state.main) };
-}
 export function validateState(raw) {
   if (!raw || typeof raw !== "object") return null;
   // Migrate older pinned/minimized layouts to their last active tool. All
@@ -201,7 +200,7 @@ export function validateState(raw) {
   const order = Array.isArray(raw.order) ? raw.order.filter(t => open.includes(t)) : [];
   const main = order.at(-1) ?? open[0] ?? null;
   const source = raw.rects?.[main === raw.main ? "main" : main];
-  return { main, rects: validAnchored(source) ? { main: { ...source } } : {}, tune: raw.tune === true && Boolean(main) };
+  return { main, rects: validAnchored(source) ? { main: { ...source } } : {} };
 }
 
 // ---- DOM window manager -----------------------------------------------------
@@ -233,9 +232,9 @@ export function createToolWindows(options) {
     launcher = "rail",
     ws = { width: 1, height: 1 },
     drag = null;
+  const dockedRects = new Map(); // independent manual bounds in each touch layout
   const visible = new Set();
   const windows = new Map();
-  const tuneKeys = new Map(); // tool → key of the active tunable item
   const compactHeights = new Map(); // explicit per-tool size, fixed until expanded
 
   for (const tool of TOOLS) {
@@ -247,7 +246,7 @@ export function createToolWindows(options) {
     title.className = "tool-window-title";
     title.id = `tool-title-${tool.id}`;
     title.tabIndex = -1;
-    title.innerHTML = `<span class="tool-icon" aria-hidden="true">${document.getElementById(tool.button)?.querySelector("svg")?.outerHTML ?? ""}</span><span class="tool-name"></span><span class="tool-sub"></span>`;
+    title.innerHTML = `<span class="tool-icon" aria-hidden="true">${document.getElementById(tool.button)?.querySelector("svg")?.outerHTML ?? ""}</span><span class="tool-name"></span>`;
     title.querySelector(".tool-name").textContent = tool.title;
     const button = (action, label, html, extra = "") => {
       const b = document.createElement("button");
@@ -259,9 +258,6 @@ export function createToolWindows(options) {
       b.innerHTML = html;
       return b;
     };
-    const tune = button("tune", "Tune", "Tune", "tune-button");
-    tune.setAttribute("aria-label", `Tune the chosen ${tool.title} entry with the crystal in view`);
-    tune.setAttribute("aria-pressed", "false");
     const close = button("close", "Close", svg(ICONS.close));
     head.append(title);
     if (tool.id === "pairs") {
@@ -271,7 +267,6 @@ export function createToolWindows(options) {
     }
     if (tool.id === "style") head.append(document.getElementById("style-pick"));
     const compact = button("compact", "Compact", svg(ICONS.fold), "compact-button");
-    compact.hidden = true;
     compact.onclick = () => {
       if (compactHeights.has(tool.id)) compactHeights.delete(tool.id);
       else {
@@ -281,50 +276,31 @@ export function createToolWindows(options) {
       }
       apply();
     };
-    head.append(tune, compact, close);
+    head.append(compact, close);
     el.prepend(head);
-    const grip = document.createElement("div");
-    grip.className = "window-grip";
-    grip.setAttribute("aria-hidden", "true");
-    grip.title = "Resize";
-    el.append(grip);
-    const gripLeft = grip.cloneNode();
-    gripLeft.classList.add("window-grip-left");
-    gripLeft.title = "Resize from bottom left";
-    el.append(gripLeft);
+    const edges = addResizeEdges(el, (event, edge) => startDrag(event, tool.id, edge));
     el.setAttribute("aria-labelledby", title.id);
     el.setAttribute("role", "region");
-    windows.set(tool.id, { tool, el, body, head, title, buttons: { tune, compact, close }, grip, gripLeft, scroll: 0, tuneScroll: null });
+    windows.set(tool.id, { tool, el, body, head, title, buttons: { compact, close }, edges, scroll: 0 });
 
-    tune.onclick = () => toggleTune(tool.id);
     close.onclick = () => closeWindow(tool.id, true);
     head.addEventListener("pointerdown", (e) => startDrag(e, tool.id, "move"));
-    grip.addEventListener("pointerdown", (e) => startDrag(e, tool.id, "resize"));
-    gripLeft.addEventListener("pointerdown", (e) => startDrag(e, tool.id, "resize-left"));
     body.addEventListener("click", e => {
       if (!e.target.closest("input, select, textarea, button, a, summary, [tabindex]")) title.focus({ preventScroll: true });
     });
     head.addEventListener("dblclick", (e) => {
-      if (profile !== "float" || e.target.closest("button")) return;
+      if (e.target.closest("button")) return;
+      dockedRects.delete(`${profile}:${tool.id}`);
       compactHeights.delete(tool.id);
-      commit(moveTool(state, tool.id, null)); // back to its default place
+      if (profile === "float") commit(moveTool(state, tool.id, null));
+      else apply();
     });
-    // Escape: a field is left first (focus to the title), then Tune ends,
-    // then the window closes. Sub-editors handle their own Escape first.
     el.addEventListener("keydown", (e) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       e.preventDefault();
       if (e.target.matches?.("input, select, textarea")) title.focus({ preventScroll: true });
-      else if (state.tune && frontTool(state) === tool.id && profile === "sheet") toggleTune(tool.id);
       else closeWindow(tool.id, true);
     });
-    // The tunable entry last touched in this tool (pair, plane, arrow).
-    const track = (e) => {
-      const item = e.target.closest?.("[data-tune-item]");
-      if (item && body.contains(item)) tuneKeys.set(tool.id, item.dataset.tuneItem);
-    };
-    body.addEventListener("pointerdown", track, true);
-    body.addEventListener("focusin", track);
   }
 
   const groups = [...rail.querySelectorAll("[data-launcher-group]")].map(button => ({
@@ -471,72 +447,20 @@ export function createToolWindows(options) {
     const el = windows.get(tool).el;
     return { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
   }
-  // ---- Tune (bottom sheets) ----
-  function tuneItem(tool) {
-    const { body } = windows.get(tool);
-    const key = tuneKeys.get(tool);
-    return (key && body.querySelector(`[data-tune-item="${CSS.escape(key)}"]`)) || body.querySelector("[data-tune-item]");
-  }
-  function markTunePath(tool) {
-    const { body, title } = windows.get(tool);
-    for (const el of body.querySelectorAll(".tune-path, .tune-item")) el.classList.remove("tune-path", "tune-item");
-    const item = state.tune && frontTool(state) === tool && profile === "sheet" ? tuneItem(tool) : null;
-    title.querySelector(".tool-sub").textContent = item ? ` · ${item.dataset.tuneName || item.getAttribute("aria-label") || ""}` : "";
-    if (!item) return false;
-    item.classList.add("tune-item");
-    for (let el = item.parentElement; el && el !== body.parentElement; el = el.parentElement) el.classList.add("tune-path");
-    return true;
-  }
-  function toggleTune(tool) {
-    if (profile !== "sheet" || frontTool(state) !== tool) return;
-    const win = windows.get(tool);
-    if (!state.tune) {
-      if (!tuneItem(tool)) return;
-      win.tuneScroll = win.body.scrollTop;
-      commit(setTune(state, true));
-    } else {
-      commit(setTune(state, false));
-      if (win.tuneScroll != null) win.body.scrollTop = win.tuneScroll; // All settings: same place
-      win.tuneScroll = null;
-    }
-  }
-  // Tune is offered once the tool has an entry to tune.
-  function refreshTuneButton(tool) {
-    const win = windows.get(tool);
-    win.buttons.tune.hidden =
-      profile !== "sheet" || frontTool(state) !== tool || !win.body.querySelector("[data-tune-item]");
-    if (state.tune && frontTool(state) === tool && profile === "sheet") {
-      const item = tuneItem(tool);
-      const subtitle = item ? ` · ${item.dataset.tuneName || item.getAttribute("aria-label") || ""}` : "";
-      if (win.title.querySelector(".tool-sub").textContent !== subtitle)
-        win.title.querySelector(".tool-sub").textContent = subtitle;
-    }
-  }
-  // Re-rendered lists (a pair added or removed) keep the tuned entry.
-  const tuneObserver = new MutationObserver(() => {
-    const tool = frontTool(state);
-    if (tool) refreshTuneButton(tool);
-    if (!state.tune || !tool) return;
-    if (windows.get(tool).body.querySelector(".tune-item")) return;
-    if (!markTunePath(tool)) commit(setTune(state, false));
-    else apply();
-  });
-  for (const { body } of windows.values()) tuneObserver.observe(body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-tune-name"] });
-
-  // ---- Move / resize (floating palettes) ----
+  // ---- Panel placement and resizing ----
   function floatingWorkspace() {
     // The fixed rail sits above palettes. Keep their headers and resize
     // corners out of that column, including after a saved view is restored.
     return { ...ws, width: launcher === "rail" ? Math.max(1, rail.offsetLeft) : ws.width };
   }
   function startDrag(e, tool, kind) {
-    if (profile !== "float" || drag || (e.button !== undefined && e.button !== 0)) return;
+    if (drag || e.button !== 0 || (kind === "move" && profile !== "float")) return;
     if (kind === "move" && e.target.closest("button")) return;
     const win = windows.get(tool);
     e.preventDefault();
     const r = currentRect(tool);
-    if (kind.startsWith("resize")) compactHeights.delete(tool);
-    drag = { tool, kind, id: e.pointerId, x: e.clientX, y: e.clientY, r, next: r, target: e.currentTarget };
+    if (kind !== "move") compactHeights.delete(tool);
+    drag = { tool, kind, profile, bounds: resizeBounds(), id: e.pointerId, x: e.clientX, y: e.clientY, r, next: r, target: e.currentTarget };
     e.currentTarget.setPointerCapture?.(e.pointerId);
     win.el.classList.add(kind === "move" ? "moving" : "resizing");
   }
@@ -545,53 +469,53 @@ export function createToolWindows(options) {
     const dx = e.clientX - drag.x,
       dy = e.clientY - drag.y;
     const r = drag.r;
-    if (drag.kind === "resize-left") {
-      const w = Math.max(MIN_W, Math.min(r.x + r.w - MARGIN, r.w - dx));
-      drag.next = { x: r.x + r.w - w, y: r.y, w, h: Math.max(MIN_H, Math.min(ws.height - MARGIN - r.y, r.h + dy)) };
-      place(windows.get(drag.tool).el, drag.next);
-      return;
-    }
-    let next =
-      drag.kind === "move"
-        ? { ...r, x: r.x + dx, y: r.y + dy }
-        : { ...r, w: Math.max(MIN_W, r.w + dx), h: Math.max(MIN_H, r.h + dy) };
-    const bounds = floatingWorkspace();
-    next = clampRect(next, bounds);
-    if (drag.kind === "resize") {
-      next.x = r.x;
-      next.y = r.y;
-      next.w = Math.min(next.w, bounds.width - MARGIN - r.x);
-      next.h = Math.min(next.h, ws.height - MARGIN - r.y);
-    }
+    const next = drag.kind === "move"
+      ? clampRect({ ...r, x: r.x + dx, y: r.y + dy }, floatingWorkspace())
+      : resizedRect(r, drag.kind, dx, dy, drag.bounds, MIN_W, MIN_H);
     drag.next = next;
     place(windows.get(drag.tool).el, next);
   }
   function dragEnd(e) {
     if (!drag || (e && e.pointerId !== drag.id)) return;
-    const { tool, kind, r, next, target, id } = drag;
+    const { tool, kind, r, next, target, id, profile: startProfile } = drag;
     drag = null;
     if (target.hasPointerCapture?.(id)) target.releasePointerCapture(id);
     windows.get(tool).el.classList.remove("moving", "resizing");
     if (next === r) return;
+    if (startProfile !== "float") {
+      dockedRects.set(`${startProfile}:${tool}`, anchorRect(next, ws));
+      apply();
+      return;
+    }
     const saved = state.rects.main;
     const anchored = anchorRect(clampRect(next, floatingWorkspace()), ws);
     // Older sessions stored one explicit size for the shared palette.
     const heights = saved?.heights ?? (saved ? Object.fromEntries(TOOL_IDS.map(id => [id, saved.h])) : {});
     anchored.heights = { ...heights };
-    if (kind.startsWith("resize")) anchored.heights[tool] = anchored.h;
+    if (kind !== "move") anchored.heights[tool] = anchored.h;
     commit(moveTool(state, tool, anchored));
   }
-  for (const { head, grip, gripLeft } of windows.values())
-    for (const el of [head, grip, gripLeft]) {
-      el.addEventListener("pointermove", dragMove);
-      el.addEventListener("pointerup", dragEnd);
-      el.addEventListener("pointercancel", dragEnd);
-      el.addEventListener("lostpointercapture", dragEnd);
-    }
+  for (const { el } of windows.values()) {
+    el.addEventListener("pointermove", dragMove);
+    el.addEventListener("pointerup", dragEnd);
+    el.addEventListener("pointercancel", dragEnd);
+    el.addEventListener("lostpointercapture", dragEnd);
+  }
+
+  function resizeBounds() {
+    const inset = profile === "float" ? MARGIN : 0;
+    const bottomGap = profile === "float" ? inset : metrics().sheetBottomGap;
+    return { left: inset, top: inset, right: floatingWorkspace().width - inset, bottom: ws.height - bottomGap };
+  }
 
   // ---- Layout ----
   function rectFor(tool) {
-    if (profile !== "float") return defaultRect(profile, ws, metrics());
+    if (profile !== "float") {
+      const saved = dockedRects.get(`${profile}:${tool}`);
+      if (!saved) return defaultRect(profile, ws, metrics());
+      const bounds = resizeBounds();
+      return clampRect(resolveRect(saved, ws), { width: bounds.right, height: bounds.bottom }, 0);
+    }
     const saved = state.rects.main;
     const bounds = floatingWorkspace();
     const r = clampRect(saved ? resolveRect(saved, ws) : defaultRect("float", ws, metrics()), bounds);
@@ -666,26 +590,17 @@ export function createToolWindows(options) {
       const wasHidden = win.el.hidden;
       win.el.hidden = false;
       win.el.dataset.place = profile;
-      const tuning = markTunePath(id);
-      win.el.dataset.tune = String(tuning);
       let r = rectFor(id);
-      if (tuning || (profile !== "float" && (launcher === "menu" || id === "extent"))) {
+      if (profile !== "float" && !dockedRects.has(`${profile}:${id}`) && (launcher === "menu" || id === "extent")) {
         // Measure at the final width so wrapped controls and validation
         // messages count toward the height of the docked panel.
         win.el.style.width = `${r.w}px`;
-        let natural;
-        if (tuning) {
-          win.el.style.height = "auto";
-          natural = Math.ceil(win.el.getBoundingClientRect().height);
-        } else {
-          natural = naturalHeight(win);
-        }
-        const h = Math.min(natural, r.h);
+        const h = Math.min(naturalHeight(win), r.h);
         r = { ...r, y: profile === "sheet" ? r.y + r.h - h : r.y, h };
       }
       // Compact is an explicit request, never an automatic camera or palette
       // reframe. Keep that height stable even if content subsequently changes.
-      if (!tuning && compactHeights.has(id)) {
+      if (compactHeights.has(id)) {
         const h = Math.min(r.h, Math.max(win.head.getBoundingClientRect().height + 2, compactHeights.get(id)));
         r = { ...r, y: profile === "sheet" ? r.y + r.h - h : r.y, h };
       }
@@ -706,13 +621,10 @@ export function createToolWindows(options) {
         if (field.bottom > body.bottom - MARGIN) win.body.scrollTop += field.bottom - body.bottom + MARGIN;
         else if (field.top < body.top + MARGIN) win.body.scrollTop -= body.top + MARGIN - field.top;
       }
-      // A header-only folded panel has no free corner for resizing: the
-      // grips would intercept Close and the title. Expand restores them.
-      win.grip.hidden = win.gripLeft.hidden = r.h <= win.head.getBoundingClientRect().height + 2;
+      win.edges.hidden = r.h <= win.head.getBoundingClientRect().height + 2;
       const compacted = compactHeights.has(id);
       const fold = naturalHeight(win) >= r.h - 48;
       const action = compacted ? "Expand" : fold ? "Fold" : "Compact";
-      win.buttons.compact.hidden = tuning;
       win.buttons.compact.innerHTML = svg(compacted ? ICONS.expand : ICONS.fold);
       win.buttons.compact.setAttribute("aria-expanded", String(!compacted));
       win.buttons.compact.title = compacted ? "Restore the full panel height" : fold
@@ -720,13 +632,6 @@ export function createToolWindows(options) {
       win.buttons.compact.setAttribute("aria-label", `${action} ${win.tool.title} panel`);
       rects.set(id, r);
       if (wasHidden) win.body.scrollTop = win.scroll;
-      const { tune } = win.buttons;
-      refreshTuneButton(id);
-      tune.setAttribute("aria-pressed", String(tuning));
-      tune.textContent = tuning ? "All settings" : "Tune";
-      tune.setAttribute("aria-label", tuning ? `Show all settings for ${win.tool.title}` : `Tune the chosen ${win.tool.title} entry with the crystal in view`);
-      tune.title = tuning ? "Show all settings of this tool again" : "Keep only the chosen entry, with more room for the crystal";
-
     }
     applyStacking();
     for (const tool of TOOLS) {

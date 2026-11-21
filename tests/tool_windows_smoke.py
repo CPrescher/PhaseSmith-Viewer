@@ -204,16 +204,12 @@ async def interaction_details(browser, phone=False):
  # and verify the renderer uses the exact resulting value.
  value=float(await slider.input_value());assert 55<value<100,value
  assert abs(next(m['opacity'] for m in (await diagnostics(page))['faceMaterials'] if m['id']==1)-value/100)<1e-8
- if phone:
-  # Remember the actual scroll position after focusing the chosen entry.
-  await field.click();saved=await body.evaluate('el=>el.scrollTop');base=await diagnostics(page)
-  await win.locator('[data-action=tune]').tap();assert (await diagnostics(page))['windows']['state']['tune'];unchanged(base,await diagnostics(page))
-  await win.locator('[data-action=tune]').tap();assert abs(await body.evaluate('el=>el.scrollTop')-saved)<1
- else:
+ assert await win.locator('[data-action=tune]').count()==0
+ if not phone:
   base=await diagnostics(page);head=await win.locator('.tool-window-title').bounding_box()
   await page.mouse.move(head['x']+20,head['y']+10);await page.mouse.down();await page.mouse.move(head['x']-100,head['y']+50,steps=6);await page.mouse.up();await settle(page)
   unchanged(base,await diagnostics(page))
-  grip=await win.locator('.window-grip:not(.window-grip-left)').bounding_box();await page.mouse.move(grip['x']+grip['width']-4,grip['y']+grip['height']-4);await page.mouse.down();await page.mouse.move(grip['x']+grip['width']+20,grip['y']+grip['height']+20,steps=5);await page.mouse.up();await settle(page)
+  grip=await win.locator('[data-edge=se]').bounding_box();await page.mouse.move(grip['x']+grip['width']-4,grip['y']+grip['height']-4);await page.mouse.down();await page.mouse.move(grip['x']+grip['width']+20,grip['y']+grip['height']+20,steps=5);await page.mouse.up();await settle(page)
   unchanged(base,await diagnostics(page))
  # Lattice changes must retain row bounds and per-tool scroll on return.
  await choose_tool(page,'#mode-lattice',phone)
@@ -260,7 +256,7 @@ async def interaction_details(browser, phone=False):
  for box in await buttons.evaluate_all('els=>els.filter(e=>e.getClientRects().length).map(e=>({w:e.offsetWidth,h:e.offsetHeight}))'):
   if phone:assert min(box['w'],box['h'])>=44,box
  await page.close()
- print(('Phone' if phone else 'Desktop')+': native edit frames, fixed scene on move/resize, values/scroll, invalid hkl, picking, Tune/rotation',flush=True)
+ print(('Phone' if phone else 'Desktop')+': native edit frames, fixed scene on move/resize, values/scroll, invalid hkl, picking, rotation',flush=True)
 
 async def main():
  async with async_playwright() as p:
