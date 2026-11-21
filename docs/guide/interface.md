@@ -6,7 +6,7 @@ The images below are actual screenshots. Numbered outlines locate each group; en
 
 ## Identify the structure
 
-The header shows the structure name and space group. Select either to open **Structure info** on a computer or phone. The panel lists the six unit-cell parameters and their reported standard uncertainties, calculated cell volume, crystal system, symmetry operations count, independent sites, and positions per cell. It also identifies the active CIF block and links to the original reference for library structures. The header, Structure info panel, and library use the same space-group notation, including overbars (Fm3̅m) and screw-axis subscripts (P3₂21). If the CIF supplies no symmetry, the header marks the assumed P1 setting.
+The header shows the structure name and space group. Select either to open **Structure info** on a computer or phone. The panel lists the six unit-cell parameters and their reported standard uncertainties, calculated cell volume, crystal system, symmetry operations count, independent sites, and positions per cell. It also identifies the active CIF block and links to the original reference for library structures. The header, Structure info panel, and library use Hermann–Mauguin notation, including overbars (Fm3̅m) and screw-axis subscripts (P3₂ 2 1). If the CIF supplies no symmetry, the header marks the assumed P1 setting.
 
 ## On a computer or landscape tablet
 

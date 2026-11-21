@@ -11,7 +11,8 @@ export function searchLibrary(query = '', collection = '') {
   const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
   return entries.filter((entry) => (!collection || entry.collections.includes(collection)) &&
     terms.every((term) => normalize([
-      entry.name, entry.formula, entry.family, entry.description, entry.spaceGroup, formatSpaceGroup(entry.spaceGroup),
+      entry.name, entry.formula, entry.family, entry.description, entry.spaceGroup,
+      formatSpaceGroup(entry.spaceGroup).replaceAll(' ', ''),
       ...entry.aliases, entry.source.label,
     ].join(' ')).includes(term)));
 }
