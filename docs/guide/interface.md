@@ -38,7 +38,7 @@ The header stays at the top. The measurement buttons move into a **vertical colu
 
 Tap **Tools** to reveal the labeled menu shown below, then choose the tool. Its settings open in a sheet over the lower part of the crystal. In short landscape phone views, the placement adapts to the available space. **Details** under the measurement buttons expands the selected-atom or measurement readout.
 
-<ViewerFigure name="phone-tools" alt="The expanded phone Tools menu listing Bonds & polyhedra, Sites, Lattice, Extent, Distances, Powder, Reflection, Detector, Style, Export and Help." caption="The menu contains settings tools. Distance and Angle remain in the separate measurement column." />
+<ViewerFigure name="phone-tools" alt="Phone Tools menu with Overlays and Analysis grouped between the structure, display and Help controls." caption="The menu contains settings tools. Distance and Angle remain in the separate measurement column." />
 
 ## Which tool do I need?
 
@@ -51,11 +51,13 @@ Tap **Tools** to reveal the labeled menu shown below, then choose the tool. Its 
 | **Distances** | Periodic interatomic distance distribution | [Pair distances](./plots.md#pair-distances) |
 | **Powder** | Calculated powder diffraction and measured traces | [Powder diffraction](./plots.md#powder-diffraction-x-ray) |
 | **Reflection** | Atomic layers, phases, and the structure factor for one reflection | [Explore a single reflection](./plots.md#explore-a-single-reflection) |
-| **Detector** | Ewald sphere, specimen rotation, and predicted detector spots | [Diffraction detector](./plots.md#explore-a-single-reflection) |
+| **Detector** | Ewald sphere, specimen rotation, and predicted detector spots | [Diffraction detector](./plots.md#diffraction-detector) |
 | **Style** | Colors, sphere sizes and individual overrides | [Appearance](./navigation.md#appearance) |
 | **Export** | PNG images and turntable movies | [Saving and exporting](./saving.md) |
 
 When the launcher is short on space, **Overlays** opens Planes, Directions and Symmetry, and **Analysis** opens Distances, Powder, Reflection and Detector. Each group opens a narrow bar to its left. Choose a tool, or press Escape to return to the group.
+
+<ViewerFigure name="phone-analysis" alt="Analysis expanded to the left of the phone Tools menu, with Distances, Powder, Reflection and Detector." />
 
 ## When a control is out of sight
 
@@ -63,6 +65,6 @@ A scrollbar shows when more content is available. Scroll inside the panel to rea
 
 The crystal stays in place while you open and switch tools. Drag on the crystal to rotate it; drag inside a scrollable panel to scroll its settings on touch screens.
 
-In a phone science window, **Tools** moves into its header so it cannot cover results.
+When Distances, Powder, Reflection or Detector is open on a phone, **Tools** moves into the panel header. In portrait you can still tap the structure name, open a file or use **⋯** above the panel. In short landscape views the panel header also provides a project menu.
 
 Drag any edge or corner to resize a tool panel.

@@ -1,7 +1,7 @@
 {
   "interface": {
     "width": 1280,
-    "height": 800,
+    "height": 900,
     "display": 740,
     "regions": [
       {
@@ -30,15 +30,15 @@
       },
       {
         "x": 1195,
-        "y": 194,
+        "y": 204,
         "width": 68,
-        "height": 469,
+        "height": 549,
         "number": 4,
         "text": "Tool rail"
       },
       {
         "x": 9,
-        "y": 729,
+        "y": 829,
         "width": 505,
         "height": 62,
         "number": 5,
@@ -129,52 +129,52 @@
   },
   "forsterite": {
     "width": 1280,
-    "height": 800,
+    "height": 900,
     "display": 740
   },
   "pairs": {
     "width": 336,
-    "height": 477,
+    "height": 548,
     "display": 420
   },
   "sites": {
     "width": 336,
-    "height": 477,
+    "height": 551,
     "display": 420
   },
   "extent": {
     "width": 336,
-    "height": 477,
+    "height": 313,
     "display": 420
   },
   "appearance": {
     "width": 336,
-    "height": 477,
+    "height": 385,
     "display": 420
   },
   "lattice": {
     "width": 336,
-    "height": 477,
+    "height": 363,
     "display": 420
   },
   "export": {
     "width": 336,
-    "height": 477,
+    "height": 463,
     "display": 420
   },
   "project": {
     "width": 376,
-    "height": 265,
+    "height": 283,
     "display": 420
   },
   "pair-distances": {
     "width": 426,
-    "height": 552,
+    "height": 652,
     "display": 680
   },
   "powder": {
     "width": 426,
-    "height": 552,
+    "height": 652,
     "display": 680
   },
   "phone": {
@@ -201,8 +201,8 @@
     ]
   },
   "phone-tools": {
-    "width": 336,
-    "height": 723,
+    "width": 314,
+    "height": 566,
     "display": 360
   },
   "tutorial-forsterite-start": {
@@ -279,5 +279,30 @@
     "width": 426,
     "height": 552,
     "display": 680
+  },
+  "directions": {
+    "width": 336,
+    "height": 245,
+    "display": 420
+  },
+  "reflection": {
+    "width": 1176,
+    "height": 771,
+    "display": 680
+  },
+  "detector": {
+    "width": 426,
+    "height": 652,
+    "display": 680
+  },
+  "phone-analysis": {
+    "width": 388,
+    "height": 510,
+    "display": 390
+  },
+  "radii": {
+    "width": 310,
+    "height": 198,
+    "display": 420
   }
 }

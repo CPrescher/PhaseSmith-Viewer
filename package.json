@@ -19,5 +19,6 @@
     "vite": "^7.2.0",
     "vitepress": "^1.6.4"
   },
-  "description": "Interactive crystal structures from CIF, with a local PhaseSmith WebAssembly engine."
+  "description": "Interactive crystal structures from CIF, with a local PhaseSmith WebAssembly engine.",
+  "version": "1.0.0"
 }

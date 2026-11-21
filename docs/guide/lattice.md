@@ -2,11 +2,17 @@
 
 Choose **Planes**, **Directions**, or **Symmetry** in the launcher. When the entries don’t all fit, open **Overlays** to find them. On a phone, open **Tools** first. The screenshot shows the controls after adding a plane.
 
-<ViewerFigure name="lattice" alt="Lattice window with an added Miller-index plane, offset, parallel planes and appearance controls." />
+<ViewerFigure name="lattice" alt="Planes panel with an added Miller-index plane, offset, parallel planes and appearance controls." />
 
 ## Add a plane
 
 Choose **Planes** from the tools. **＋ Plane** adds a Miller-index plane with integer indices and an editable fractional offset m in hx + ky + lz = m. A new plane starts at a whole-number m: the integer closest to the center of the displayed extent among those whose plane crosses its interior (ties go toward 0), otherwise the nearest integer on its boundary. In one cell, (100) starts at m = 1, (1̄00) at −1 and (11̄0) at 0. A very narrow fractional extent may contain no plane with an integer m; the plane's readout then says so, and you can type a fractional m, widen the extent or raise Size. While m has not been typed in, it follows changes to the indices. Once you enter m yourself it stays fixed, also when the indices or the extent change.
+
+The **+ Plane** button follows the last plane. In a two-column panel it fills the next empty cell. Use the trash button on a plane to remove that entry. Directions and Bonds & polyhedra use the same arrangement for arrows and pairs.
+
+### Entering three indices
+
+A first mouse click in an unfocused **(hkl)** or **[uvw]** field selects its contents. Double-click to select all three indices again. Type `110` for `1 1 0`, or `1-10` for `1 -1 0`. Separate multi-digit indices with spaces, as in `10 1 0`. On a phone, the extra minus and space keys let you enter signed indices from the numeric keyboard.
 
 ## Parallel planes and appearance
 
@@ -18,13 +24,15 @@ Choose **Planes** from the tools. **＋ Plane** adds a Miller-index plane with i
 
 ## Plane labels
 
-The shared **Labels** toggle annotates added planes and directions. The adjacent **m** checkbox adds the offset to plane labels ("(100) · m=0.5"); turned off, labels show only the indices. It changes label text only, and in exports too.
+The shared **Labels** toggle annotates added planes and directions. The adjacent **m** checkbox adds the offset to plane labels ("(100) · m=0.5"); turned off, labels show only the indices. Enable **Labels** to use **m**. The same label text appears in exported images and movies.
 
 **Position** places plane labels **Outside** a projected edge of the drawn plane with a short leader line in the plane's color (default), against an **Edge** without a leader, or at the **Center** of the plane. Outside and Edge labels avoid the view controls, the legend, other labels and, where possible, the structure itself. In tight views a label falls back to sitting on the edge, and additional parallel planes are left unlabeled rather than placed over the middle of the structure. Exported images and movies show the same label positions and leaders. Direction labels stay beside the arrow tip.
 
 ## Direct-lattice arrows
 
-In **Directions**, **＋ Arrow** adds a direct-lattice [uvw] vector with a fractional origin and a length multiplier.
+In **Directions**, **＋ Arrow** adds a direct-lattice [uvw] vector with a fractional origin and a length multiplier. For an arrow along **a + b**, enter `110` in **[uvw]** and leave the length at 1.
+
+<ViewerFigure name="directions" alt="Directions panel with the indices, fractional origin, length and color for an arrow, followed by the Add Arrow button." />
 
 ## Symmetry elements and operations
 

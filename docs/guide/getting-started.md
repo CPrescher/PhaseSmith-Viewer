@@ -4,9 +4,9 @@ This short walkthrough uses forsterite, Mg₂SiO₄, to introduce the main contr
 
 ## 1. Open the worked example
 
-[Open forsterite in the viewer](https://cprescher.github.io/PhaseSmith-Viewer/?example=forsterite). This address loads the bundled structure with Si–O and Mg–O pairs already configured. It starts the example even if the browser has a different saved session.
+<a href="../?example=forsterite" target="_blank" rel="noopener">Open forsterite in the viewer</a>. This address loads the bundled structure with Si–O and Mg–O pairs already configured. It starts the example even if the browser has a different saved session.
 
-The **Library** and **Open file** controls are in the **header at the upper right**, above the crystal. Library browses bundled structures. Choose **Open file** to load a CIF, or **⋯ → Open project** for a saved `.psv` scene.
+The **Library** and **Open file** controls are in the **header at the upper right**, above the crystal. Library browses bundled structures. Choose **Open file** to load a CIF or reopen a saved `.psv` scene.
 
 <ViewerFigure name="file-controls" alt="Library, Open file and project menu controls in the upper-right header." />
 
@@ -48,7 +48,7 @@ Choose **⋯ → Save project** in the header.
 
 <ViewerFigure name="project" alt="Header project menu with Save project and Open project." caption="Projects preserve the editable scene. Export contains image and movie output." />
 
-Keep the downloaded `.psv` file: it contains the original CIF and the viewer settings. Open it later with **⋯ → Open project**, including on another device.
+Keep the downloaded `.psv` file: it contains the original CIF and the viewer settings. Open it later with **Open file**, including on another device.
 
 For an image, use the PNG controls in **Export**. A picture preserves the appearance; a project preserves the interactive scene.
 

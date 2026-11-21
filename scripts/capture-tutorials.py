@@ -94,7 +94,7 @@ async def main():
         await page.locator('#file').set_input_files(shots.ROOT / 'public/example.cif')
         await page.wait_for_function('window.viewerDiagnostics().atoms.length > 0 && !window.viewerDiagnostics().session.suspended')
         await capture(page,'rock-salt-start')
-        await page.locator('#mode-lattice').click()
+        await shots.choose_tool(page, '#mode-lattice')
         await page.locator('#plane-add').click()
         plane=page.locator('[data-plane-id]').first
         await change(plane.locator('[data-field=hkl]'),'1 1 1')
@@ -109,8 +109,7 @@ async def main():
         assert second['hkl'] == [2,2,2] and second['m'] == 0 and second['family']
         assert abs(second['d']*2-first['d']) < 1e-9
         await capture(page,'planes-222')
-        await page.locator('#mode-lattice').click()
-        await page.locator('#mode-powder').click()
+        await shots.choose_tool(page, '#mode-powder')
         await page.wait_for_function("document.querySelector('#analysis-table th')?.textContent === '2θ (°)' && document.querySelector('#analysis-chart .analysis-profile')")
         await capture(page,'powder-settings',selectors=['#analysis-window'],display=680)
         await page.locator('#analysis-fwhm').fill('0')

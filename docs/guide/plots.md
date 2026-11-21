@@ -68,9 +68,17 @@ See [Scientific conventions](./science.md#diffraction) for the structure-factor 
 
 ## Explore a single reflection
 
-Open **Reflection** and enter the Miller indices and wavelength to inspect how the atomic layers contribute to the reflection. Like the plot windows and Detector, it is a movable window: its title bar moves it, and its launcher, ×, or Escape closes it without changing the main view. On compact screens, use **Crystal**, **Phase sum**, and **Ray paths** to choose the explanation, and expand **Wavelength / detector** for the wavelength, detector link, or exercise export. Use **Detector** to see where that reflection lands. The Ewald sphere shows the reciprocal lattice, the incident beam, and the diffracted beam.
+Open **Reflection** and enter the Miller indices and wavelength to inspect how the atomic layers contribute to the reflection. Like the plot windows and Detector, it is a movable window: its title bar moves it, and its launcher, ×, or Escape closes it without changing the main view. On compact screens, use **Crystal**, **Phase sum**, and **Ray paths** to choose the explanation, and expand **Wavelength / detector** for the wavelength, detector link, or exercise export. Choose **Show on detector** to follow that same reflection to its predicted spot. The **(hkl)** field here and in Detector accepts compact entries such as `200` for `2 0 0`. Use spaces for multi-digit indices.
 
-In **Detector**, enter **2 0 0** for periclase and press **Enter** to rotate to the reflection. Step through other crossings with **Previous reflection** and **Next reflection**. Choose **Link main view** to turn the specimen from the crystal view. **Show crystal** reduces the detector to a control dock; **Show detector** restores the diagrams. On phones, switch between **Ewald sphere** and **Detector spots**. In landscape, the controls and diagrams scroll independently. With the powder plot open, selecting a detector spot also highlights its powder line when it is in range.
+<ViewerFigure name="reflection" alt="Reflection explorer showing the selected Miller indices, crystal layers and contributions to the structure factor." />
+
+## Diffraction detector
+
+<ViewerFigure name="detector" alt="Diffraction detector showing the Ewald sphere, the Detector spots tab and crystal rotation controls." />
+
+The Ewald sphere shows the reciprocal lattice, the incident beam and the diffracted beam.
+
+In **Detector**, enter **2 0 0** for periclase and press **Enter** to rotate to the reflection. Step through other crossings with **Previous reflection** and **Next reflection**. Choose **Link main view** to turn the specimen from the crystal view. **Show crystal** reduces the detector to a control dock; **Show detector** restores the diagrams. On phones, switch between **Ewald sphere** and **Detector spots**. In landscape, the controls and diagrams scroll independently. With Powder open, selecting a detector reflection synchronizes the wavelength and extends the plot range if needed to include its powder line.
 
 Geometry edits apply immediately; mounting matrices use **Apply orientation**. Open **Options**, a movable window beside the detector on a wide screen, to change the wavelength, detector distance, or detector shape, import a PONI calibration, or set the specimen orientation and rotation axis.
 

@@ -2,7 +2,7 @@
 
 Open **Style → Radius model & displacement → Radius model** to choose how large the viewer draws each atom. On a phone, open **Tools → Style**. The default is **Crystal (Shannon 1976)**. Changes affect the spheres you see and pick. Distance, angle, coordination, and polyhedron volume use the atomic coordinates.
 
-<ViewerFigure name="appearance" alt="Appearance window with Crystal (Shannon 1976) selected under Sphere radii." />
+<ViewerFigure name="radii" alt="Radius model and displacement controls in Style, with Crystal (Shannon 1976) selected." />
 
 ## Compare the four models
 

@@ -56,4 +56,4 @@ Transparent scenes with deep stacks of overlapping surfaces may show a renderer 
 
 ## Report a problem
 
-[Open a GitHub issue](https://github.com/CPrescher/PhaseSmith-Viewer/issues) with the browser and device, steps to reproduce, expected result, and actual result. Include a screenshot and, where appropriate, a shareable CIF or `.psv` project. A project embeds the original CIF, so check its contents before attaching it publicly.
+[Open a GitHub issue](https://github.com/CPrescher/PhaseSmith-Viewer/issues) with the viewer version (at the bottom of the **⋯** menu), browser and device, steps to reproduce, expected result, and actual result. Include a screenshot and, where appropriate, a shareable CIF or `.psv` project. A project embeds the original CIF, so check its contents before attaching it publicly.

@@ -22,7 +22,7 @@ Click **Angle**, the **∠** button beside Distance, and pick three atoms in A�
 
 <ViewerFigure name="sites" alt="Sites and volumes window showing original CIF sites and the coordination table." />
 
-Choose **Sites**, the second button on the right-hand tool rail (or **Tools → Sites** on a phone), to see the original CIF site labels, fractional coordinates and occupancies. **Labels** annotates visible spheres. Tap a table row to highlight visible copies of that site. The polyhedron table reports coordination numbers and convex-hull volumes in Å³ by central site. These volumes use the physical atomic coordinates.
+Choose **Sites**, the second button on the right-hand tool rail (or **Tools → Sites** on a phone), to see the original CIF site labels, fractional coordinates and occupancies. **Site labels** annotates visible spheres. Tap a table row to highlight visible copies of that site. The polyhedron table reports coordination numbers and convex-hull volumes in Å³ by central site. These volumes use the physical atomic coordinates.
 
 **Show coordination shell** draws the neighbor hull around one equivalent atom: the visible copy closest to the center of the plotted structure. Rotating or panning the view keeps that choice fixed; changing the plotted extent or atom visibility chooses the closest available copy again. All equivalent site copies remain highlighted. The hull includes periodic neighbors within the site cutoff, so a large cutoff can encompass several neighbor layers and extend beyond the plotted atoms.
 

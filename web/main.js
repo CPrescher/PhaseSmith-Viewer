@@ -1,3 +1,4 @@
+import { version as viewerVersion } from "../package.json";
 import * as THREE from "three";
 import { ViewControls } from "./view-controls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
@@ -51,6 +52,7 @@ import {
 } from "./appearance.js";
 const $ = (id) => document.getElementById(id),
   viewport = $("viewport");
+$("viewer-version").textContent = `PhaseSmith Viewer ${viewerVersion}`;
 createFullscreenSwitch({ button: $("fullscreen-toggle"), status: $("fullscreen-status") });
 // The project menu can open from the main header or a floating inspector.
 const fileMenu = $("file-menu");

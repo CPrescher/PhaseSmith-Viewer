@@ -1,5 +1,7 @@
 """Check the published guide under the same URL prefix as the viewer."""
 import asyncio
+import json
+from pathlib import Path
 import os
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit, unquote
@@ -7,6 +9,7 @@ from playwright.async_api import async_playwright, expect
 
 URL = os.environ.get('VIEWER_URL', 'http://127.0.0.1:4181/PhaseSmith-Viewer').rstrip('/')
 DOCS = URL + '/docs/'
+VERSION = json.loads((Path(__file__).resolve().parents[1] / 'package.json').read_text())['version']
 
 
 class PageLinks(HTMLParser):
@@ -41,6 +44,21 @@ async def main():
         page = await context.new_page()
         await page.goto(DOCS)
         await expect(page.locator('h1')).to_contain_text('PhaseSmith Viewer user guide')
+
+        await expect(page.locator('main')).to_contain_text(f'PhaseSmith Viewer {VERSION}')
+        nav_viewer = page.get_by_role('link', name='Open viewer ↗', exact=True).first
+        assert await nav_viewer.evaluate('a => a.href') == URL + '/'
+        example = await context.new_page()
+        await example.goto(DOCS + 'getting-started.html')
+        async with context.expect_page() as opened:
+            await example.get_by_role('link', name='Open forsterite in the viewer').click()
+        crystal = await opened.value
+        await expect(crystal).to_have_url(URL + '/?example=forsterite')
+        await crystal.wait_for_function('window.viewerDiagnostics?.().coordination.polyhedronCount === 12')
+        await crystal.locator('#file-menu-button').click()
+        await expect(crystal.locator('#viewer-version')).to_have_text(f'PhaseSmith Viewer {VERSION}')
+        await crystal.close()
+        await example.close()
 
         # Crawl actual output links, including anchors and image assets. This
         # catches repository-prefix errors that a root-path preview can hide.
@@ -130,6 +148,9 @@ async def main():
         # the model or losing the current scene to documentation navigation.
         await page.goto(URL + '/')
         await page.wait_for_function('window.viewerDiagnostics?.().atoms.length > 0')
+        await page.locator('#file-menu-button').click()
+        await expect(page.locator('#viewer-version')).to_be_in_viewport()
+        await page.keyboard.press('Escape')
         await page.locator('#tools-menu').click()
         help_link = page.get_by_role('link', name='Help, user guide and Impressum (opens in a new tab)', exact=True)
         await help_link.scroll_into_view_if_needed()

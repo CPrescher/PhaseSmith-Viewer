@@ -1,6 +1,6 @@
 # Files and structure library
 
-Use **Library** or the **Open file** button in the upper-right header, above the crystal view. Choose **Open file** for a CIF or **⋯ → Open project** for a saved scene.
+Use **Library** or the **Open file** button in the upper-right header, above the crystal view. Choose **Open file** for either a CIF or a saved **.psv** project. You can also reopen a project from **⋯ → Open project**.
 
 <ViewerFigure name="file-controls" alt="Library, Open file and project menu controls in the header." />
 
@@ -28,10 +28,10 @@ The library is a selected collection, not an exhaustive mineral database. Solid 
 
 Direct links open specific entries:
 
-- [Quartz](https://cprescher.github.io/PhaseSmith-Viewer/?structure=quartz)
-- [Ideal cubic perovskite](https://cprescher.github.io/PhaseSmith-Viewer/?structure=cubic-perovskite)
-- [Forsterite worked example](https://cprescher.github.io/PhaseSmith-Viewer/?example=forsterite)
-- [Wollastonite worked example](https://cprescher.github.io/PhaseSmith-Viewer/?example=wollastonite)
+- <a href="../?structure=quartz" target="_blank" rel="noopener">Quartz</a>
+- <a href="../?structure=cubic-perovskite" target="_blank" rel="noopener">Ideal cubic perovskite</a>
+- <a href="../?example=forsterite" target="_blank" rel="noopener">Forsterite worked example</a>
+- <a href="../?example=wollastonite" target="_blank" rel="noopener">Wollastonite worked example</a>
 
 A structure link selects a starting structure. It does **not** encode your current camera, colors, or cutoffs. Share a [`.psv` project](./saving.md#portable-project-files) to transfer those settings.
 

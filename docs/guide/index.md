@@ -2,11 +2,15 @@
 title: User guide
 description: Learn to explore crystal structures, measure atomic geometry, and illustrate coordination and diffraction with PhaseSmith Viewer.
 ---
+<script setup>
+import { version } from "../../package.json"
+</script>
+
 # PhaseSmith Viewer user guide
 
 Explore a crystal structure from its atoms to its coordination polyhedra, lattice planes, and powder diffraction pattern. PhaseSmith Viewer runs in your browser on a computer, tablet, or phone. Open a CIF or choose a structure from the built-in library to begin.
 
-**[Open the viewer ↗](https://cprescher.github.io/PhaseSmith-Viewer/)** · **[Start the five-minute guide](./getting-started.md)** · [Impressum & privacy](#impressum)
+**<a href="../" target="_blank" rel="noopener">Open the viewer ↗</a>** · **[Start the five-minute guide](./getting-started.md)** · [Impressum & privacy](#impressum)
 
 <ViewerFigure name="forsterite" alt="Forsterite in PhaseSmith Viewer, showing Si–O tetrahedra and Mg–O octahedra with the Bonds & polyhedra controls." />
 <p class="caption">Forsterite: use pair cutoffs to explore the coordination around silicon and magnesium.</p>
@@ -31,7 +35,7 @@ The [worked examples](./tutorials.md) walk through coordination in forsterite, s
 
 ## About this guide
 
-This guide describes the released GitHub Pages viewer. Labels in **bold** match controls in the application. Lengths are in ångströms (Å), angles in degrees, and volumes in Å³ unless stated otherwise.
+This guide accompanies PhaseSmith Viewer **{{ version }}**. To check the version in the viewer, open the **⋯** menu beside **Open file**. The version appears at the bottom. Labels in **bold** match controls in the application. Lengths are in ångströms (Å), angles in degrees, and volumes in Å³ unless stated otherwise.
 
 Structure files are parsed and analyzed locally in the browser. Save a `.psv` project when you need a portable copy of your work; browser autosave alone is not a backup. For source code, issues, and contributions, visit [GitHub](https://github.com/CPrescher/PhaseSmith-Viewer).
 

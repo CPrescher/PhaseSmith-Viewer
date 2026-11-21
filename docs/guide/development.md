@@ -16,14 +16,12 @@ Open the address printed by Vite. The compiled importer is already included as `
 To serve the production build locally:
 
 ```sh
-npm run build
-npm run docs:build
-python3 -m http.server 4179 --bind 127.0.0.1 --directory dist
+npm run preview
 ```
 
-The viewer is at `http://127.0.0.1:4179/` and the guide at `http://127.0.0.1:4179/docs/`. A static local build can run without an internet connection.
+The viewer is at `http://127.0.0.1:4216/` and the guide at `http://127.0.0.1:4216/docs/`. A static local build can run without an internet connection.
 
-To use it on a tablet on the same network, bind the server to `0.0.0.0` and open the computer's local IP address at port 4179 on the tablet.
+To use it on a tablet on the same network, serve the built `dist/` directory on the computer with `python3 -m http.server 4179 --bind 0.0.0.0 --directory dist` and open `http://<computer-IP>:4179/` on the tablet.
 
 ## Edit this guide
 
@@ -46,8 +44,8 @@ VitePress checks internal page links during the build. Match documented control 
 With the production viewer served locally and Playwright installed, run:
 
 ```sh
-VIEWER_URL=http://127.0.0.1:4179 python3 scripts/capture-docs.py
-VIEWER_URL=http://127.0.0.1:4179 python3 scripts/capture-tutorials.py
+VIEWER_URL=http://127.0.0.1:4216 python3 scripts/capture-docs.py
+VIEWER_URL=http://127.0.0.1:4216 python3 scripts/capture-tutorials.py
 ```
 
 Set `BROWSER_CHANNEL=chrome` to use an installed Chrome. The script captures each scene in both themes on the same page, preserving camera, selections, and panel scroll. It measures the real button positions for the callout labels. Commit both theme images and the generated figure metadata together.
@@ -84,8 +82,8 @@ Browser checks use Python Playwright. Install `tests/requirements-browser.txt` a
 ```sh
 python3 -m pip install -r tests/requirements-browser.txt
 python3 -m playwright install chromium
-VIEWER_URL=http://127.0.0.1:4179 python3 tests/pages_smoke.py
-VIEWER_URL=http://127.0.0.1:4179 python3 tests/docs_smoke.py
+VIEWER_URL=http://127.0.0.1:4216 python3 tests/pages_smoke.py
+VIEWER_URL=http://127.0.0.1:4216 python3 tests/docs_smoke.py
 ```
 
 Use the individual browser checks in `tests/` when changing the corresponding feature. The workflow's **full_browser_matrix** option runs the extended screen, theme, and pixel-density checks.

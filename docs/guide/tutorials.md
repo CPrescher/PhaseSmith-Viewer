@@ -10,7 +10,7 @@ Each example uses a bundled structure. Save a project before opening an example 
 
 ### 1. Open the example and check the pairs
 
-[Open the forsterite example](https://cprescher.github.io/PhaseSmith-Viewer/?example=forsterite). Choose **Bonds & polyhedra** on the right-hand tool rail (on a phone, open **Tools → Bonds & polyhedra**). Keep **Si–O = 1.80 Å** and **Mg–O = 2.30 Å**, with **Polyhedra** enabled in both pair cards.
+<a href="../?example=forsterite" target="_blank" rel="noopener">Open the forsterite example</a>. Choose **Bonds & polyhedra** on the right-hand tool rail (on a phone, open **Tools → Bonds & polyhedra**). Keep **Si–O = 1.80 Å** and **Mg–O = 2.30 Å**, with **Polyhedra** enabled in both pair cards.
 
 <ViewerFigure name="tutorial-forsterite-start" alt="Forsterite with blue silicon tetrahedra, green magnesium octahedra, and both pair controls enabled." caption="Starting point: blue Si–O tetrahedra and green Mg–O octahedra appear together. The two pair cards control them separately." />
 
@@ -52,13 +52,13 @@ Set the **Mg–O** cutoff back to **2.30 Å** and press **Enter**.
 
 ### 1. Follow the chain through three cells
 
-[Open the wollastonite example](https://cprescher.github.io/PhaseSmith-Viewer/?example=wollastonite). It starts looking along **c**, with three cells along **b**. Choose **Extent** on the tool rail (on a phone, **Tools → Extent**) to see the ranges. Follow the Si–O tetrahedra across the internal cell boundaries.
+<a href="../?example=wollastonite" target="_blank" rel="noopener">Open the wollastonite example</a>. It starts looking along **c**, with three cells along **b**. Choose **Extent** on the tool rail (on a phone, **Tools → Extent**) to see the ranges. Follow the Si–O tetrahedra across the internal cell boundaries.
 
 <ViewerFigure name="tutorial-wollastonite-three-cells" alt="Wollastonite viewed along c with connected silicon tetrahedra spanning three cells along b and Extent set from zero to three." caption="The b range is 0–3. Shared oxygen vertices connect neighboring tetrahedra across the internal cell boundaries; the chain continues beyond one unit cell." />
 
 ### 2. Reduce the view to one cell
 
-In **Extent**, change the upper **b** limit from **3** to **1** and press **Enter**.
+In **Extent**, tap **−** twice beside **b Max** to reduce it from **3** to **1**. You can also type **1** and press **Enter**.
 
 <ViewerFigure name="tutorial-wollastonite-one-cell" alt="Wollastonite with the b range reduced to zero to one, showing a shorter segment of the silicate chain." caption="The b range is now 0–1, and fewer repeats are visible. The viewer refits the scene, so compare the cell boundaries and number of repeats rather than their size on screen." />
 
@@ -76,7 +76,7 @@ Restore the upper **b** limit to **3** and press **Enter**. Choose **Turn** in t
 
 ### 1. Load the rock-salt model
 
-Download the [ideal rock-salt CIF](https://cprescher.github.io/PhaseSmith-Viewer/example.cif), then load it with **Open file** in the upper-right header of the [viewer](https://cprescher.github.io/PhaseSmith-Viewer/).
+Download the <a href="../example.cif" target="_blank" rel="noopener">ideal rock-salt CIF</a>, then load it with **Open file** in the upper-right header of the <a href="../" target="_blank" rel="noopener">viewer</a>.
 
 <ViewerFigure name="tutorial-rock-salt-start" alt="The ideal sodium chloride structure loaded in the viewer before adding lattice planes." caption="Start with the NaCl model and its cubic unit-cell outline. No plane family has been added yet." />
 
@@ -110,7 +110,7 @@ Keep the rock-salt model open, or load it as described above. Choose **Powder** 
 
 Set **Peak FWHM = 0** to show discrete sticks. Select the first table row, **1 1 1**, or its stick near **27.367°**.
 
-<ViewerFigure name="tutorial-powder-sticks" alt="Discrete powder sticks with the 111 reflection selected in the graph and table." caption="The selected (111) line is highlighted in the graph and table. Its details show 2θ ≈ 27.367°, d ≈ 3.256 Å, relative intensity ≈ 8.14, and multiplicity 8." />
+<ViewerFigure name="tutorial-powder-sticks" alt="Discrete powder sticks with the 111 reflection selected in the graph and table." caption="The selected (111) line is highlighted in the graph and table. Its details show 2θ ≈ 27.367°, d ≈ 3.256 Å, relative intensity ≈ 8.13, and multiplicity 8." />
 
 ### 3. Broaden the pattern and export the lines
 
