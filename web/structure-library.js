@@ -1,3 +1,4 @@
+import { desktop, saveBlob } from "./desktop.js";
 import entries from './structure-library.json' with { type: 'json' };
 import { formatSpaceGroup, formulaLabel } from './structure-notation.js';
 
@@ -58,6 +59,14 @@ export function createStructureLibrary({ onSelect, isBusy }) {
       const download = el('a', '', 'CIF ↓');
       download.href = `${import.meta.env.BASE_URL}${entry.file}`;
       download.download = `${entry.id}.cif`;
+      if (desktop) download.onclick = async event => {
+        event.preventDefault();
+        try {
+          const response = await fetch(download.href);
+          if (!response.ok) throw Error("The bundled CIF could not be read.");
+          await saveBlob(await response.blob(), download.download);
+        } catch (error) { count.textContent = error.message; }
+      };
       details.append(link, document.createTextNode(' · '), download);
       card.append(details);
       return card;

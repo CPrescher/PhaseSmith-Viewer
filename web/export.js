@@ -1,3 +1,4 @@
+import { saveBlob } from "./desktop.js";
 // Image (PNG) and turntable movie export.
 //
 // A frame is composed on a 2D canvas: the theme's canvas background (or
@@ -119,17 +120,6 @@ export async function withPngDpi(blob, dpi) {
     offset = end;
   }
   return new Blob(parts, { type: "image/png" });
-}
-
-export function download(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -432,8 +422,9 @@ export function createExporter(ctx) {
       );
       const blob = await withPngDpi(encoded, dpi);
       const filename = `${slugName(ctx.name())}.png`;
-      download(blob, filename);
-      return { filename, width: size.width, height: size.height, bytes: blob.size, dpi };
+      const saved = await saveBlob(blob, filename);
+      if (!saved) return null;
+      return { filename: saved, width: size.width, height: size.height, bytes: blob.size, dpi };
     } finally {
       busy = false;
       ctx.setBusy(false);
@@ -550,8 +541,9 @@ export function createExporter(ctx) {
           if (canceled) return;
           restore();
           const filename = `${slugName(ctx.name())}-turntable.${support.extension}`;
-          download(blob, filename);
-          resolve({ filename, mime: support.mime, width: size.width, height: size.height, bytes: blob.size,
+          const saved = await saveBlob(blob, filename);
+          if (!saved) return resolve({ canceled: true, reason: "Save canceled." });
+          resolve({ filename: saved, mime: support.mime, width: size.width, height: size.height, bytes: blob.size,
             duration, requestedSeconds: seconds, slow: (duration ?? elapsed) > seconds * 1.2 });
         } catch (error) {
           if (!canceled) restore();

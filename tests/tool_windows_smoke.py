@@ -213,7 +213,12 @@ async def interaction_details(browser, phone=False):
   unchanged(base,await diagnostics(page))
  # Lattice changes must retain row bounds and per-tool scroll on return.
  await choose_tool(page,'#mode-lattice',phone)
- for _ in range(4):await page.locator('#plane-add').click()
+ # Allow the content-sized desktop panel to reach its height limit before
+ # checking scroll restoration. Wide/tall windows can fit four whole cards.
+ lattice_body=page.locator('#tool-window-lattice .tool-window-body')
+ for _ in range(12):
+  await page.locator('#plane-add').click();await settle(page)
+  if await lattice_body.evaluate('el=>el.scrollHeight-el.clientHeight>120'):break
  row=page.locator('[data-plane-id]').first;hkl=row.locator('input[type=text]').first
  await hkl.fill('1 1 1');await hkl.press('Tab');await hkl.scroll_into_view_if_needed();await settle(page)
  rect=await row.bounding_box();await hkl.fill('0 0 0');await hkl.press('Tab');await settle(page)
@@ -222,7 +227,7 @@ async def interaction_details(browser, phone=False):
  # Finish the edit and dismiss the touch keys before measuring saved scroll.
  await hkl.fill('1 1 0');await hkl.press('Enter');await settle(page)
  assert not (await diagnostics(page))['lattice']['planes'][0]['error']
- lattice_body=page.locator('#tool-window-lattice .tool-window-body');await lattice_body.hover();await page.mouse.wheel(0,400);await page.wait_for_timeout(150)
+ await lattice_body.hover();await page.mouse.wheel(0,400);await page.wait_for_timeout(150)
  saved=await lattice_body.evaluate('el=>el.scrollTop');assert saved>0
  await choose_tool(page,'#mode-pairs',phone);assert float(await field.input_value())==2.15
  await choose_tool(page,'#mode-lattice',phone);assert abs(await lattice_body.evaluate('el=>el.scrollTop')-saved)<1

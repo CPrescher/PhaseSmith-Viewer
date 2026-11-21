@@ -4,3 +4,5 @@ dist/
 .DS_Store
 __pycache__/
 docs/.vitepress/cache/
+src-tauri/target/
+src-tauri/gen/

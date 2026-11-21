@@ -1,0 +1,22 @@
+[package]
+name = "phasesmith-viewer"
+version = "1.0.0"
+edition = "2021"
+publish = false
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tempfile = "3"
+serde = { version = "1", features = ["derive"] }
+open = "5"
+percent-encoding = "2"
+
+[target.'cfg(windows)'.dependencies]
+tauri-plugin-single-instance = "2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }

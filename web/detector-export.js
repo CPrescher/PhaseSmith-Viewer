@@ -1,4 +1,5 @@
-import { download, slugName } from "./export.js";
+import { saveBlob } from "./desktop.js";
+import { slugName } from "./export.js";
 
 // The SVG snapshots have no access to the viewer's stylesheet.
 // Freeze the paint and text styles, including the current theme and axis colors.
@@ -84,5 +85,5 @@ export async function saveDetectorPNG({ sphere, detector, sample, settings, dete
   }
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
   if (!blob) throw Error("The browser could not encode the PNG.");
-  download(blob, slugName(sample) + "-diffraction.png");
+  await saveBlob(blob, slugName(sample) + "-diffraction.png");
 }

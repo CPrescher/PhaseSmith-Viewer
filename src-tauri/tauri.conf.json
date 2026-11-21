@@ -1,0 +1,91 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "PhaseSmith Viewer",
+  "version": "../package.json",
+  "identifier": "org.phasesmith.viewer",
+  "build": {
+    "frontendDist": "../dist",
+    "beforeBuildCommand": "npm run prepreview"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "PhaseSmith Viewer",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 540,
+        "minHeight": 400,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "capabilities": [
+        {
+          "identifier": "viewer",
+          "windows": [
+            "main"
+          ],
+          "permissions": [
+            "core:event:allow-listen",
+            "core:event:allow-unlisten",
+            "core:window:allow-is-fullscreen",
+            "core:window:allow-set-fullscreen"
+          ]
+        }
+      ],
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "cif"
+        ],
+        "name": "Crystallographic Information File",
+        "role": "Viewer",
+        "mimeType": "chemical/x-cif",
+        "rank": "Default"
+      },
+      {
+        "ext": [
+          "psv"
+        ],
+        "name": "PhaseSmith Viewer Project",
+        "role": "Editor",
+        "rank": "Owner",
+        "exportedType": {
+          "identifier": "org.phasesmith.viewer.project",
+          "conformsTo": [
+            "public.json"
+          ]
+        },
+        "contentTypes": [
+          "org.phasesmith.viewer.project"
+        ]
+      }
+    ],
+    "macOS": {
+      "minimumSystemVersion": "14.0"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "offlineInstaller",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

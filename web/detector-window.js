@@ -1,3 +1,4 @@
+import { saveBlob } from "./desktop.js";
 import { enableTripletSelection, numericKeys } from "./numeric-input.js";
 import { maxScatteringVector } from "./diffraction-engine.js";
 import { circularDetector, rectangularDetector, readPoni, calibratedDetector } from "./detector-geometry.js";
@@ -292,15 +293,13 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   }
   for (const id of ["from","to","cone"]) $(id).oninput = updateWedge;
   $("wedge").ontoggle = updateWedge;
-  $("coverage-csv").onclick = () => {
+  $("coverage-csv").onclick = async () => {
     const rows = ["h,k,l,omega_deg,two_theta_deg,d_A,F_squared"];
     for (const {point,omega} of scanWedge())
       rows.push([...point.hkl,omega,point.twoTheta,1/point.length,point.intensity].join(","));
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob([rows.join("\n")], {type:"text/csv"}));
-    link.download = "phasesmith-rotation-wedge.csv";
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    try {
+      await saveBlob(new Blob([rows.join("\n")], { type: "text/csv" }), "phasesmith-rotation-wedge.csv");
+    } catch (error) { $("coverage").textContent = error.message; }
   };
   $("project").onclick = () => document.getElementById("project-save").click();
   function align(fitFromExplorer = false) {

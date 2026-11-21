@@ -27,6 +27,23 @@ npm run preview
 
 Open the viewer at `http://127.0.0.1:4216/` and the guide at `http://127.0.0.1:4216/docs/`. Use these server URLs for previews; opening `index.html` directly does not load the application correctly.
 
+## Desktop app
+
+On macOS and Windows the Tauri app bundles the complete viewer, library and searchable guide. Opening a CIF or PSV from Finder or Explorer uses the same importer as **Open file**. Exports use native Save dialogs. The app restores the current scene and its undo/redo history when launched again.
+
+With the web dependencies installed, a Rust toolchain and the platform’s [Tauri build prerequisites](https://v2.tauri.app/start/prerequisites/), build the installers with:
+
+```sh
+# macOS (Apple silicon and Intel)
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+npm run desktop:build -- --target universal-apple-darwin --bundles app,dmg
+
+# Windows (run on the desired architecture)
+npm run desktop:build -- --bundles nsis
+```
+
+Installers are written beneath `src-tauri/target/` in the release bundle directory. The Windows setup includes the WebView2 offline installer.
+
 ## Documentation
 
 Edit Markdown in `docs/guide/`. Run `npm run docs:dev` for a live preview. The VitePress configuration, sidebar, and local search are in `docs/.vitepress/config.mjs`. Design review notes in `docs/reviews/` are not published.

@@ -9,6 +9,26 @@ export function createHistory({ limit = 100, equal = (a, b) => JSON.stringify(a)
       past = [];
       future = [];
     },
+    // Save one state per step. Neighboring entries already share an endpoint.
+    snapshot() {
+      return {
+        past: past.map(({ before, label }) => [before, label]),
+        future: future.map(({ after, label }) => [after, label]),
+      };
+    },
+    resume(saved) {
+      const valid = steps => Array.isArray(steps) && steps.length <= limit &&
+        steps.every(step => Array.isArray(step) && step.length === 2 &&
+          step[0] && typeof step[0] === "object" && typeof step[1] === "string");
+      if (!current || !valid(saved?.past) || !valid(saved?.future) ||
+          saved.past.length + saved.future.length > limit) return;
+      past = saved.past.map(([before, label], i) => ({
+        before, after: saved.past[i + 1]?.[0] ?? current, label,
+      }));
+      future = saved.future.map(([after, label], i) => ({
+        before: saved.future[i + 1]?.[0] ?? current, after, label,
+      }));
+    },
     checkpoint(state, label) {
       const next = clone(state);
       if (current === null || equal(current, next)) {

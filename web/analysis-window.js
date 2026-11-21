@@ -1,3 +1,4 @@
+import { saveBlob } from "./desktop.js";
 import { diffractionModule } from "./diffraction-engine.js";
 import { formatMillerIndices } from "./crystal-math.js";
 import { focusLauncher, floatingDialog, isFrontDialog } from "./floating-dialog.js";
@@ -327,19 +328,16 @@ export function createAnalysisWindow({ getStructure, onExplain, onChange = () =>
       : "Integrated intensities, strongest line = 100. One representative hkl is shown; overlapping reflections are summed.";
   }
   more.onclick = () => { expanded = !expanded; renderTable(); };
-  csv.onclick = () => {
+  csv.onclick = async () => {
     if (!result?.rows.length) return;
     const distances = resultMode === "distances";
     const rows = distances
       ? [["distance_A", "min_A", "max_A", "pairs_per_cell", "atom_pairs"], ...result.rows.map(r => [r.distance, r.min, r.max, r.count, pairText(r)])]
       : [["two_theta_deg", "d_A", "relative_integrated_intensity", "multiplicity", "hkls_Friedel_mates_implied", "wavelength_A"], ...result.rows.map(r => [r.twoTheta, r.d, r.intensity, r.multiplicity, r.hkls.map(h => h.join(" ")).join("; "), result.wavelength])];
     const text = rows.map(row => row.map(v => `"${String(v).replaceAll('"', '""')}"`).join(",")).join("\r\n");
-    const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `phasesmith-${distances ? "distances" : "powder"}.csv`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    try {
+      await saveBlob(new Blob([text], { type: "text/csv;charset=utf-8" }), `phasesmith-${distances ? "distances" : "powder"}.csv`);
+    } catch (error) { status.textContent = error.message; }
   };
 
   const show = floatingDialog(win, opener, $("analysis-head"), close);

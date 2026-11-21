@@ -59,3 +59,19 @@ test("layout camera updates preserve the current undo and redo branches", () => 
   history.undo(s => { restored = s; });
   assert.deepEqual(restored, { value: 0, camera: [7, 8, 9] });
 });
+
+test("a resumed desktop session preserves both sides of the undo cursor", () => {
+  const history = createHistory();
+  history.reset({ n: 0 });
+  for (let n = 1; n <= 3; n++) history.checkpoint({ n }, `Edit ${n}`);
+  history.undo(() => {});
+  history.undo(() => {});
+  const restored = createHistory();
+  restored.reset({ n: 1 });
+  restored.resume(structuredClone(history.snapshot()));
+  assert.deepEqual(restored.state, history.state);
+  for (const n of [2, 3]) restored.redo(s => assert.equal(s.n, n));
+  for (const n of [2, 1, 0]) restored.undo(s => assert.equal(s.n, n));
+  restored.checkpoint({ n: 8 }, "New edit");
+  assert.equal(restored.state.redoCount, 0);
+});

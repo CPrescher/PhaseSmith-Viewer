@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>PhaseSmith Viewer split crystal</title>
+  <defs>
+    <linearGradient id="base" x2=".7" y2="1" gradientUnits="objectBoundingBox"><stop stop-color="#283e54"/><stop offset="1" stop-color="#0b1622"/></linearGradient>
+    <linearGradient id="teal" x2="1" y2=".75"><stop stop-color="#86f6df"/><stop offset="1" stop-color="#16b29e"/></linearGradient>
+    <linearGradient id="ice" x2=".7" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#c8e7eb"/></linearGradient>
+  </defs>
+  <rect x="64" y="70" width="896" height="896" rx="206" fill="#08111b" opacity=".18"/>
+  <rect x="64" y="56" width="896" height="896" rx="206" fill="url(#base)"/>
+  <path fill="url(#teal)" d="M512 174 850 512 701 661 363 323Z"/>
+  <path fill="#118b82" d="m363 323 338 338-19 19-338-338Z"/>
+  <path fill="url(#ice)" d="m323 363 338 338-149 149L174 512Z"/>
+  <path fill="#8fc4ce" d="m174 512 338 338v20L174 532Z"/>
+</svg>

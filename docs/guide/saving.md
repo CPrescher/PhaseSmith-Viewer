@@ -16,6 +16,14 @@ In **Reflection** or **Detector**, choose **Save exercise** to save a project at
 
 The format is readable JSON with a format identifier and version, independent of the local browser session format. Unsupported versions and unreadable structures report an error and keep the current scene. Project contents stay local; nothing is uploaded.
 
+## Installed desktop app
+
+Double-click a CIF or a `.psv` project in Finder or Explorer to open it in the viewer. If another app handles the file, choose **Open With → PhaseSmith Viewer**. The bundled structure library, calculations and Help work offline. Links to external reference databases need a connection.
+
+**Save project**, image and movie exports, CSV exports and library CIF downloads open the system Save dialog. Choose the folder and filename there. Canceling leaves the destination untouched.
+
+Launching the app by itself restores the last structure, view, and up to 100 undo/redo steps. If you quit just after undoing an edit, **Redo** is available when you return. Opening another structure or project starts its own editing session. Use a project file to move your scene between the app and browser.
+
 ## Browser autosave
 
 The viewer saves its state on this device and restores it when you open the same page again, also after restarting the browser. This covers the loaded CIF and data block, the plotting extent, pairs and their cutoffs, colors and opacities, element and individual styles, atom visibility, size and labels, the asymmetric-unit view, planes, directions, symmetry and label settings, the camera, the turn angle, the measurement with its picked atoms in order, and the open tool windows with their places. Nothing is uploaded. Opening a different example address starts that example instead. **⋯ → This device** shows the save status; **Start fresh** asks for confirmation before discarding the saved session and reloads this page's structure.

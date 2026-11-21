@@ -1,3 +1,5 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { desktop, connectDesktop, saveBlob } from "./desktop.js";
 import { version as viewerVersion } from "../package.json";
 import * as THREE from "three";
 import { ViewControls } from "./view-controls.js";
@@ -53,7 +55,8 @@ import {
 const $ = (id) => document.getElementById(id),
   viewport = $("viewport");
 $("viewer-version").textContent = `PhaseSmith Viewer ${viewerVersion}`;
-createFullscreenSwitch({ button: $("fullscreen-toggle"), status: $("fullscreen-status") });
+document.documentElement.toggleAttribute("data-desktop-app", desktop);
+createFullscreenSwitch({ nativeWindow: desktop ? getCurrentWindow() : null, button: $("fullscreen-toggle"), status: $("fullscreen-status") });
 // The project menu can open from the main header or a floating inspector.
 const fileMenu = $("file-menu");
 let fileMenuButton = $("file-menu-button");
@@ -3040,7 +3043,7 @@ function initialize() {
         else sessionStatus("Part of the saved session could not be restored; the rest is shown.", true);
       }
     }
-    if (!task.project) currentProjectFilename = "";
+    if (!task.project) currentProjectFilename = desktop && typeof task.restore?.projectFilename === "string" ? task.restore.projectFilename : "";
     const displayedGeneration = structureGeneration;
     // Save only after the final layout/resize has settled (two frames),
     // so the restored camera is captured as restored, not refitted.
@@ -3052,6 +3055,7 @@ function initialize() {
         }
         if (displayedGeneration !== structureGeneration) return;
         history.reset(exportHistoryState());
+        if (desktop && task.restore && !task.project) history.resume(task.restore.undoHistory);
         historyReady = true;
         updateHistoryButtons();
         updateProjectButtons();
@@ -3107,33 +3111,33 @@ function initialize() {
   }
   createStructureLibrary({ onSelect: openLibraryEntry, isBusy: () => exporter.busy });
   $("open").onclick = () => $("file").click();
-  async function openFile(e, projectOnly = false) {
-    if (exporter.busy) { e.target.value = ""; return; }
-    const file = e.target.files[0];
-    if (file) {
-      const intent = ++userIntent;
-      try {
-        const text = await file.text();
-        if (intent !== userIntent) return;
-        if (projectOnly || /\.psv$/i.test(file.name)) {
-          const project = parseProject(text);
-          projectStatus(`Opening ${file.name}…`);
-          load(project.document.text, project.document.filename, project.state.block, project.state,
-            { name: file.name, theme: project.theme });
-        } else load(text, file.name);
-      } catch (err) {
-        if (intent !== userIntent) return;
-        $("loading").hidden = true;
-        $("open").disabled = false;
-        $("block").disabled = false;
-        updateProjectButtons();
-        updateHistoryButtons();
-        if (projectOnly || /\.psv$/i.test(file.name)) projectStatus(`Could not open ${file.name}: ${err.message}`, true);
-        $("error").hidden = false;
-        $("error").textContent = err.message;
-      }
-      e.target.value = "";
+  async function openDocument(file, projectOnly = false) {
+    const intent = ++userIntent;
+    try {
+      const text = await file.text();
+      if (intent !== userIntent) return;
+      if (projectOnly || /\.psv$/i.test(file.name)) {
+        const project = parseProject(text);
+        projectStatus(`Opening ${file.name}…`);
+        load(project.document.text, project.document.filename, project.state.block, project.state,
+          { name: file.name, theme: project.theme });
+      } else load(text, file.name);
+    } catch (err) {
+      if (intent !== userIntent) return;
+      $("loading").hidden = true;
+      $("open").disabled = false;
+      $("block").disabled = false;
+      updateProjectButtons();
+      updateHistoryButtons();
+      if (projectOnly || /\.psv$/i.test(file.name)) projectStatus(`Could not open ${file.name}: ${err.message}`, true);
+      $("error").hidden = false;
+      $("error").textContent = err.message;
     }
+  }
+  async function openFile(e, projectOnly = false) {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (file && !exporter.busy) await openDocument(file, projectOnly);
   }
   $("file").onchange = openFile;
   $("project-file").onchange = (e) => openFile(e, true);
@@ -3560,6 +3564,7 @@ function initialize() {
         return;
       }
       const result = await exporter.exportPNG({ scale: exportScale(), transparent: $("export-transparent").checked, dpi });
+      if (!result) { $("export-status").textContent = "Save canceled."; return; }
       $("export-status").textContent = `Saved ${result.filename} (${result.width} × ${result.height} px, ${result.dpi} dpi).`;
       lastExport = result;
     } catch (error) {
@@ -3691,7 +3696,7 @@ function initialize() {
     $("project-save").disabled = busy || !historyReady || !structure || !$("loading").hidden;
     $("project-open").disabled = busy;
   }
-  $("project-save").onclick = () => {
+  $("project-save").onclick = async () => {
     if (exporter.busy || !structure || !$("loading").hidden || saveSuspended > 0) return;
     try {
       flushHistory();
@@ -3702,16 +3707,10 @@ function initialize() {
         theme: themeSwitch.theme,
       });
       const filename = projectFilename(currentProjectFilename || currentFilename || structure.name);
-      const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.append(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-      currentProjectFilename = filename;
-      projectStatus(`Downloaded ${filename}. Open it to restore this project.`);
+      const saved = await saveBlob(new Blob([text], { type: "application/json" }), filename);
+      if (!saved) return;
+      currentProjectFilename = saved;
+      projectStatus(`${desktop ? "Saved" : "Downloaded"} ${saved}. Open it to restore this project.`);
     } catch (error) {
       projectStatus(`Could not save the project: ${error.message}`, true);
     }
@@ -4027,7 +4026,7 @@ function initialize() {
       build(); // include the last live edit and its resulting selection
     }
     cameraGesture = false;
-    if (history.checkpoint(exportHistoryState(), historyLabel)) scheduleSave();
+    if (history.checkpoint(exportHistoryState(), historyLabel)) saveHistoryChange();
     updateHistoryButtons();
   }
   function scheduleHistory(delay = 0) {
@@ -4131,7 +4130,7 @@ function initialize() {
     const label = history.state[`${action}Label`];
     if (history[action](applyHistoryState)) {
       $("history-status").textContent = `${action === "undo" ? "Undid" : "Redid"}: ${label}.`;
-      scheduleSave();
+      saveHistoryChange();
     }
     updateHistoryButtons();
   }
@@ -4161,6 +4160,12 @@ function initialize() {
     scheduleHistory(cameraGesture ? 220 : 0);
   });
 
+  function saveHistoryChange() {
+    // Finder can terminate the process before a debounced write fires.
+    if (desktop) void saveNow();
+    else scheduleSave();
+  }
+
   // Debounced autosave; the CIF text is only rewritten when it changed
   // (session-store keeps it separately).
   function scheduleSave(delay = 800) {
@@ -4175,6 +4180,10 @@ function initialize() {
     let state;
     try {
       state = exportViewerState();
+      if (desktop && historyReady) {
+        state.undoHistory = history.snapshot();
+        state.projectFilename = currentProjectFilename;
+      }
     } catch (error) {
       sessionStatus(`Could not collect the settings to save: ${error.message}`, true);
       return Promise.resolve(false);
@@ -4255,6 +4264,19 @@ function initialize() {
   // imported later); a different example URL starts that example. A file
   // the user opens meanwhile wins (userIntent).
   (async () => {
+    await connectDesktop({
+      open: (name, text) => openDocument({ name, text: async () => text }),
+      flush: async () => {
+        document.activeElement?.blur();
+        flushHistory();
+        if (!structure || saveSuspended > 0) return true;
+        return await saveNow() || confirm("The current session could not be saved. Quit with the last saved session?");
+      },
+      report: message => {
+        $("error").hidden = false;
+        $("error").textContent = message;
+      },
+    });
     let session = null;
     try {
       session = await sessionStore.load();
@@ -4262,7 +4284,7 @@ function initialize() {
       sessionStatus(`Saved sessions are unavailable on this device (${error?.message ?? error}). The viewer keeps working.`, true);
     }
     if (userIntent || request) return;
-    if (session && (session.entrypoint ?? "") === ENTRYPOINT) {
+    if (session && ((desktop && !ENTRYPOINT) || (session.entrypoint ?? "") === ENTRYPOINT)) {
       restoredAt = session.savedAt ?? 0;
       const block = typeof session.state.block === "string" ? session.state.block : undefined;
       load(session.document.text, session.document.filename, block, session.state);
