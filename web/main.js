@@ -75,6 +75,11 @@ document.addEventListener("click", event => {
   const button = event.target.closest('[popovertarget="file-menu"]');
   if (button) fileMenuButton = button;
 }, true);
+// Place the menu beside its button before the browser first displays it.
+fileMenu.addEventListener("beforetoggle", event => {
+  if (event.newState === "open") positionFileMenu();
+});
+// Once visible, its measured width also constrains it at the viewport edge.
 fileMenu.addEventListener("toggle", () => {
   if (fileMenu.matches(":popover-open")) positionFileMenu();
 });
