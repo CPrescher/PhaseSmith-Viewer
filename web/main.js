@@ -2087,7 +2087,6 @@ function initialize() {
     invalidate();
   }
   function updateSelection() {
-    $("inspect-neighbors").hidden = true;
     dispose(selectionGroup);
     selectionGroup.clear();
     // Selection is a crisp back-face shell: from any direction it reads as
@@ -2278,18 +2277,11 @@ function initialize() {
   }
   function showAtomInfo() {
     const a = selection[0];
-    $("inspect-neighbors").hidden = !a;
     $("distance").replaceChildren(document.createTextNode(a ? a.label : "—"));
     const lines = a ? atomInfoLines(a) : [];
     $("selection").textContent = a ? lines.join("\n") : $("show-atoms").checked ? "Tap an atom for its details." : "Show atoms to inspect.";
   }
   // Distance (2 atoms) · Angle (3) · Info (1). Each mode starts a fresh selection.
-  $("inspect-neighbors").onclick = () => {
-    if (!selection[0]) return;
-    toolWindows.choose("sites", { expand: true });
-    highlightSite(selection[0].label);
-    $("shell-summary").scrollIntoView({block:"nearest"});
-  };
   function setMeasureMode(mode) {
     if (mode !== measureMode) selection = [];
     measureMode = mode;
@@ -3562,9 +3554,8 @@ function initialize() {
     },
     onChange: () => scheduleSave(),
   });
-  // Picking an atom can add the neighbor shortcut while a phone sheet is
-  // already open. Keep its header below the actual card, including after
-  // a label wraps or the selection is cleared; never move the camera.
+  // Keep phone sheet headers clear of the info card when a long atom
+  // label wraps or the selection is cleared; never move the camera.
   const measurementResize = new ResizeObserver(() => toolWindows.layout());
   measurementResize.observe(document.querySelector(".measure-details"));
 

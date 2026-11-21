@@ -384,8 +384,7 @@ export function createToolWindows(options) {
     }
   });
 
-  function choose(tool, { focus = false, expand = false } = {}) {
-    if (expand) compactHeights.delete(tool);
+  function choose(tool, { focus = false } = {}) {
     commit(chooseTool(state, tool));
     if (focus) windows.get(tool)?.title.focus({ preventScroll: true });
   }

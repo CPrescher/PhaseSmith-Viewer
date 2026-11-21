@@ -1087,25 +1087,6 @@ h2 {
 .measure-more {
   display: none;
 }
-#inspect-neighbors {
-  margin-top: 6px;
-  min-height: 32px;
-  padding: 4px 8px;
-  border: 1px solid var(--overlay-line);
-  border-radius: 7px;
-  background: transparent;
-  color: var(--overlay-text);
-  font-size: 12px;
-  font-weight: 600;
-  pointer-events: auto;
-}
-#inspect-neighbors:hover {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-@media (pointer: coarse), (max-width: 640px) {
-  #inspect-neighbors { min-height: 44px; }
-}
 .measure-row {
   flex: none;
   gap: 4px;
@@ -2764,7 +2745,6 @@ button.element[aria-pressed="false"] .dot {
 /* The modes and their info readout share one right-aligned column. The
    settings rail stays alongside it; neither card changes the canvas. */
 #app[data-profile="side"] .measure-details { max-height: 94px; }
-#app[data-profile="side"] .measure-details:has(#inspect-neighbors:not([hidden])) { max-height: 144px; }
 .muted-note { margin: 2px 0 10px; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .tool-window .section-title:has(#polyhedra-only) { flex-wrap: wrap; }
 
