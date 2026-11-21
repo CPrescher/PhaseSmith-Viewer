@@ -555,6 +555,12 @@ export function createToolWindows(options) {
   function apply() {
     measureWorkspace();
     const shown = openTools(state);
+    const focused = document.activeElement;
+    const visual = window.visualViewport;
+    const keyboard = visual && visual.scale === 1 &&
+      window.innerHeight - visual.height > 100 &&
+      focused?.matches("input:not([type=checkbox]):not([type=radio]):not([type=range]), textarea");
+    app.classList.toggle("keyboard-editing", Boolean(keyboard && shown.some(id => windows.get(id).body.contains(focused))));
     // Refresh fixed-control reserves after rotation even with no editor
     // open, so the Turn dock never inherits the previous orientation.
     if (!shown.length) metrics();
@@ -589,7 +595,23 @@ export function createToolWindows(options) {
         const h = Math.min(r.h, Math.max(win.head.getBoundingClientRect().height + 2, compactHeights.get(id)));
         r = { ...r, y: profile === "sheet" ? r.y + r.h - h : r.y, h };
       }
+      // iOS keyboards shrink the visual viewport, not the canvas/layout
+      // viewport. Move only the edited toolbox into that visible area;
+      // keep the camera, launcher profile and saved palette bounds intact.
+      const editing = keyboard && win.body.contains(focused);
+      if (editing) {
+        const view = viewport.getBoundingClientRect();
+        const top = Math.max(MARGIN, visual.offsetTop - view.top + MARGIN);
+        const bottom = Math.min(ws.height - MARGIN, visual.offsetTop + visual.height - view.top - MARGIN);
+        const h = Math.min(r.h, Math.max(HEAD_H, bottom - top));
+        r = { ...r, y: Math.max(top, Math.min(r.y, bottom - h)), h };
+      }
       place(win.el, r);
+      if (editing) {
+        const field = focused.getBoundingClientRect(), body = win.body.getBoundingClientRect();
+        if (field.bottom > body.bottom - MARGIN) win.body.scrollTop += field.bottom - body.bottom + MARGIN;
+        else if (field.top < body.top + MARGIN) win.body.scrollTop -= body.top + MARGIN - field.top;
+      }
       // A header-only folded panel has no free corner for resizing: the
       // grips would intercept Close and the title. Expand restores them.
       win.grip.hidden = win.gripLeft.hidden = r.h <= win.head.getBoundingClientRect().height + 2;
@@ -658,6 +680,11 @@ export function createToolWindows(options) {
     if (!drag) apply();
   });
   resize.observe(viewport);
+  window.visualViewport?.addEventListener("resize", () => { if (!drag) apply(); });
+  window.visualViewport?.addEventListener("scroll", () => { if (!drag) apply(); });
+  // Restore ordinary placement when editing ends, including native Done.
+  for (const type of ["focusin", "focusout"])
+    viewport.addEventListener(type, () => requestAnimationFrame(() => { if (!drag) apply(); }));
   apply();
 
   return {
