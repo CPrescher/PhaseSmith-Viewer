@@ -245,8 +245,6 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
     $("save").disabled = false;
     $("save-error").textContent = "";
     tracked = model.requested;
-    const sample = getStructure();
-    $("sample").textContent = sample.name || sample.block || "Crystal";
     $("omega").disabled = $("azimuth").disabled = false;
     updateCrossings();
   }
@@ -757,7 +755,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
         sphere: $("ewald"),
         detector: $("image"),
         detectorSize: model.detector.caption,
-        sample: $("sample").textContent,
+        sample: document.getElementById("name").textContent,
         settings: `λ = ${model.wavelength} Å · Distance ${model.distance} mm · ω = ${$("omega-value").textContent} · Beam rotation ${$("azimuth-value").textContent}`,
       });
     } catch {

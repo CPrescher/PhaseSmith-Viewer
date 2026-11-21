@@ -2982,7 +2982,6 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 #detector-window { width: 724px; height: min(725px, calc(100dvh - 32px)); container-type: inline-size; }
 .detector-body { scrollbar-gutter: stable; flex: 1 1 0; display: flex; flex-direction: column; }
 .detector-body > * { flex: none; }
-.detector-sample { font-weight: 600; margin: 0 0 10px; }
 #detector-form, .detector-actions { display: flex; align-items: end; flex-wrap: wrap; gap: 8px 12px; }
 #detector-form label, .detector-angles label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
 #detector-form label { align-self: center; }
@@ -3362,11 +3361,10 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
   .reflection-mobile-tabs { flex-direction: row; gap: 3px; }
   #reflection-explorer .reflection-mobile-tabs button { min-width: 0; padding: 4px; font-size: 12px; }
   #detector-window:not(.showing-crystal) .detector-body { display: grid; grid-template-columns: 190px minmax(0, 1fr); grid-auto-rows: min-content; align-items: start; gap: 6px 14px; }
-  #detector-window:not(.showing-crystal) .detector-sample { grid-column: 1; grid-row: 1; margin: 0; }
   #detector-window:not(.showing-crystal) #detector-form { grid-column: 1; grid-row: 2; gap: 4px; }
   #detector-window:not(.showing-crystal) .detector-angles { grid-column: 1; grid-row: 3; grid-template-columns: 1fr; margin: 0; }
   #detector-window:not(.showing-crystal) .detector-actions,
-  #detector-window:not(.showing-crystal) .detector-body > p:not(.detector-sample) { grid-column: 1; }
+  #detector-window:not(.showing-crystal) .detector-body > p { grid-column: 1; }
   .detector-view-tabs { grid-column: 2; grid-row: 1; display: flex; gap: 6px; }
   .detector-view-tabs button { flex: 1; }
   .detector-view-tabs button[aria-pressed="true"] { background: var(--accent-soft) !important; border-color: var(--accent) !important; }
@@ -3389,7 +3387,6 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 /* Separate landscape scrolling keeps the live spot diagram in view while
    the user changes reflections or adjusts the scan controls. */
 .detector-controls, .detector-visuals { display: contents; }
-.detector-sample { order: 0; }
 #detector-form { order: 1; }
 .detector-view-tabs { order: 2; }
 .detector-views { order: 3; }
