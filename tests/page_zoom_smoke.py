@@ -64,14 +64,23 @@ async def check(browser, native_touch):
     await shell_gestures("#library-title")
     if native_touch:
         dialog = page.locator("#structure-library")
-        box = await dialog.bounding_box()
-        await session.send("Input.synthesizeScrollGesture", {
-            "x": box["x"] + box["width"] - 30,
-            "y": box["y"] + box["height"] * 0.75,
-            "yDistance": -250, "gestureSourceType": "touch", "speed": 600,
-        })
-        await page.wait_for_function("document.getElementById('structure-library').scrollTop > 0", timeout=5000)
-        assert await dialog.evaluate("el => el.scrollTop") > 0, "Dialog cannot scroll"
+        # Swipe on visible result text so the gesture starts inside the
+        # scrollable content, independent of dialog borders and scrollbars.
+        paragraph = dialog.locator(".library-description").first
+        await paragraph.scroll_into_view_if_needed()
+        start = await dialog.evaluate("el => el.scrollTop")
+        box = await paragraph.bounding_box()
+        x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        for step in range(7):
+            await session.send("Input.dispatchTouchEvent", {
+                "type": "touchMove" if step else "touchStart",
+                "touchPoints": [{"x": x, "y": y - step * 20, "id": 1}],
+            })
+            await page.evaluate("new Promise(requestAnimationFrame)")
+        await session.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+        await page.wait_for_function(
+            "start => document.getElementById('structure-library').scrollTop > start", arg=start,
+        )
     assert not errors, errors
     print(f"{browser.browser_type.name}: page scale stays at 1; gesture guard works", flush=True)
 
