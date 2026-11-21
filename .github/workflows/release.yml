@@ -1,0 +1,259 @@
+name: Release
+
+on:
+  push:
+    tags: ['v[0-9]*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish a GitHub Release for the version on main
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      number: ${{ steps.check.outputs.number }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - id: check
+        name: Check the release version
+        env:
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, tomllib
+          from pathlib import Path
+
+          package = json.loads(Path("package.json").read_text())
+          npm_lock = json.loads(Path("package-lock.json").read_text())
+          crate = tomllib.loads(Path("src-tauri/Cargo.toml").read_text())["package"]
+          crates = tomllib.loads(Path("src-tauri/Cargo.lock").read_text())["package"]
+          viewer = next(c for c in crates if c["name"] == crate["name"] and "source" not in c)
+          version = package["version"]
+          if not re.fullmatch(r"(0|[1-9]\d*)(\.(0|[1-9]\d*)){2}", version):
+              raise SystemExit("Use a stable release version, such as 1.0.0")
+          if {npm_lock["version"], npm_lock["packages"][""]["version"], crate["version"], viewer["version"]} != {version}:
+              raise SystemExit("Update both package manifests and lockfiles to the same version")
+          ref = os.environ["GITHUB_REF"]
+          if os.environ["GITHUB_EVENT_NAME"] == "push" and ref != f"refs/tags/v{version}":
+              raise SystemExit(f"The pushed tag must be v{version}")
+          if os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch" and os.environ["PUBLISH"] == "true" and ref != "refs/heads/main":
+              raise SystemExit("Select main to publish a release")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              print(f"number={version}", file=output)
+          PY
+
+  web:
+    needs: version
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.number }}
+      VIEWER_URL: http://127.0.0.1:4216
+      VIEWER_TEST_PROFILE: ci
+      BROWSER_CHANNEL: chrome
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: tests/requirements-browser.txt
+      - run: npm ci
+      - run: cargo test --locked --manifest-path engine/Cargo.toml
+      - run: node --test tests/*.test.mjs
+      - run: npm run prepreview
+      - name: Test the packaged viewer and guide
+        run: |
+          python -m pip install -r tests/requirements-browser.txt
+          python -m playwright install --with-deps chromium
+          python -m http.server 4216 --bind 127.0.0.1 --directory dist > "$RUNNER_TEMP/server.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          curl -fsS --retry 10 --retry-connrefused --retry-delay 1 "$VIEWER_URL/" > /dev/null
+          python tests/docs_smoke.py
+          python tests/run_browser_checks.py --workers 2 --timeout 900
+      - name: Package the standalone web distribution
+        working-directory: dist
+        run: zip -qr "../PhaseSmith-Viewer-${VERSION}-web.zip" .
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: release-web
+          path: PhaseSmith-Viewer-*-web.zip
+          if-no-files-found: error
+          compression-level: 0
+
+  desktop:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            platform: macOS-universal
+            target: universal-apple-darwin
+          - os: windows-2025
+            platform: Windows-x64
+            target: x86_64-pc-windows-msvc
+          - os: windows-11-arm
+            platform: Windows-ARM64
+            target: aarch64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.version.outputs.number }}
+      TARGET: ${{ matrix.target }}
+      PLATFORM: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Build and verify the universal Mac installer
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          mkdir out
+          if [[ -z "$APPLE_CERTIFICATE$APPLE_CERTIFICATE_PASSWORD$APPLE_SIGNING_IDENTITY$APPLE_ID$APPLE_PASSWORD$APPLE_TEAM_ID" ]]; then
+            unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
+            export APPLE_SIGNING_IDENTITY=-
+            echo 'macOS: ad-hoc signed, without Apple notarization.' > out/macOS.txt
+          else
+            : "${APPLE_CERTIFICATE:?}" "${APPLE_CERTIFICATE_PASSWORD:?}" "${APPLE_SIGNING_IDENTITY:?}"
+            if [[ -n "$APPLE_ID$APPLE_PASSWORD$APPLE_TEAM_ID" ]]; then
+              : "${APPLE_ID:?}" "${APPLE_PASSWORD:?}" "${APPLE_TEAM_ID:?}"
+              echo 'macOS: Developer ID signed and notarized by Apple.' > out/macOS.txt
+            else
+              unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
+              echo 'macOS: Developer ID signed, without Apple notarization.' > out/macOS.txt
+            fi
+          fi
+          npm run desktop:build -- --ci --target "$TARGET" --bundles app,dmg -- --locked
+          dmg=(src-tauri/target/"$TARGET"/release/bundle/dmg/*.dmg)
+          [[ ${#dmg[@]} -eq 1 ]]
+          output="out/PhaseSmith-Viewer-$VERSION-$PLATFORM.dmg"
+          mv "${dmg[0]}" "$output"
+          mount=$(mktemp -d)
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$output"
+          trap 'hdiutil detach "$mount"' EXIT
+          app="$mount/PhaseSmith Viewer.app"
+          archs=$(lipo -archs "$app/Contents/MacOS/phasesmith-viewer")
+          [[ " $archs " == *" arm64 "* && " $archs " == *" x86_64 "* ]]
+          codesign --verify --deep --strict "$app"
+          if [[ "$APPLE_SIGNING_IDENTITY" != - ]]; then
+            codesign -dv --verbose=2 "$app" 2>&1 | grep '^Authority=Developer ID Application:'
+          fi
+          if [[ -n "${APPLE_ID:-}" ]]; then
+            xcrun stapler validate "$app"
+            spctl --assess --type execute "$app"
+          fi
+      - name: Build and verify the Windows offline installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          rustup target add $env:TARGET
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm run desktop:build -- --ci --target $env:TARGET --bundles nsis -- --locked
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $installers = @(Get-ChildItem "src-tauri/target/$env:TARGET/release/bundle/nsis/*.exe")
+          if ($installers.Count -ne 1) { throw "Expected one NSIS installer" }
+          New-Item -ItemType Directory out | Out-Null
+          $output = "out/PhaseSmith-Viewer-$env:VERSION-$env:PLATFORM-setup.exe"
+          Move-Item $installers[0].FullName $output
+          $install = Join-Path $env:RUNNER_TEMP viewer-install
+          $setup = Start-Process -FilePath $output -ArgumentList "/S", "/D=$install" -Wait -PassThru
+          if ($setup.ExitCode) { throw "Setup exited with code $($setup.ExitCode)" }
+          $binary = Join-Path $install phasesmith-viewer.exe
+          $bytes = [IO.File]::ReadAllBytes($binary)
+          $pe = [BitConverter]::ToInt32($bytes, 0x3c)
+          $machine = [BitConverter]::ToUInt16($bytes, $pe + 4)
+          $expected = if ($env:PLATFORM -eq 'Windows-x64') { 0x8664 } else { 0xaa64 }
+          if ($machine -ne $expected) { throw "Unexpected architecture in $binary" }
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: release-${{ matrix.platform }}
+          path: out/
+          if-no-files-found: error
+          compression-level: 0
+
+  assemble:
+    needs: [version, web, desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: packages
+      - name: Check the complete release and calculate checksums
+        working-directory: packages
+        env:
+          VERSION: ${{ needs.version.outputs.number }}
+        run: |
+          prefix="PhaseSmith-Viewer-$VERSION"
+          files=("$prefix-macOS-universal.dmg" "$prefix-Windows-x64-setup.exe" "$prefix-Windows-ARM64-setup.exe" "$prefix-web.zip")
+          for file in "${files[@]}"; do test -s "$file"; done
+          sha256sum "${files[@]}" > SHA256SUMS
+          sha256sum --check SHA256SUMS
+          cat macOS.txt >> "$GITHUB_STEP_SUMMARY"
+          echo 'Windows: unsigned offline installers.' >> "$GITHUB_STEP_SUMMARY"
+          cat SHA256SUMS >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: release-checksums
+          path: packages/SHA256SUMS
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'push' || inputs.publish
+    needs: [version, assemble]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: publish-v${{ needs.version.outputs.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: v${{ needs.version.outputs.number }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: packages
+      - name: Publish the tested commit and verified downloads
+        working-directory: packages
+        run: |
+          sha256sum --check SHA256SUMS
+          tag_args=()
+          if git show-ref --verify --quiet "refs/tags/$TAG"; then
+            [[ "$(git rev-parse "refs/tags/$TAG^{commit}")" == "$(git rev-parse HEAD)" ]] || { echo "Tag points to a different commit"; exit 1; }
+            tag_args+=(--verify-tag)
+          elif [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            echo "Release tag no longer exists"
+            exit 1
+          fi
+          notes="$(cat macOS.txt) Windows: unsigned offline installers."
+          gh release create "$TAG" "${tag_args[@]}" --target "$(git rev-parse HEAD)" \
+            --title "PhaseSmith Viewer $TAG" --generate-notes --notes "$notes" \
+            PhaseSmith-Viewer-* SHA256SUMS

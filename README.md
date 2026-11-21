@@ -68,6 +68,16 @@ cargo test --locked --manifest-path engine/Cargo.toml
 npm run build:engine
 ```
 
+## Versioned releases
+
+Open **Actions → Release → Run workflow** and select `main`. Leave **Publish a GitHub Release** unchecked for a rehearsal. The run builds the downloads, tests them and records their SHA-256 checksums. Check **Publish** to also create the version tag on the tested commit and publish the downloads with generated release notes. Pushing a matching tag such as `v1.0.0` also triggers publication.
+
+Each release includes a universal macOS DMG, offline Windows installers for x64 and ARM64, a ZIP containing the web viewer and guide, and `SHA256SUMS`. The web ZIP can be served from the root of a local HTTP server. GitHub Pages continues to deploy from successful builds of `main`.
+
+For the next version, update `package.json`, `package-lock.json`, `src-tauri/Cargo.toml` and `src-tauri/Cargo.lock` together. The workflow checks that their versions agree before starting the builds.
+
+For Mac Developer ID signing, set the repository Actions secrets `APPLE_CERTIFICATE` (base64-encoded P12), `APPLE_CERTIFICATE_PASSWORD` and `APPLE_SIGNING_IDENTITY`. For notarization, also set `APPLE_ID`, `APPLE_PASSWORD` (an app-specific password) and `APPLE_TEAM_ID`. With no signing credentials the workflow produces an ad-hoc signed Mac app. The Windows installers are unsigned. The release notes identify the signing status of each platform. [Tauri macOS signing guide](https://v2.tauri.app/distribute/sign/macos/)
+
 ## Sources and attribution
 
 Library entries retain original structure citations and source links in `web/structure-library.json`. Idealized teaching models are labeled separately. The powder plot, reflection explorer, and detector use PhaseSmith’s Waasmaier–Kirfel neutral-atom X-ray form factors. Element colors and fallback covalent radii are adapted from the [Blue Obelisk Data Repository](https://github.com/BlueObelisk/bodr/blob/master/bodr/elements/elements.xml).
