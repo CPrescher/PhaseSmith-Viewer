@@ -3496,9 +3496,9 @@ function initialize() {
         seconds: Number($("export-seconds").value),
         fps: Number($("export-fps").value),
         scale: exportScale(),
-        onProgress: (p) => {
+        onProgress: (p, { slow }) => {
           progress.value = p;
-          $("export-status").textContent = `Recording turntable… ${Math.round(p * 100)}%`;
+          $("export-status").textContent = `Recording turntable… ${Math.round(p * 100)}%${slow ? " · Rendering is slow; the movie may last longer than requested." : ""}`;
         },
       });
       progress.hidden = false;
@@ -3509,7 +3509,7 @@ function initialize() {
         ? result.reason === "resized"
           ? "Recording stopped because the view was resized; nothing was saved. Record again at the new size."
           : "Recording canceled; nothing was saved."
-        : `Saved ${result.filename} (${result.width} × ${result.height}, ${result.frames} frames).`;
+        : `Saved ${result.filename} (${result.width} × ${result.height} px${result.duration === null ? "" : `, ${result.duration.toFixed(1)} s`}).${result.slow ? ` Requested ${result.requestedSeconds} s; rendering ran slowly. Lower the export size or frame rate to improve timing.` : ""}`;
       lastExport = result;
     } catch (error) {
       $("export-status").textContent = `Recording failed: ${error.message}`;

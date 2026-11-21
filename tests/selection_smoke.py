@@ -5,6 +5,7 @@ from pathlib import Path
 from playwright.async_api import async_playwright
 from smoke import URL, diagnostics, settle
 from session_viewer_smoke import ANGLE_CIF
+from gui_review_smoke import hit
 
 
 async def check(browser, w, h, touch):
@@ -55,8 +56,19 @@ async def check(browser, w, h, touch):
     await act(page.locator("#measure-info"))
     await pick("A")
     await count(1)
+    neighbors = page.get_by_role("button", name="View neighbors", exact=True)
+    assert await hit(neighbors), "Atom info shortcut must receive pointer clicks"
+    if touch:
+        assert (await neighbors.bounding_box())["height"] >= 44
+    camera = (await diagnostics(page))["camera"]
+    await act(neighbors)
+    assert await page.locator("#tool-window-sites").is_visible()
+    assert (await page.locator("#shell-summary").inner_text()).startswith("A · CN")
+    assert (await diagnostics(page))["camera"] == camera
+    await act(page.locator('#tool-window-sites [data-action=close]'))
     await blank()
     await count(0)
+    assert not await neighbors.is_visible()
     await act(page.locator("#measure-distance"))
     await pick("A")
     await count(1)

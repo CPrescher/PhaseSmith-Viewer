@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+import os
 import struct
 import zlib
 from pathlib import Path
@@ -171,6 +172,41 @@ async def check(browser):
         assert abs(canvas["h"] - canvas["ch"]) <= 1, canvas
         assert await page.locator("#export-video").is_enabled()
         print("Movie decoded", metadata)
+
+        # Make real capture frames arrive too slowly for 24 fps. The file
+        # must still decode, and the UI must report its actual duration.
+        await page.evaluate('''() => {
+          const draw = CanvasRenderingContext2D.prototype.drawImage;
+          const scene = document.querySelector('#viewport canvas');
+          CanvasRenderingContext2D.prototype.drawImage = function(...args) {
+            if (args[0] === scene) {
+              const end = performance.now()+85;
+              while(performance.now()<end) {}
+            }
+            return draw.apply(this,args);
+          };
+        }''')
+        slow_camera = (await diagnostics(page))["camera"]
+        async with page.expect_download(timeout=60000) as pending:
+            await page.locator("#export-video").tap()
+            await page.wait_for_function("document.querySelector('#export-status').textContent.includes('Rendering is slow')")
+        slow_movie = await pending.value
+        slow_data = Path(await slow_movie.path()).read_bytes()
+        slow_metadata = await page.evaluate('''({data,mime})=>new Promise((resolve,reject)=>{
+          const video=document.createElement('video');
+          video.onloadedmetadata=()=>resolve({duration:video.duration,width:video.videoWidth,height:video.videoHeight});
+          video.onerror=()=>reject(Error('Slow movie failed to decode'));
+          video.src='data:'+mime+';base64,'+data;
+        })''', {"data":base64.b64encode(slow_data).decode(),"mime":mime})
+        await page.wait_for_function('viewerDiagnostics().export.last?.slow===true')
+        result = (await diagnostics(page))["export"]["last"]
+        assert slow_metadata["duration"] > 5, slow_metadata
+        assert abs(result["duration"]-slow_metadata["duration"]) < .01, (result,slow_metadata)
+        status = await page.locator('#export-status').inner_text()
+        assert 'Requested 4 s' in status and 'frames' not in status, status
+        assert (await diagnostics(page))["camera"] == slow_camera
+        assert not (await diagnostics(page))["export"]["busy"]
+        print('Slow movie decoded and honestly reported',slow_metadata)
     else:
         print(
             "Video unsupported", await page.locator("#export-video-note").inner_text()
@@ -183,8 +219,14 @@ async def check(browser):
 async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch(channel="chrome")
+        print('Export browser: chromium',flush=True)
         await check(browser)
         await browser.close()
+        if os.environ.get('WEBKIT_EXECUTABLE'):
+            browser = await p.webkit.launch(executable_path=os.environ['WEBKIT_EXECUTABLE'])
+            print('Export browser: webkit',flush=True)
+            await check(browser)
+            await browser.close()
 
 
 if __name__ == "__main__":
