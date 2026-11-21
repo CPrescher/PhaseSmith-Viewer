@@ -46,7 +46,7 @@ export function createStructureInfo() {
     const number = meta.space_group_number || structure.matchedGroup?.number;
     const operations = structure.symmetryOperations.length;
     const formattedSymbol = symbol && formatSpaceGroup(symbol, structure.matchedGroup?.symbol) + (assumed ? " (assumed)" : "");
-    const group = formattedSymbol || (number ? `No. ${number}` : meta.space_group_hall || `${operations} sym. op.`);
+    const group = formattedSymbol || (number ? `No. ${number}` : `${operations} sym. op.`);
     $("space-group-symbol").textContent = group;
     button.setAttribute("aria-label", `Structure info for ${$("name").textContent}, ${group}`);
     button.disabled = false;
@@ -58,9 +58,8 @@ export function createStructureInfo() {
     });
     rows("info-cell", [...parameters, ["Volume", structure.volume.toFixed(3) + " Å³"]]);
     rows("info-symmetry", [
-      ["Space group", formattedSymbol || (number || meta.space_group_hall ? null : "Symbol not reported")],
+      ["Space group", formattedSymbol || (number ? null : "Hermann–Mauguin symbol unavailable")],
       ["International Tables No.", number],
-      ["Hall symbol", meta.space_group_hall],
       ["Crystal system", structure.crystalSystem],
       ["Symmetry taken from", symmetrySources[meta.symmetry_source]],
       ["Symmetry operations", operations],
