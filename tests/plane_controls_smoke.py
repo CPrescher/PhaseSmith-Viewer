@@ -72,7 +72,17 @@ async def check(browser, width, height, theme):
         await activate(row.locator("button[aria-label^='Remove plane']"))
         await activate(page.locator("#plane-add"))
     else:
-        await hkl.focus()
+        selected_text = "el => el.value.slice(el.selectionStart, el.selectionEnd)"
+        await hkl.click()
+        assert await hkl.evaluate(selected_text) == await hkl.input_value()
+        await page.keyboard.type("210")
+        await hkl.press("Tab")
+        assert (await state())["planes"][0]["hkl"] == [2, 1, 0]
+        await hkl.click()
+        await hkl.click()
+        assert await hkl.evaluate(selected_text) == ""
+        await hkl.dblclick()
+        assert await hkl.evaluate(selected_text) == "2 1 0"
         assert not await row.locator('.numeric-keys[data-for="hkl"]').is_visible()
     # Compact indices are expanded visibly; letters are rejected as whole edits,
     # including paste/fill paths where beforeinput may not contain the text.
