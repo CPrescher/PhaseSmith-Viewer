@@ -514,15 +514,18 @@ h2 {
   opacity: 0;
   cursor: pointer;
 }
+.chip > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
 .chip span::before {
   content: "";
-  display: inline-block;
+  flex: none;
   width: 8px;
   height: 8px;
-  margin-right: 7px;
   border-radius: 2px;
   border: 1.5px solid currentColor;
-  vertical-align: 1px;
 }
 .chip:has(input:checked) {
   color: var(--text);
@@ -3369,6 +3372,16 @@ button.element[aria-pressed="false"] .dot {
 #warnings[data-informational="true"] { background: var(--raised); color: var(--muted); outline-color: var(--line-strong); }
 #shell-cutoff { min-height: var(--touch); padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-field); background: var(--field); color: var(--text); }
 #shell-controls label { font-size: 13px; line-height: 1.5; }
+/* Center native checkboxes too, without changing the full-chip hit targets. */
+#app label:has(> input[type="checkbox"]):not(.chip) {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+#app label:not(.chip) > input[type="checkbox"] {
+  flex: none;
+  margin: 0;
+}
 #analysis-family { align-items: center; font-size: 13px; }
 #analysis-family select { max-width: 100%; min-height: var(--touch); }
 #analysis-observed input[type="file"] { font-size: 13px; color: var(--muted); }
