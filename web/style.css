@@ -2271,6 +2271,21 @@ button.element[aria-pressed="false"] .dot {
   display: grid;
   gap: 6px;
 }
+/* Conserve horizontal canvas space on phones while keeping the controls
+   tall enough to tap and the crystallographic notation at its usual size. */
+@media (max-width: 640px), (max-width: 940px) and (max-height: 500px) {
+  .view-directions.toolbar { gap: 1px; padding: 0 2px; }
+  .view-directions > :is(#view-a, #view-b, #view-c, #reset) {
+    min-width: 32px;
+    padding-inline: 4px;
+  }
+  .view-directions summary { padding-inline: 6px; }
+}
+@media (max-width: 640px) {
+  .view-directions details { position: static; }
+  /* The direction editor opens beneath the Turn and history controls. */
+  #direction-form { left: 0; top: calc(100% + var(--touch) + 12px); }
+}
 /* Phones: the toolbar plus the widest measurement column leave no room
    for one more 44px button, so Turn floats just below the toolbar's left
    end (outside the centered crystal) instead of wrapping the row. The
