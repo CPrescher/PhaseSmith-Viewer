@@ -1503,10 +1503,17 @@ button.element[aria-pressed="false"] .dot {
 .tool-field:invalid {
   border-color: var(--danger);
 }
+input[type="color"] {
+  appearance: none;
+  box-sizing: border-box;
+}
+input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 2px; }
+input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
 .tool-color {
   width: 30px;
   height: 30px;
-  padding: 1px;
+  padding: 5px;
   border: 1px solid var(--line-strong);
   border-radius: 6px;
   background: var(--panel);
@@ -1516,10 +1523,13 @@ button.element[aria-pressed="false"] .dot {
 }
 /* Keep the offset checkbox beside Labels when Position wraps. */
 .plane-label-toggles { display: inline-flex; align-items: center; gap: 4px; }
-.plane-label-toggles .chip { min-height: 26px; padding-inline: 5px; }
-.plane-label-toggles .chip > span { gap: 4px; }
+.plane-label-toggles .chip,
+.chip.parallel-planes { min-height: 26px; padding-inline: 5px; }
+.plane-label-toggles .chip > span,
+.chip.parallel-planes > span { gap: 4px; }
 @media (pointer: coarse) {
-  .plane-label-toggles .chip { min-height: 30px; }
+  .plane-label-toggles .chip,
+  .chip.parallel-planes { min-height: 30px; }
 }
 .plane-label-toggles .chip:has(input:disabled) {
   color: var(--muted);
@@ -2057,7 +2067,7 @@ button.element[aria-pressed="false"] .dot {
 .custom-color input {
   width: var(--touch);
   height: var(--touch);
-  padding: 2px;
+  padding: 5px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   background: var(--panel);

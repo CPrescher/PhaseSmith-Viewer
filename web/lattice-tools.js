@@ -1086,6 +1086,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           (v) => ((plane.family = v), rebuild()),
           "Planes at m + n (integer n) through the plotting range, spaced d",
         );
+        family.label.classList.add("parallel-planes");
         family.input.dataset.field = "family";
         // Display size of this entry's faces (all family members): the
         // clipping box grows about the range centre; the plane equation,
