@@ -255,8 +255,15 @@ async def check(browser,w,h,theme):
         await page.locator('#tools-menu').click()
         assert await hit(page.locator('#mode-pairs')), 'Tools must be above science windows'
         await page.locator('#mode-pairs').click()
-        assert not await page.locator('#detector-window').is_visible()
-        assert await page.locator('#tool-window-pairs').is_visible()
+        assert await page.locator('#detector-window').is_visible()
+        assert await hit(page.locator('#tool-window-pairs [data-action=close]'))
+        await choose_tool(page, '#mode-sites', True)
+        assert not await page.locator('#tool-window-pairs').is_visible()
+        assert await hit(page.locator('#tool-window-sites [data-action=close]'))
+        await choose_tool(page, '#mode-detector', True)
+        assert await hit(page.locator('#detector-close'))
+        assert await page.locator('#detector-link').is_checked()
+        assert await page.locator('#tool-window-sites').is_visible()
         assert await hit(page.locator('#tools-menu')), 'launcher must return before the next input'
         await page.locator('#tools-menu').tap()
         await choose_tool(page,'#mode-reflection',True)
@@ -275,6 +282,12 @@ async def check(browser,w,h,theme):
                 assert await hit(button), (w,h,selector,'covered rail action',await button.get_attribute('id'))
         await page.locator('#mode-sites').click()
         assert await hit(page.locator('#site-table tbody tr').first), 'settings must be reachable after science tools'
+        for panel in ['#analysis-window', '#reflection-explorer', '#detector-window']:
+            assert await page.locator(panel).is_visible(), (w, h, panel)
+        await choose_tool(page, '#mode-pairs')
+        assert not await page.locator('#tool-window-sites').is_visible()
+        assert await hit(page.locator('#tool-window-pairs [data-action=close]'))
+        assert await page.locator('#detector-window').is_visible()
         await choose_tool(page,'#mode-reflection')
         await page.locator('#style-open').click()
         assert await hit(page.locator('#style-target')), 'Style must be reachable after Reflection'

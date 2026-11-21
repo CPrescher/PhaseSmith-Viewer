@@ -61,7 +61,7 @@ When the launcher is short on space, **Overlays** opens Planes, Directions and S
 
 ## When a control is out of sight
 
-A scrollbar shows when more content is available. Scroll inside the panel to reach it. Export, for example, has movie controls below the PNG settings. Project files and local saves are in the header’s three-dot menu. Close or switch the tool from the rail/menu to reach another set of settings. Choosing a settings tool closes the science windows while retaining their values, so the selected controls are immediately reachable. Close a panel temporarily to reach atoms behind it, then reopen it to continue editing.
+A scrollbar shows when more content is available. Scroll inside the panel to reach it. Export, for example, has movie controls below the PNG settings. Project files and local saves are in the header’s three-dot menu. Close or switch the tool from the rail/menu to reach another set of settings. Choosing a settings tool replaces the previous settings panel and keeps analysis windows open. If the panels overlap, select a tool from the rail or Tools menu to bring it forward. Close a panel temporarily to reach atoms behind it, then reopen it to continue editing.
 
 The crystal stays in place while you open and switch tools. Drag on the crystal to rotate it; drag inside a scrollable panel to scroll its settings on touch screens.
 

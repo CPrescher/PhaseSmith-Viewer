@@ -3653,18 +3653,6 @@ function initialize() {
   });
   installPanelScrollbars();
 
-  // Choosing a settings tool reveals its controls even when a science
-  // window covers that area. Closing a window preserves its values.
-  $("tool-rail").addEventListener("click", event => {
-    const button = event.target.closest("[data-tool]");
-    if (!button) return;
-    const open = ["analysis", "detector", "reflection"].filter(id =>
-      $(id === "reflection" ? "reflection-explorer" : `${id}-window`)?.open);
-    if (!open.length) return;
-    for (const id of open) $(`${id}-close`).click();
-    if (toolWindows.isOpen(button.dataset.tool)) toolWindows.close(button.dataset.tool);
-  }, true);
-
   // Light/dark theme: CSS follows data-theme; scene overlays that carry
   // their own colors are rebuilt with the new palette.
   const themeSwitch = createThemeSwitch({

@@ -2519,6 +2519,8 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
    overlays. Its transparent layer does not intercept the surrounding view. */
 #app[data-profile="float"] .tool-layer,
 #app.keyboard-editing .tool-layer { z-index: 16; }
+/* Keep the selected settings above overlapping inspectors and below the launcher. */
+body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in-front { z-index: 2000; }
 .tool-window {
   position: absolute;
   display: flex;

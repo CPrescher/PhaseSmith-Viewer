@@ -1,3 +1,4 @@
+import { frontScienceWindow, setSettingsInFront } from "./floating-dialog.js";
 import { addResizeEdges, resizedRect } from "./panel-resize.js";
 
 // One settings palette over the canvas. The rail toggles its active tool;
@@ -270,6 +271,8 @@ export function createToolWindows(options) {
     windows.set(tool.id, { tool, el, body, head, title, scroll: 0 });
 
     close.onclick = () => closeWindow(tool.id, true);
+    for (const type of ["pointerdown", "focusin"])
+      el.addEventListener(type, () => setSettingsInFront(true), true);
     head.addEventListener("pointerdown", (e) => startDrag(e, tool.id, "move"));
     body.addEventListener("click", e => {
       if (!e.target.closest("input, select, textarea, button, a, summary, [tabindex]")) title.focus({ preventScroll: true });
@@ -346,8 +349,9 @@ export function createToolWindows(options) {
       const fromSubmenu = activeGroup;
       closeGroup();
       closeMenu();
-      const closing = state.main === tool.id;
-      commit(toggleTool(state, tool.id));
+      const closing = state.main === tool.id && !frontScienceWindow();
+      if (closing) closeWindow(tool.id);
+      else choose(tool.id);
       if (closing && launcher === "menu") menuButton?.focus({ preventScroll: true });
       else if (closing && fromSubmenu) fromSubmenu.button.focus({ preventScroll: true });
       else if (!closing && (e.detail === 0 || launcher === "menu" || fromSubmenu)) windows.get(tool.id)?.title.focus({ preventScroll: true });
@@ -411,7 +415,7 @@ export function createToolWindows(options) {
       e.preventDefault();
       setMenu(false);
       menuButton?.focus({ preventScroll: true });
-    } else if (e.key === "Escape" && !e.defaultPrevented && !document.querySelector("dialog[open], :popover-open")) {
+    } else if (e.key === "Escape" && !e.defaultPrevented && !frontScienceWindow() && !document.querySelector("dialog:modal, :popover-open")) {
       const current = stacking(state).at(-1);
       if (current) { e.preventDefault(); closeWindow(current, true); }
     }
@@ -419,6 +423,7 @@ export function createToolWindows(options) {
 
   function choose(tool, { focus = false } = {}) {
     commit(chooseTool(state, tool));
+    if (state.main === tool) setSettingsInFront(true);
     if (focus) windows.get(tool)?.title.focus({ preventScroll: true });
   }
   function closeWindow(tool, refocus = false) {
@@ -614,6 +619,7 @@ export function createToolWindows(options) {
         onVisibility(tool.id, on);
       }
     }
+    if (!shown.length) setSettingsInFront(false);
     if (menuButton) {
       const front = shown[0] ? TOOLS.find((t) => t.id === frontTool(state)) : null;
       menuButton.dataset.active = front ? front.id : "";

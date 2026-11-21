@@ -2,8 +2,18 @@ import { addResizeEdges, resizedRect } from "./panel-resize.js";
 
 // Modeless science windows share focus order, dragging, and Escape.
 const windows = [];
+let settingsInFront = false;
+export function frontScienceWindow() {
+  return settingsInFront ? null : windows.filter(dialog => dialog.open).at(-1);
+}
 export function isFrontDialog(win) {
-  return windows.filter(dialog => dialog.open).at(-1) === win;
+  return frontScienceWindow() === win;
+}
+export function setSettingsInFront(active) {
+  if (settingsInFront === active) return;
+  settingsInFront = active;
+  document.getElementById("tool-layer").classList.toggle("in-front", active);
+  placeToolsMenu();
 }
 let menuHome;
 function placeToolsMenu() {
@@ -17,7 +27,7 @@ function placeToolsMenu() {
     });
   }
   const active = document.getElementById("app")?.dataset.launcher === "menu"
-    ? windows.filter(dialog => dialog.open).at(-1) : null;
+    ? frontScienceWindow() : null;
   menu.classList.toggle("in-science", !!active);
   if (active) {
     const head = active.querySelector("header");
@@ -44,7 +54,8 @@ export function floatingDialog(win, opener, handle, close) {
     if (index >= 0) windows.splice(index, 1);
     windows.push(win);
     windows.forEach((dialog, i) => (dialog.style.zIndex = 1000 + i));
-    placeToolsMenu();
+    if (settingsInFront) setSettingsInFront(false);
+    else placeToolsMenu();
   };
   function windowBounds() {
     const rail = document.getElementById("tool-rail");
@@ -140,7 +151,7 @@ export function floatingDialog(win, opener, handle, close) {
         win.open &&
         !document.getElementById("tool-rail")?.classList.contains("menu-open") &&
         !document.querySelector(":popover-open") &&
-        windows.filter((dialog) => dialog.open).at(-1) === win &&
+        isFrontDialog(win) &&
         !document.querySelector("dialog:modal")
       ) {
         event.preventDefault();
