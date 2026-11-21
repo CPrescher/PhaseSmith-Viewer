@@ -1840,7 +1840,7 @@ function initialize() {
           cell.textContent = text;
           row.append(cell);
         }
-        const choose = () => highlightSite(highlightedSite === s.label ? null : s.label);
+        const choose = () => selectSite(highlightedSite === s.label ? null : s.label);
         row.onclick = choose;
         row.onkeydown = (e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -1890,7 +1890,7 @@ function initialize() {
         }
         row.tabIndex = 0;
         row.title = `Highlight ${g.label} centers`;
-        const choose = () => highlightSite(highlightedSite === g.label ? null : g.label);
+        const choose = () => selectSite(highlightedSite === g.label ? null : g.label);
         row.onclick = choose;
         row.onkeydown = (e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -1911,6 +1911,15 @@ function initialize() {
   let highlightedSite = null;
   const siteGroup = new THREE.Group();
   scene.add(siteGroup);
+  function selectSite(label) {
+    // A table row inspects the equivalent site copies, not a previously
+    // picked individual atom. Keep distance/angle measurements separate.
+    if (measureMode === "info" && selection.length) {
+      selection = [];
+      updateSelection();
+    }
+    highlightSite(label);
+  }
   function inspectShell(center) {
     $("shell-controls").hidden = !center;
     const summary = $("shell-summary"), body = $("shell-ligands");
@@ -2541,7 +2550,9 @@ function initialize() {
       if (measureMode === "info") selection = [];
       else if (selection.length === (measureMode === "angle" ? 3 : 2)) selection = [];
       if (!selection.includes(atom)) selection.push(atom);
-      if (measureMode === "info" && $("mode-sites").getAttribute("aria-pressed") === "true") highlightSite(atom.label);
+      // A crystal pick always targets individual atoms, even with Sites
+      // open. Only an explicit table-row choice highlights a whole site.
+      if (highlightedSite) highlightSite(null);
       updateSelection();
     } else if (
       selection.length &&
