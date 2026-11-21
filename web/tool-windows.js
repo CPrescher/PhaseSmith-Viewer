@@ -14,7 +14,7 @@ export const TOOLS = [
 export const TOOL_IDS = TOOLS.map((t) => t.id);
 export const MARGIN = 8;
 const MIN_W = 260,
-  MIN_H = 180,
+  MIN_H = 88,
   HEAD_H = 48;
 
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
@@ -306,6 +306,7 @@ export function createToolWindows(options) {
     });
     head.addEventListener("dblclick", (e) => {
       if (profile !== "float" || e.target.closest("button")) return;
+      compactHeights.delete(tool.id);
       commit(moveTool(state, tool.id, null)); // back to its default place
     });
     // Escape: a field is left first (focus to the title), then Tune ends,
@@ -567,11 +568,18 @@ export function createToolWindows(options) {
   }
   function dragEnd(e) {
     if (!drag || (e && e.pointerId !== drag.id)) return;
-    const { tool, next, target, id } = drag;
+    const { tool, kind, r, next, target, id } = drag;
     drag = null;
     if (target.hasPointerCapture?.(id)) target.releasePointerCapture(id);
     windows.get(tool).el.classList.remove("moving", "resizing");
-    commit(moveTool(state, tool, anchorRect(clampRect(next, floatingWorkspace()), ws)));
+    if (next === r) return;
+    const saved = state.rects.main;
+    const anchored = anchorRect(clampRect(next, floatingWorkspace()), ws);
+    // Older sessions stored one explicit size for the shared palette.
+    const heights = saved?.heights ?? (saved ? Object.fromEntries(TOOL_IDS.map(id => [id, saved.h])) : {});
+    anchored.heights = { ...heights };
+    if (kind.startsWith("resize")) anchored.heights[tool] = anchored.h;
+    commit(moveTool(state, tool, anchored));
   }
   for (const { head, grip, gripLeft } of windows.values())
     for (const el of [head, grip, gripLeft]) {
@@ -585,7 +593,13 @@ export function createToolWindows(options) {
   function rectFor(tool) {
     if (profile !== "float") return defaultRect(profile, ws, metrics());
     const saved = state.rects.main;
-    return clampRect(saved ? resolveRect(saved, ws) : defaultRect("float", ws, metrics()), floatingWorkspace());
+    const bounds = floatingWorkspace();
+    const r = clampRect(saved ? resolveRect(saved, ws) : defaultRect("float", ws, metrics()), bounds);
+    const manual = saved?.heights === undefined ? saved?.h : saved.heights?.[tool];
+    const win = windows.get(tool);
+    win.el.style.width = `${r.w}px`;
+    const h = finite(manual) && manual > 0 ? manual : Math.min(naturalHeight(win), saved ? ws.height - 2 * MARGIN : r.h);
+    return clampRect(saved ? resolveRect({ ...saved, h }, ws) : { ...r, h }, bounds);
   }
   function place(el, r) {
     el.style.left = `${r.x}px`;
@@ -623,7 +637,8 @@ export function createToolWindows(options) {
     const rect = win.body.getBoundingClientRect();
     const ends = [...win.body.children].filter(el => el.getClientRects().length)
       .map(el => el.getBoundingClientRect().bottom - rect.top + win.body.scrollTop);
-    return Math.ceil(win.head.getBoundingClientRect().height + Math.max(0, ...ends) + 16);
+    const padding = parseFloat(getComputedStyle(win.body).paddingBottom);
+    return Math.ceil(win.head.getBoundingClientRect().height + Math.max(0, ...ends) + padding + win.el.offsetHeight - win.el.clientHeight);
   }
   function apply() {
     measureWorkspace();

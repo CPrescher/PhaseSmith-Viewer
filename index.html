@@ -568,14 +568,7 @@
                         type="checkbox"
                         checked
                         aria-label="Plane and direction labels"
-                      /><span>Labels</span></label
-                    ><button
-                      id="plane-add"
-                      class="text-button"
-                      aria-label="Add lattice plane (hkl)"
-                    >
-                      ＋ Plane
-                    </button>
+                      /><span>Labels</span></label>
                   </div>
                   <!-- Label text option for planes; shown once a plane exists. -->
                   <div id="plane-label-options" class="tool-options" hidden>
@@ -596,10 +589,10 @@
                         <option value="outside" selected>Outside</option>
                         <option value="edge">Edge</option>
                         <option value="center">Center</option>
-                      </select></label
-                    >
+                      </select></label>
                   </div>
                   <div id="plane-list" class="tool-list"></div>
+                  <button id="plane-add" type="button" class="secondary add-overlay" aria-label="Add lattice plane (hkl)">+ Plane</button>
                 </section>
               </div>
             </section>
@@ -609,15 +602,9 @@
                   <div class="section-title">
                     <h2 id="arrow-title">Directions <span class="scientific-notation">[uvw]</span></h2>
                     <label class="chip small" title="Labels on drawn planes and direction arrows"><input id="direction-labels-toggle" type="checkbox" checked aria-label="Plane and direction labels"><span>Labels</span></label>
-                    <button
-                      id="arrow-add"
-                      class="text-button"
-                      aria-label="Add direction arrow [uvw]"
-                    >
-                      ＋ Arrow
-                    </button>
                   </div>
                   <div id="arrow-list" class="tool-list"></div>
+                  <button id="arrow-add" type="button" class="secondary add-overlay" aria-label="Add direction arrow [uvw]">+ Arrow</button>
                 </section>
               </div>
             </section>

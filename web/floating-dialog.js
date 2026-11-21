@@ -61,7 +61,12 @@ export function floatingDialog(win, opener, handle, close) {
     win.style.left = Math.max(8, Math.min(r.left, right - r.width)) + "px";
     const headerBottom = innerWidth >= 1000 && innerHeight > 600
       ? document.querySelector("#app > header").getBoundingClientRect().bottom + 8 : 8;
-    win.style.maxHeight = `${innerHeight - headerBottom - 8}px`;
+    let maxHeight = innerHeight - headerBottom - 8;
+    if (innerWidth >= 1000 && innerHeight > 600 && !win.style.height && !win.dataset.userMoved && win.id !== "detector-options") {
+      const bottom = document.querySelector(".view-bottom").getBoundingClientRect().top;
+      maxHeight = Math.min(maxHeight, Math.max(300, bottom - r.top - 12));
+    }
+    win.style.maxHeight = `${maxHeight}px`;
     win.style.top = Math.max(headerBottom, Math.min(r.top, innerHeight - win.offsetHeight - 8)) + "px";
   }
   let drag = null;
@@ -124,14 +129,10 @@ export function floatingDialog(win, opener, handle, close) {
         // Wide screens have room for a scientific inspector beside the
         // centered crystal. Only the window changes; the camera stays fixed.
         win.style.width = Math.max(360, Math.min(520, Math.round(innerWidth * 0.32))) + "px";
-        const controlsTop = document.querySelector(".view-bottom")?.getBoundingClientRect().top || innerHeight - 80;
-        win.style.height = Math.min(win.offsetHeight, Math.max(300, controlsTop - 196)) + "px";
         win.style.left = "12px";
         win.style.top = "184px";
       } else if (win.id === "reflection-explorer" && innerWidth > 900 && innerHeight > 600) {
         const top = document.querySelector("#app > header").getBoundingClientRect().bottom + 8;
-        const bottom = document.querySelector(".view-bottom")?.getBoundingClientRect().top || innerHeight;
-        win.style.height = Math.max(360, Math.min(innerHeight, bottom) - top - 12) + "px";
         win.style.left = Math.max(8, (innerWidth - win.offsetWidth) / 2) + "px";
         win.style.top = top + "px";
       } else {

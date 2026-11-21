@@ -70,7 +70,7 @@ async def matrix(browser):
     rect=await page.locator('.tool-window:not([hidden])').bounding_box()
     body=page.locator('.tool-window:not([hidden]) .tool-window-body')
     profile=d['windows']['profile']
-    fitted=profile!='float' and (phone_launcher or tool=='#mode-extent')
+    fitted=profile=='float' or phone_launcher or tool=='#mode-extent'
     if fitted:
      # Short panels fit their contents. Longer panels retain scrolling room.
      assert await body.evaluate('e=>e.clientHeight>=119 || e.scrollHeight<=e.clientHeight+1')
@@ -81,7 +81,7 @@ async def matrix(browser):
     else:
      assert (await body.bounding_box())['height']>=120
      if bounds: assert rect==bounds,('Tool switch moved palette',w,h,rect,bounds)
-    if not fitted or phone_launcher: bounds=rect
+    if not fitted or phone_launcher or profile=='float': bounds=rect
     assert rect['x']>=0 and rect['y']>=0 and rect['x']+rect['width']<=w+.5 and rect['y']+rect['height']<=h+.5
     if d['windows']['profile'] in ['sheet','side']:
      for selector in ['.view-bottom','#view-readout','.axis-compass','#tools-menu']:

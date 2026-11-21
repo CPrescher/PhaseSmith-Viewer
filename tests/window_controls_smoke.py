@@ -18,6 +18,35 @@ async def resize_left(page,selector,grip):
  assert after['height']<before['height']-30,(selector,before,after)
  assert (await diagnostics(page))['camera']==camera
 
+async def check_overlay_height(page, tool, item):
+ panel=page.locator('#tool-window-'+tool)
+ await choose_tool(page,'#mode-'+tool)
+ await panel.locator('.tool-window-title').dblclick()
+ add=page.locator('#'+item+'-add')
+ rows=page.locator('#'+item+'-list')
+ empty=(await panel.bounding_box())['height']
+ await add.click()
+ await settle(page)
+ taller=(await panel.bounding_box())['height']
+ assert taller>empty+40
+ row=rows.locator('.tool-row').last
+ assert await row.evaluate('e=>e===document.activeElement')
+ button=await add.bounding_box()
+ box=await row.bounding_box()
+ assert button['y']>=box['y']+box['height']-1 and abs(button['width']-box['width'])<2
+ await resize_left(page,'#tool-window-'+tool,'#tool-window-'+tool+' .window-grip-left')
+ manual=(await panel.bounding_box())['height']
+ await add.click()
+ await settle(page)
+ assert (await panel.bounding_box())['height']==manual
+ assert await hit(rows.locator('.tool-row').last.locator('input[type=text]').first)
+ await choose_tool(page,'#mode-extent')
+ await choose_tool(page,'#mode-'+tool)
+ assert (await panel.bounding_box())['height']==manual
+ await panel.locator('.tool-window-title').dblclick()
+ assert (await panel.bounding_box())['height']>manual
+ await panel.locator('[data-action=close]').click()
+
 async def main():
  async with async_playwright() as p:
   b=await p.chromium.launch(channel='chrome')
@@ -36,6 +65,8 @@ async def main():
     else:
      await coordinate_click(page,'#fullscreen-toggle');await page.wait_for_function('!!document.fullscreenElement');await coordinate_click(page,'#fullscreen-toggle');await page.wait_for_function('!document.fullscreenElement')
     async with page.expect_file_chooser():await coordinate_click(page,'#open')
+    await check_overlay_height(page,'lattice','plane')
+    await check_overlay_height(page,'directions','arrow')
     for tool in ['pairs','sites','lattice','directions','symmetry','extent','export','style']:
      await choose_tool(page,'#style-open' if tool=='style' else '#mode-'+tool)
      await resize_left(page,'#tool-window-'+tool,'#tool-window-'+tool+' .window-grip-left')

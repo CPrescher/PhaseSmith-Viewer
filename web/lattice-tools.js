@@ -1317,6 +1317,16 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     );
   }
 
+  function revealAddedRow(list) {
+    const row = list.lastElementChild;
+    row.tabIndex = -1;
+    row.focus({ preventScroll: true });
+    requestAnimationFrame(() => {
+      if (row.isConnected && document.activeElement === row) {
+        row.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }
+    });
+  }
   $("plane-add").onclick = () => {
     if (!getStructure()) return;
     planes.push({
@@ -1335,6 +1345,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     });
     renderPlaneList();
     rebuild();
+    revealAddedRow($("plane-list"));
   };
   $("arrow-add").onclick = () => {
     if (!getStructure()) return;
@@ -1349,6 +1360,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     });
     renderArrowList();
     rebuild();
+    revealAddedRow($("arrow-list"));
   };
   $("sym-filters").replaceChildren(
     ...SYMMETRY_CATEGORIES.map((c) => {

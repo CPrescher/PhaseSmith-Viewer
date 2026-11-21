@@ -1407,6 +1407,7 @@ button.element[aria-pressed="false"] .dot {
 }
 
 /* Lattice tools: plane and arrow rows. */
+.add-overlay { width: 100%; margin-top: 6px; }
 .tool-list {
   display: grid;
   gap: 6px;
@@ -3644,13 +3645,13 @@ body:fullscreen, body:-webkit-full-screen { width: 100%; height: 100%; backgroun
   border-radius: 50%; background: var(--accent);
 }
 
-/* Phone science windows can shrink around a short result or a collapsed
+/* Science windows can shrink around a short result or a collapsed
    settings group. The viewport limits still bound long tables and diagrams. */
-body:has(#app[data-launcher="menu"]) :is(#analysis-window, #reflection-explorer, #detector-window, #detector-options) {
+body:has(#app:is([data-launcher="menu"], [data-profile="float"])) :is(#analysis-window, #reflection-explorer, #detector-window, #detector-options) {
   height: auto;
   min-height: 0;
 }
-body:has(#app[data-launcher="menu"]) #detector-window .detector-body { flex-basis: auto; }
+body:has(#app:is([data-launcher="menu"], [data-profile="float"])) #detector-window .detector-body { flex-basis: auto; }
 body:has(#app[data-launcher="menu"]) #detector-window.showing-crystal {
   height: auto !important;
   max-height: min(320px, calc(100dvh - 80px)) !important;
