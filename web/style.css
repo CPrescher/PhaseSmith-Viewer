@@ -2475,6 +2475,9 @@ button.element[aria-pressed="false"] .dot {
   z-index: 10;
   pointer-events: none;
 }
+/* A deliberately moved desktop palette stays interactive over the canvas
+   overlays. Its transparent layer does not intercept the surrounding view. */
+#app[data-profile="float"] .tool-layer { z-index: 16; }
 .tool-window {
   position: absolute;
   display: flex;

@@ -53,6 +53,23 @@ async def main():
      await panel.locator('[data-action=compact]').click()
      assert await panel.locator('.window-grip-left').is_visible(), 'Expand must restore corner resizing'
      await panel.locator('.tool-window-title').dblclick()
+     # Resizing right into the permanent launcher must stop before its
+     # buttons can cover the palette header (and leave both usable).
+     grip=await panel.locator('.window-grip:not(.window-grip-left)').bounding_box()
+     await page.mouse.move(grip['x']+grip['width']-4,grip['y']+4);await page.mouse.down()
+     await page.mouse.move(w-1,grip['y']+4,steps=8);await page.mouse.up()
+     assert await hit(panel.locator('[data-action=close]')), 'The launcher must not cover Close after right resize'
+     for button in await page.locator('#tool-rail .rail-button').all():assert await hit(button)
+     await panel.locator('.tool-window-title').dblclick()
+     # Drag high enough that Close overlaps the fixed measurement toolbar.
+     head=await panel.locator('.tool-window-title').bounding_box()
+     await page.mouse.move(head['x']+20,head['y']+10);await page.mouse.down()
+     await page.mouse.move(head['x']+20,100,steps=8);await page.mouse.up()
+     assert await hit(panel.locator('[data-action=close]')), 'Canvas overlays must not intercept a moved palette header'
+     await coordinate_click(page,'#tool-window-'+tool+' [data-action=close]')
+     assert not await panel.is_visible()
+     await choose_tool(page,'#style-open' if tool=='style' else '#mode-'+tool)
+     await panel.locator('.tool-window-title').dblclick()
     await page.locator('#tool-window-style [data-action=close]').click()
     await choose_tool(page,'#mode-sites')
     body=await page.locator('#tool-window-sites .tool-window-body').bounding_box()

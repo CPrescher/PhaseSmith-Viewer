@@ -5,6 +5,7 @@ import asyncio, math, os
 from playwright.async_api import async_playwright
 from browser_test_config import QUICK
 from smoke import URL, diagnostics, settle, choose_tool
+from gui_review_smoke import hit
 
 TOOLS=['#mode-pairs','#mode-lattice','#style-open','#mode-sites','#mode-extent','#mode-export']
 SIZES=[(1440,900),(1920,1080),(1024,768),(768,1024),(390,844),(375,667),(844,390),(667,375),(960,1050)]
@@ -221,7 +222,12 @@ async def interaction_details(browser, phone=False):
  # Pick an exposed atom without replacing or scrolling the active editor.
  before=await diagnostics(page);rect=await page.locator('.tool-window:not([hidden])').bounding_box();await pick(page);after=await diagnostics(page)
  assert after['windows']['visible']==['lattice'];unchanged(before,after)
- assert await page.locator('.tool-window:not([hidden])').bounding_box()==rect
+ current=await page.locator('.tool-window:not([hidden])').bounding_box()
+ if phone:
+  assert current['x']==rect['x'] and current['width']==rect['width']
+  assert abs(current['y']+current['height']-rect['y']-rect['height'])<1
+  assert await hit(page.locator('#tool-window-lattice [data-action=close]'))
+ else:assert current==rect
  assert abs(await lattice_body.evaluate('el=>el.scrollTop')-saved)<1
  if phone:
   await page.locator('#measure-more').tap();box=await page.locator('#selection').bounding_box();panel=await page.locator('#tool-window-lattice').bounding_box()

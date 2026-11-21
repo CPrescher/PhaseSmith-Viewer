@@ -453,6 +453,11 @@ export function createToolWindows(options) {
   for (const { body } of windows.values()) tuneObserver.observe(body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-tune-name"] });
 
   // ---- Move / resize (floating palettes) ----
+  function floatingWorkspace() {
+    // The fixed rail sits above palettes. Keep their headers and resize
+    // corners out of that column, including after a saved view is restored.
+    return { ...ws, width: launcher === "rail" ? Math.max(1, rail.offsetLeft) : ws.width };
+  }
   function startDrag(e, tool, kind) {
     if (profile !== "float" || drag || (e.button !== undefined && e.button !== 0)) return;
     if (kind === "move" && e.target.closest("button")) return;
@@ -479,11 +484,12 @@ export function createToolWindows(options) {
       drag.kind === "move"
         ? { ...r, x: r.x + dx, y: r.y + dy }
         : { ...r, w: Math.max(MIN_W, r.w + dx), h: Math.max(MIN_H, r.h + dy) };
-    next = clampRect(next, ws);
+    const bounds = floatingWorkspace();
+    next = clampRect(next, bounds);
     if (drag.kind === "resize") {
       next.x = r.x;
       next.y = r.y;
-      next.w = Math.min(next.w, ws.width - MARGIN - r.x);
+      next.w = Math.min(next.w, bounds.width - MARGIN - r.x);
       next.h = Math.min(next.h, ws.height - MARGIN - r.y);
     }
     drag.next = next;
@@ -495,7 +501,7 @@ export function createToolWindows(options) {
     drag = null;
     if (target.hasPointerCapture?.(id)) target.releasePointerCapture(id);
     windows.get(tool).el.classList.remove("moving", "resizing");
-    commit(moveTool(state, tool, anchorRect(clampRect(next, ws), ws)));
+    commit(moveTool(state, tool, anchorRect(clampRect(next, floatingWorkspace()), ws)));
   }
   for (const { head, grip, gripLeft } of windows.values())
     for (const el of [head, grip, gripLeft]) {
@@ -509,7 +515,7 @@ export function createToolWindows(options) {
   function rectFor(tool) {
     if (profile !== "float") return defaultRect(profile, ws, metrics());
     const saved = state.rects.main;
-    return clampRect(saved ? resolveRect(saved, ws) : defaultRect("float", ws, metrics()), ws);
+    return clampRect(saved ? resolveRect(saved, ws) : defaultRect("float", ws, metrics()), floatingWorkspace());
   }
   function place(el, r) {
     el.style.left = `${r.x}px`;

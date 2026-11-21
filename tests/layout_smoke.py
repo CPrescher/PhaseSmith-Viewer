@@ -1,11 +1,13 @@
 """Stable layout: the crystal canvas, the tool launcher (rail, or the header
-Tools button on phones), the open tool window's outline and the mouse-action
+Tools button on phones), the open tool window's anchor and the mouse-action
 buttons keep their exact bounds in every animation frame while atoms are
 picked, measurement modes and tools change, pairs/planes/arrows are added and
 edited, a tool window is scrolled by a real touch gesture (wheel with a
 mouse), Turn and editors open and close, and after a resize/orientation round
 trip. Each tool keeps its own scroll position; picking never scrolls or
 replaces the open tool.
+Phone sheets may shrink upward content space to clear the selected atom card;
+their bottom edge and width remain fixed, and Close stays reachable.
 
 Portable: Playwright's bundled Chromium by default. BROWSER_CHANNEL=chrome uses
 an installed Chrome and CHROMIUM_EXECUTABLE another Chromium build;
@@ -81,12 +83,21 @@ async def check(browser, engine, width, height, touch, theme):
 
     baseline = None
 
+    def stationary(selector, current, original):
+        if phone and selector == WINDOW:
+            # Selection can grow the info card. Only the sheet's top edge
+            # may move, keeping its bottom anchor and both side edges fixed.
+            return same([current[0],current[2],current[1]+current[3]],
+                        [original[0],original[2],original[1]+original[3]])
+        return same(current, original)
+
     async def settle(action=""):
         await page.evaluate("new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))")
         if baseline:  # fail at the action that moved something
             now = await page.evaluate(RECTS, tracked)
             for selector in tracked:
-                assert same(now[selector], baseline[selector]), (where, action, selector, now[selector], baseline[selector])
+                assert stationary(selector, now[selector], baseline[selector]), (where, action, selector, now[selector], baseline[selector])
+            assert await page.evaluate(HITS, [WINDOW+' [data-action=close]', None]), (where, action, 'Close is covered')
 
     async def press(selector):
         locator = page.locator(selector).first
@@ -241,7 +252,7 @@ async def check(browser, engine, width, height, touch, theme):
     assert len(frames) > 20, (where, len(frames))
     for i, frame in enumerate(frames):
         for selector in tracked:
-            assert same(frame[selector], baseline[selector]), (where, "frame", i, selector, frame[selector], baseline[selector])
+            assert stationary(selector, frame[selector], baseline[selector]), (where, "frame", i, selector, frame[selector], baseline[selector])
 
     # Resize / orientation round trip: fills the new window, keeps the tool
     # and its window, then returns to exactly the same layout.
@@ -258,11 +269,11 @@ async def check(browser, engine, width, height, touch, theme):
     await page.wait_for_timeout(300)
     back = await page.evaluate(RECTS, tracked)
     for selector in tracked:
-        assert same(back[selector], baseline[selector]), (where, "after rotation", selector, back[selector], baseline[selector])
+        assert stationary(selector, back[selector], baseline[selector]), (where, "after rotation", selector, back[selector], baseline[selector])
 
     assert not errors, (where, errors)
     await context.close()
-    print(f"{where}: {len(frames)} frames, canvas {baseline['canvas'][2]:.0f}×{baseline['canvas'][3]:.0f} and tool window fixed")
+    print(f"{where}: {len(frames)} frames, canvas {baseline['canvas'][2]:.0f}×{baseline['canvas'][3]:.0f} fixed and tool window anchored")
 
 
 async def expect_attr(locator, name, value, where):
