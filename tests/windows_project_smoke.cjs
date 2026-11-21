@@ -1,17 +1,17 @@
 // Exercise the installed file associations and native Save dialog on a Windows runner.
 const assert = require('node:assert/strict');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
 const fs = require('node:fs/promises');
 const net = require('node:net');
 const path = require('node:path');
 const { setTimeout: delay } = require('node:timers/promises');
 const { chromium } = require('playwright-core');
 
-function shell(action, document, env) {
+function shell(action, document) {
   const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
     path.join(__dirname, 'windows_project_dialog.ps1'), '-Action', action];
   if (document) args.push('-Document', document);
-  execFileSync('powershell.exe', args, { env, stdio: 'inherit', timeout: 65000 });
+  execFileSync('powershell.exe', args, { stdio: 'inherit', timeout: 65000 });
 }
 
 async function openDocument(document, profile) {
@@ -19,17 +19,21 @@ async function openDocument(document, profile) {
   await new Promise(resolve => listener.listen(0, '127.0.0.1', resolve));
   const port = listener.address().port;
   await new Promise(resolve => listener.close(resolve));
-  shell('Open', document, {
+  // Start the installed app with a private test profile. Explorer may start
+  // applications through a broker which does not inherit test environment variables.
+  const binary = path.join(process.env.RUNNER_TEMP, 'viewer-install', 'phasesmith-viewer.exe');
+  const viewer = spawn(binary, [], { stdio: 'inherit', env: {
     ...process.env,
     WEBVIEW2_USER_DATA_FOLDER: profile,
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port} --remote-debugging-address=127.0.0.1 --enable-unsafe-swiftshader --use-angle=swiftshader`,
-  });
+  } });
   const endpoint = `http://127.0.0.1:${port}`;
   const deadline = Date.now() + 90000;
   while (true) {
     try {
       if ((await fetch(endpoint + '/json/version')).ok) break;
     } catch { /* WebView2 is still starting. */ }
+    if (viewer.exitCode !== null) throw new Error('Installed viewer exited at startup: ' + viewer.exitCode);
     if (Date.now() > deadline) throw new Error('The installed viewer did not start WebView2 for ' + document);
     await delay(300);
   }
@@ -38,7 +42,10 @@ async function openDocument(document, profile) {
   const page = context.pages()[0] || await context.waitForEvent('page');
   page.on('pageerror', error => console.error('Viewer error:', error));
   await page.waitForFunction(() => document.documentElement.hasAttribute('data-desktop-app')
-    && window.viewerDiagnostics?.().block === 'periodic_distance'
+    && window.viewerDiagnostics?.().history.ready, null, { timeout: 60000 });
+  console.log('Connected to the installed desktop viewer. Opening ' + path.basename(document));
+  shell('Open', document);
+  await page.waitForFunction(() => window.viewerDiagnostics?.().block === 'periodic_distance'
     && window.viewerDiagnostics().history.ready, null, { timeout: 60000 });
   return { browser, page };
 }

@@ -7,7 +7,12 @@ $binary = [IO.Path]::GetFullPath((Join-Path $env:RUNNER_TEMP 'viewer-install/pha
 
 if ($Action -eq 'Open') {
     # Use the installed shell association, as Explorer does on a double-click.
-    Start-Process -FilePath $Document
+    $extension = [IO.Path]::GetExtension($Document)
+    $class = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey($extension).GetValue('')
+    $command = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$class\shell\open\command").GetValue('')
+    if ($command -ne ('"{0}" "%1"' -f $binary)) { throw "Unexpected registered handler for $extension : $command" }
+    Write-Host "Windows registered $extension to the installed viewer."
+    Start-Process -FilePath $Document -Verb Open
     return
 }
 

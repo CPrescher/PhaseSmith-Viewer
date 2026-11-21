@@ -131,12 +131,7 @@ jobs:
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
           mkdir out
           : "${APPLE_CERTIFICATE:?Missing signing certificate}" "${APPLE_CERTIFICATE_PASSWORD:?Missing certificate password}" "${APPLE_SIGNING_IDENTITY:?Missing Developer ID}"
-          if [[ -z "$APPLE_ID$APPLE_PASSWORD" ]]; then
-            # Tauri treats empty environment variables as supplied credentials.
-            unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
-          else
-            : "${APPLE_ID:?Missing Apple ID}" "${APPLE_PASSWORD:?Missing app-specific password}" "${APPLE_TEAM_ID:?Missing team ID}"
-          fi
+          : "${APPLE_ID:?Missing Apple ID}" "${APPLE_PASSWORD:?Missing app-specific password}" "${APPLE_TEAM_ID:?Missing team ID}"
           npm run desktop:build -- --ci --target "$TARGET" --bundles app,dmg -- --locked
           dmg=(src-tauri/target/"$TARGET"/release/bundle/dmg/*.dmg)
           [[ ${#dmg[@]} -eq 1 ]]
@@ -144,14 +139,13 @@ jobs:
           mv "${dmg[0]}" "$output"
           mount=$(mktemp -d)
           hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$output"
-          trap 'hdiutil detach "$mount"' EXIT
+          trap 'result=$?; hdiutil detach "$mount" || exit 1; exit "$result"' EXIT
           app="$mount/PhaseSmith Viewer.app"
           archs=$(lipo -archs "$app/Contents/MacOS/phasesmith-viewer")
           [[ " $archs " == *" arm64 "* && " $archs " == *" x86_64 "* ]]
           codesign --verify --deep --strict "$app"
           codesign -dv --verbose=2 "$app" 2>&1 | grep '^Authority=Developer ID Application:'
           echo "Verified the Developer ID signature on the universal app in the DMG."
-          : "${APPLE_ID:?Set APPLE_ID and APPLE_PASSWORD to notarize the signed app}"
           xcrun stapler validate "$app"
           spctl --assess --type execute "$app"
           echo 'macOS: Developer ID signed and notarized by Apple.' > out/macOS.txt
