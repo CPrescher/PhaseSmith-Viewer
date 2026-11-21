@@ -78,6 +78,26 @@ async def check(browser,w,h,theme):
         assert restored==before
     await choose_tool(page,'#mode-extent')
     assert await page.locator('#range-apply').count() == 0
+    if w < 500:
+        panel = page.locator('#tool-window-extent')
+        async def bottom_gap():
+            return await panel.evaluate('''el => {
+                const body = el.querySelector('.tool-window-body');
+                // Short displays can scroll. Measure the trailing space after
+                // the last control in both the scrolling and fitted layouts.
+                const row = el.querySelector('.section-title').getBoundingClientRect();
+                return el.getBoundingClientRect().bottom - row.bottom
+                    + body.scrollHeight - body.clientHeight - body.scrollTop;
+            }''')
+        assert 0 <= await bottom_gap() <= 20, 'Extent should end just below Cell and Boundary'
+        if h >= 800:
+            assert await hit(page.locator('#boundary'))
+            assert await panel.locator('.tool-window-body').evaluate('e => e.scrollHeight === e.clientHeight')
+        pose = (await diagnostics(page))['camera']
+        await panel.get_by_role('button', name='Fold Extent panel').click()
+        await panel.get_by_role('button', name='Expand Extent panel').click()
+        assert 0 <= await bottom_gap() <= 20
+        assert (await diagnostics(page))['camera'] == pose
     field = page.locator('#range-a-max')
     increase = page.get_by_role('button', name='Increase a maximum by one cell')
     decrease = page.get_by_role('button', name='Decrease a maximum by one cell')

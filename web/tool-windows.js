@@ -654,13 +654,19 @@ export function createToolWindows(options) {
       const tuning = markTunePath(id);
       win.el.dataset.tune = String(tuning);
       let r = rectFor(id);
-      if (tuning) {
-        // Compact strip: the named entry only, at its natural height.
-        win.el.style.height = "auto";
+      if (tuning || (id === "extent" && profile !== "float")) {
+        // Measure at the final width so wrapped controls and validation
+        // messages count toward the height of the docked panel.
         win.el.style.width = `${r.w}px`;
-        const natural = Math.ceil(win.el.getBoundingClientRect().height);
+        let natural;
+        if (tuning) {
+          win.el.style.height = "auto";
+          natural = Math.ceil(win.el.getBoundingClientRect().height);
+        } else {
+          natural = naturalHeight(win);
+        }
         const h = Math.min(natural, r.h);
-        r = { ...r, y: r.y + r.h - h, h };
+        r = { ...r, y: profile === "sheet" ? r.y + r.h - h : r.y, h };
       }
       // Compact is an explicit request, never an automatic camera or palette
       // reframe. Keep that height stable even if content subsequently changes.
@@ -753,6 +759,7 @@ export function createToolWindows(options) {
     if (!drag) apply();
   });
   resize.observe(viewport);
+  resize.observe(windows.get("extent").body.querySelector(".plot-range"));
   window.visualViewport?.addEventListener("resize", () => { if (!drag) apply(); });
   window.visualViewport?.addEventListener("scroll", () => { if (!drag) apply(); });
   // Restore ordinary placement when editing ends, including native Done.
