@@ -130,19 +130,12 @@ jobs:
         run: |
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
           mkdir out
-          if [[ -z "$APPLE_CERTIFICATE$APPLE_CERTIFICATE_PASSWORD$APPLE_SIGNING_IDENTITY$APPLE_ID$APPLE_PASSWORD$APPLE_TEAM_ID" ]]; then
-            unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
-            export APPLE_SIGNING_IDENTITY=-
-            echo 'macOS: ad-hoc signed, without Apple notarization.' > out/macOS.txt
+          : "${APPLE_CERTIFICATE:?Missing signing certificate}" "${APPLE_CERTIFICATE_PASSWORD:?Missing certificate password}" "${APPLE_SIGNING_IDENTITY:?Missing Developer ID}"
+          if [[ -z "$APPLE_ID$APPLE_PASSWORD" ]]; then
+            # Tauri treats empty environment variables as supplied credentials.
+            unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
           else
-            : "${APPLE_CERTIFICATE:?}" "${APPLE_CERTIFICATE_PASSWORD:?}" "${APPLE_SIGNING_IDENTITY:?}"
-            if [[ -n "$APPLE_ID$APPLE_PASSWORD$APPLE_TEAM_ID" ]]; then
-              : "${APPLE_ID:?}" "${APPLE_PASSWORD:?}" "${APPLE_TEAM_ID:?}"
-              echo 'macOS: Developer ID signed and notarized by Apple.' > out/macOS.txt
-            else
-              unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
-              echo 'macOS: Developer ID signed, without Apple notarization.' > out/macOS.txt
-            fi
+            : "${APPLE_ID:?Missing Apple ID}" "${APPLE_PASSWORD:?Missing app-specific password}" "${APPLE_TEAM_ID:?Missing team ID}"
           fi
           npm run desktop:build -- --ci --target "$TARGET" --bundles app,dmg -- --locked
           dmg=(src-tauri/target/"$TARGET"/release/bundle/dmg/*.dmg)
@@ -156,13 +149,12 @@ jobs:
           archs=$(lipo -archs "$app/Contents/MacOS/phasesmith-viewer")
           [[ " $archs " == *" arm64 "* && " $archs " == *" x86_64 "* ]]
           codesign --verify --deep --strict "$app"
-          if [[ "$APPLE_SIGNING_IDENTITY" != - ]]; then
-            codesign -dv --verbose=2 "$app" 2>&1 | grep '^Authority=Developer ID Application:'
-          fi
-          if [[ -n "${APPLE_ID:-}" ]]; then
-            xcrun stapler validate "$app"
-            spctl --assess --type execute "$app"
-          fi
+          codesign -dv --verbose=2 "$app" 2>&1 | grep '^Authority=Developer ID Application:'
+          echo "Verified the Developer ID signature on the universal app in the DMG."
+          : "${APPLE_ID:?Set APPLE_ID and APPLE_PASSWORD to notarize the signed app}"
+          xcrun stapler validate "$app"
+          spctl --assess --type execute "$app"
+          echo 'macOS: Developer ID signed and notarized by Apple.' > out/macOS.txt
       - name: Build and verify the Windows offline installer
         if: runner.os == 'Windows'
         shell: pwsh
@@ -185,6 +177,16 @@ jobs:
           $machine = [BitConverter]::ToUInt16($bytes, $pe + 4)
           $expected = if ($env:PLATFORM -eq 'Windows-x64') { 0x8664 } else { 0xaa64 }
           if ($machine -ne $expected) { throw "Unexpected architecture in $binary" }
+      - name: Open a CIF, save a PSV and reopen it in the installed Windows viewer
+        if: runner.os == 'Windows'
+        timeout-minutes: 8
+        shell: pwsh
+        run: |
+          $tools = Join-Path $env:RUNNER_TEMP viewer-test-tools
+          npm install --prefix $tools --no-save --ignore-scripts --no-audit --no-fund playwright-core@1.65.1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $env:NODE_PATH = Join-Path $tools node_modules
+          node tests/windows_project_smoke.cjs
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: release-${{ matrix.platform }}
