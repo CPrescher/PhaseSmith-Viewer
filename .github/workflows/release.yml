@@ -132,6 +132,10 @@ jobs:
           mkdir out
           : "${APPLE_CERTIFICATE:?Missing signing certificate}" "${APPLE_CERTIFICATE_PASSWORD:?Missing certificate password}" "${APPLE_SIGNING_IDENTITY:?Missing Developer ID}"
           : "${APPLE_ID:?Missing Apple ID}" "${APPLE_PASSWORD:?Missing app-specific password}" "${APPLE_TEAM_ID:?Missing team ID}"
+          # Authenticate before compiling two architectures. Keep submission history out of logs.
+          export APPLE_ID="$(python3 -c 'import os; print(os.environ["APPLE_ID"].strip())')"
+          export APPLE_PASSWORD="$(python3 -c 'import os; print(os.environ["APPLE_PASSWORD"].strip())')"
+          xcrun notarytool history --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" > /dev/null
           npm run desktop:build -- --ci --target "$TARGET" --bundles app,dmg -- --locked
           dmg=(src-tauri/target/"$TARGET"/release/bundle/dmg/*.dmg)
           [[ ${#dmg[@]} -eq 1 ]]
@@ -176,11 +180,7 @@ jobs:
         timeout-minutes: 8
         shell: pwsh
         run: |
-          $tools = Join-Path $env:RUNNER_TEMP viewer-test-tools
-          npm install --prefix $tools --no-save --ignore-scripts --no-audit --no-fund playwright-core@1.65.1
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          $env:NODE_PATH = Join-Path $tools node_modules
-          node tests/windows_project_smoke.cjs
+          powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tests/windows_project_roundtrip.ps1
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: release-${{ matrix.platform }}
