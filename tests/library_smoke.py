@@ -1,3 +1,4 @@
+from smoke import reveal_control
 """Bundled library: selection, source links, restore, failures and phone layout."""
 import asyncio
 import os
@@ -77,6 +78,7 @@ async def main():
             await expect(page.locator('#structure-info-open')).to_be_focused()
             assert await page.evaluate('new Set(window.viewerDiagnostics().atoms.map(a => a.element)).size') == 2
             await choose_tool(page, '#mode-export', phone)
+            await reveal_control(page, "#session-save")
             await page.locator('#session-save').click()
             await page.wait_for_timeout(300)
             await page.reload()

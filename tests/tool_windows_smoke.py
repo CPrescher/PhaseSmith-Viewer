@@ -1,9 +1,11 @@
+from smoke import reveal_control
 """Native inputs: stationary scene, single toggleable tools, aligned info,
 independent global visibility, precise editing and saved settings."""
 import asyncio, math, os
 from playwright.async_api import async_playwright
 from browser_test_config import QUICK
 from smoke import URL, diagnostics, settle, choose_tool
+from gui_review_smoke import hit
 
 TOOLS=['#mode-pairs','#mode-lattice','#style-open','#mode-sites','#mode-extent','#mode-export']
 SIZES=[(1440,900),(1920,1080),(1024,768),(768,1024),(390,844),(375,667),(844,390),(667,375),(960,1050)]
@@ -18,7 +20,11 @@ async def launcher(page,button):
   await settle(page)
   unchanged(prior,await diagnostics(page))
   menu=await page.locator('#tool-rail').bounding_box();trigger=await page.locator('#tools-menu').bounding_box()
-  assert menu['y']+menu['height']<=trigger['y']-4,(menu,trigger)
+  if page.viewport_size['height'] < 500:
+   for action in await page.locator('#tool-rail .rail-button').all():
+    assert await action.evaluate("e=>{const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));}"), 'landscape action covered'
+  else:
+   assert menu['y']+menu['height']<=trigger['y']-4,(menu,trigger)
  await page.locator(button).click()
  await settle(page)
 def unchanged(before,after):
@@ -105,6 +111,7 @@ async def matrix(browser):
 async def editing(browser):
  page=await browser.new_page(viewport={'width':1200 if QUICK else 1440,'height':800 if QUICK else 900},has_touch=True)
  await ready(page);await choose_tool(page,'#mode-pairs')
+ await page.locator('#pair-visibility-options > summary').click()
  assert 'Hide atoms outside polyhedra' in await page.locator('label:has(#polyhedra-only)').inner_text()
  await page.locator('#polyhedra-filter-help').wait_for(state='visible')
  pose=await diagnostics(page);window=await page.locator('#tool-window-pairs').bounding_box()
@@ -123,7 +130,7 @@ async def editing(browser):
  assert all(not m['visible'] and not m['outlineVisible'] for m in d['faceMaterials'])
  await choose_tool(page,'#mode-lattice');await page.locator('#plane-add').click();await settle(page)
  assert any(p['faces']['visible'] for p in (await diagnostics(page))['lattice']['planes'])
- await choose_tool(page,'#mode-export');await page.locator('#session-save').click()
+ await choose_tool(page,'#mode-export');await reveal_control(page,"#session-save");await page.locator('#session-save').click()
  await page.wait_for_function('!viewerDiagnostics().session.pending && viewerDiagnostics().session.status.startsWith("Saved")')
  await page.wait_for_timeout(1200) # let the IndexedDB save transaction commit
  await page.reload();await page.wait_for_function('window.viewerDiagnostics?.().session.restoredAt>0 && !viewerDiagnostics().session.suspended')
@@ -195,7 +202,7 @@ async def interaction_details(browser, phone=False):
   base=await diagnostics(page);head=await win.locator('.tool-window-title').bounding_box()
   await page.mouse.move(head['x']+20,head['y']+10);await page.mouse.down();await page.mouse.move(head['x']-100,head['y']+50,steps=6);await page.mouse.up();await settle(page)
   unchanged(base,await diagnostics(page))
-  grip=await win.locator('.window-grip').bounding_box();await page.mouse.move(grip['x']+grip['width']-4,grip['y']+grip['height']-4);await page.mouse.down();await page.mouse.move(grip['x']+grip['width']+20,grip['y']+grip['height']+20,steps=5);await page.mouse.up();await settle(page)
+  grip=await win.locator('.window-grip:not(.window-grip-left)').bounding_box();await page.mouse.move(grip['x']+grip['width']-4,grip['y']+grip['height']-4);await page.mouse.down();await page.mouse.move(grip['x']+grip['width']+20,grip['y']+grip['height']+20,steps=5);await page.mouse.up();await settle(page)
   unchanged(base,await diagnostics(page))
  # Lattice changes must retain row bounds and per-tool scroll on return.
  await choose_tool(page,'#mode-lattice',phone)
@@ -215,7 +222,12 @@ async def interaction_details(browser, phone=False):
  # Pick an exposed atom without replacing or scrolling the active editor.
  before=await diagnostics(page);rect=await page.locator('.tool-window:not([hidden])').bounding_box();await pick(page);after=await diagnostics(page)
  assert after['windows']['visible']==['lattice'];unchanged(before,after)
- assert await page.locator('.tool-window:not([hidden])').bounding_box()==rect
+ current=await page.locator('.tool-window:not([hidden])').bounding_box()
+ if phone:
+  assert current['x']==rect['x'] and current['width']==rect['width']
+  assert abs(current['y']+current['height']-rect['y']-rect['height'])<1
+  assert await hit(page.locator('#tool-window-lattice [data-action=close]'))
+ else:assert current==rect
  assert abs(await lattice_body.evaluate('el=>el.scrollTop')-saved)<1
  if phone:
   await page.locator('#measure-more').tap();box=await page.locator('#selection').bounding_box();panel=await page.locator('#tool-window-lattice').bounding_box()

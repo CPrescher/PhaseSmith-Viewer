@@ -146,7 +146,7 @@ async def main():
                     )
                 )[-1]
                 browser = await p.webkit.launch(executable_path=str(exe))
-            for w, h, touch in [(1440, 900, False), (390, 844, True)]:
+            for w, h, touch in [(1440, 900, False), (390, 844, True), (375, 667, True)]:
                 await check(browser, w, h, touch)
             await browser.close()
 

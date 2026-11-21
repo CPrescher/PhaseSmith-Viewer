@@ -45,6 +45,32 @@ export function videoSupport() {
   return { reason: "No supported video format (MP4 or WebM) for recording; PNG export still works." };
 }
 
+// Recorder timestamps follow real time, not the requested frame cadence.
+// Read the finished file rather than reporting a requested frame count as
+// encoded data. Some WebM implementations expose an indefinite duration.
+function recordedDuration(blob) {
+  return new Promise((resolve) => {
+    const video = document.createElement("video"), url = URL.createObjectURL(blob);
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      const duration = video.duration;
+      video.onloadedmetadata = video.onerror = null;
+      video.removeAttribute("src");
+      video.load();
+      URL.revokeObjectURL(url);
+      resolve(Number.isFinite(duration) && duration > 0 ? duration : null);
+    };
+    const timer = setTimeout(finish, 3000);
+    video.preload = "metadata";
+    video.muted = true;
+    video.onloadedmetadata = video.onerror = finish;
+    video.src = url;
+  });
+}
+
 // ---- PNG physical size (pHYs) ------------------------------------------------
 // DPI is metadata only: the pixels are not resampled. The pHYs chunk
 // (pixels per metre, unit = 1) goes right after IHDR, replacing any
@@ -474,10 +500,13 @@ export function createExporter(ctx) {
     const offset = saved.position.clone().sub(saved.target);
     const axis = saved.up.clone().normalize();
     let canceled = false,
+      restored = false,
       reason = "",
       timer = 0,
       frame = 0;
     const restore = () => {
+      if (restored) return;
+      restored = true;
       clearTimeout(timer);
       stream.getTracks().forEach((t) => t.stop());
       camera.position.copy(saved.position);
@@ -507,14 +536,27 @@ export function createExporter(ctx) {
     };
     const done = new Promise((resolve, reject) => {
       settle = resolve;
-      recorder.onstop = () => {
-        restore();
-        if (canceled) return resolve({ canceled: true, reason });
-        const blob = new Blob(chunks, { type: support.mime.split(";")[0] });
-        if (!blob.size) return reject(Error("The recording produced no data."));
-        const filename = `${slugName(ctx.name())}-turntable.${support.extension}`;
-        download(blob, filename);
-        resolve({ filename, mime: support.mime, width: size.width, height: size.height, bytes: blob.size, frames });
+      recorder.onstop = async () => {
+        if (canceled) {
+          restore();
+          return resolve({ canceled: true, reason });
+        }
+        const elapsed = (performance.now() - start) / 1000;
+        try {
+          const blob = new Blob(chunks, { type: support.mime.split(";")[0] });
+          if (!blob.size) throw Error("The recording produced no data.");
+          const duration = await recordedDuration(blob);
+          // Cancel may have restored the scene while metadata was loading.
+          if (canceled) return;
+          restore();
+          const filename = `${slugName(ctx.name())}-turntable.${support.extension}`;
+          download(blob, filename);
+          resolve({ filename, mime: support.mime, width: size.width, height: size.height, bytes: blob.size,
+            duration, requestedSeconds: seconds, slow: (duration ?? elapsed) > seconds * 1.2 });
+        } catch (error) {
+          if (!canceled) restore();
+          reject(error);
+        }
       };
       recorder.onerror = (e) => {
         canceled = true;
@@ -543,7 +585,8 @@ export function createExporter(ctx) {
         recorder.onerror({ error });
         return;
       }
-      onProgress?.(frame / frames);
+      const elapsed = (performance.now() - start) / 1000;
+      onProgress?.(frame / frames, { slow: frame > 1 && elapsed > Math.max(1, (frame + 1) / fps * 1.2) });
       frame++;
       if (frame > frames) {
         recorder.stop();

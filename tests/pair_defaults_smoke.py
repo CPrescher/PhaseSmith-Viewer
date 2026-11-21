@@ -1,3 +1,4 @@
+from smoke import reveal_control
 """Pair estimates follow UI element changes, while manual settings survive."""
 
 import asyncio
@@ -41,6 +42,7 @@ async def main():
             await cutoff.fill("1.812345")
             await cutoff.press("Enter")
             await page.locator("#viewport canvas").click(position={"x": 15, "y": 200})
+            await reveal_control(page, "#polyhedra-only")
             await page.locator("#polyhedra-only").uncheck()
             await settle(page)
             assert float(await cutoff.input_value()) == 1.812345
@@ -54,6 +56,7 @@ async def main():
             state = await diagnostics(page)
             assert next(f for f in state["faceMaterials"] if f["id"] == last_id)["color"] == si_color
             await choose_tool(page, "#mode-export", False)
+            await reveal_control(page, "#session-save")
             await page.locator("#session-save").click()
             await page.wait_for_timeout(200)
             await page.reload()

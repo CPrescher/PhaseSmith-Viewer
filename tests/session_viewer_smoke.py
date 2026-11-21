@@ -1,3 +1,4 @@
+from smoke import reveal_control
 """Full viewer settings and ordered measurements survive an actual browser restart."""
 
 import asyncio
@@ -105,7 +106,7 @@ async def run(profile):
         # Repeated cells, customized plane, arrow, labels and symmetry.
         await page.locator("#mode-extent").click()
         await page.locator("#range-c-max").fill("2")
-        await page.locator("#range-form button[type=submit]").click()
+        await page.locator("#range-c-max").press("Enter")
         await page.locator("#mode-lattice").click()
         await page.locator("#plane-add").click()
         row = page.locator("[data-plane-id]").first
@@ -144,6 +145,7 @@ async def run(profile):
         await page.locator('input[name=export-scale][value="4"]').check()
         await page.locator("#export-seconds").select_option("4")
         await page.locator("#export-fps").select_option("24")
+        await reveal_control(page, "#session-save")
         await page.locator("#session-save").click()
         await page.wait_for_timeout(200)
         # Leave Style active; autosave must preserve it without opening Export again.
@@ -201,6 +203,7 @@ async def run(profile):
         original = await diagnostics(page)
         assert math.isclose(original["angle"], 90)
         await page.locator("#mode-export").click()
+        await reveal_control(page, "#session-save")
         await page.locator("#session-save").click()
         await wait_record(
             page,
@@ -238,7 +241,9 @@ async def run(profile):
             and 2.6 < float(await ca.locator("[data-field=cutoff]").input_value()) < 2.9
         )
         await page.locator("#mode-export").click()
+        page.once("dialog", lambda dialog: dialog.accept())
         async with page.expect_navigation():
+            await reveal_control(page, "#session-fresh")
             await page.locator("#session-fresh").click()
         await ready(page)
         assert "wollaston" in (await diagnostics(page))["block"].lower()

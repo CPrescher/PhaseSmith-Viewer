@@ -16,7 +16,7 @@ import {
   transpose,
 } from "./detector-orientation.js";
 import { cameraAxes, ewaldCamera } from "./ewald-camera.js";
-import { floatingDialog, resizeFromLowerLeft } from "./floating-dialog.js";
+import { floatingDialog, isFrontDialog } from "./floating-dialog.js";
 
 const millimeters = (value) => (Math.abs(value) < 0.005 ? 0 : value).toFixed(2);
 
@@ -29,7 +29,6 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   const win = $("window"),
     opener = document.getElementById("mode-detector");
   const show = floatingDialog(win, opener, $("head"), close);
-  resizeFromLowerLeft(win, $("resize-left"));
   let panel = null,
     pendingCalibration = null,
     calibrationVersion = 0,
@@ -77,6 +76,28 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   function redrawDetector() {
     if (model) drawDetector($("image"), model.detector, spots, chosen, $("ring").checked, select);
   }
+  for (const button of win.querySelectorAll("[data-detector-view]")) {
+    button.onclick = () => {
+      win.querySelector(".detector-views").dataset.view = button.dataset.detectorView;
+      for (const other of win.querySelectorAll("[data-detector-view]"))
+        other.setAttribute("aria-pressed", String(other === button));
+      redrawSphere();
+      redrawDetector();
+    };
+  }
+  function revealCrystal(on) {
+    const controlsTop = document.querySelector("#view-readout")?.getBoundingClientRect().top || document.querySelector(".view-bottom")?.getBoundingClientRect().top || innerHeight - 80;
+    win.style.setProperty("--linked-bottom", `${innerHeight - controlsTop + 12}px`);
+    win.classList.toggle("showing-crystal", on);
+    $("reveal").textContent = on ? "Show detector" : "Show crystal";
+    $("reveal").setAttribute("aria-pressed", String(on));
+    win.querySelector(".detector-body").scrollTop = 0;
+  }
+  $("reveal").onclick = () => revealCrystal(!win.classList.contains("showing-crystal"));
+  $("link").addEventListener("change", () => {
+    $("reveal").hidden = !$("link").checked;
+    if (!$("link").checked) revealCrystal(false);
+  });
   const plotSize = new ResizeObserver(() => {
     if (win.open) {
       redrawSphere();
@@ -86,6 +107,8 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   plotSize.observe($("ewald"));
   plotSize.observe($("image"));
   function syncMain() {
+    $("reveal").hidden = !$("link").checked;
+    if (!$("link").checked && win.classList.contains("showing-crystal")) revealCrystal(false);
     if (!win.open || !model || !$("link").checked) return onMainView(null);
     const axes = cameraAxes(sphereCamera.view);
     // Express the Ewald camera in crystal coordinates using the same rotated
@@ -257,7 +280,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       if (!model || model.searchOnly) throw Error("A full detector search is required for wedge coverage.");
       const {events, continuous} = scanWedge();
       const unique = new Set(events.map(e => e.point.hkl.join()));
-      $("coverage").textContent = unique.size + " distinct hkl · " + events.length + " discrete crossings" +
+      $("coverage").textContent = unique.size + " distinct reflections · " + events.length + " crossings of the Ewald sphere in this rotation range" +
         (continuous ? ". " + continuous + " continuously excited indices excluded from the discrete count." : ".");
       $("coverage-csv").disabled = !events.length;
     } catch (error) { $("coverage").textContent = error.message; }
@@ -414,11 +437,53 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       } else syncMain();
     });
   }
-  opener.onclick = () => (win.open ? close() : open());
+  opener.onclick = () => win.open ? (isFrontDialog(win) ? close() : show()) : open();
   $("close").onclick = close;
-  $("open-options").onclick = () => $("options").showModal();
+  let optionsParentLayout = null;
+  const showOptions = floatingDialog($("options"), $("open-options"), $("options").querySelector("header"), () => $("options").close());
+  $("open-options").onclick = () => {
+    if ($("options").open) return $("options").close();
+    const placeAutomatically = $("options").dataset.userMoved !== "true";
+    showOptions();
+    if (placeAutomatically && innerWidth >= 1000) {
+      // Keep most of the live detector visible while its geometry is edited.
+      const rect = win.getBoundingClientRect(), right = rect.right + 12;
+      const limit = document.getElementById("tool-rail").getBoundingClientRect().left - 8;
+      const rightSpace = limit - right, leftSpace = rect.left - 20;
+      const space = Math.max(rightSpace, leftSpace);
+      if (space >= 300) {
+        const width = Math.min(420, space);
+        $("options").style.width = width + "px";
+        $("options").style.left = (rightSpace >= leftSpace ? right : rect.left - width - 12) + "px";
+      } else $("options").style.left = "8px";
+      $("options").style.top = Math.max(8, rect.top) + "px";
+    } else if (placeAutomatically && innerWidth >= 740 && innerHeight > 500) {
+      // Temporarily narrow the tablet inspector so both windows, including
+      // the diagram tabs and both headers, remain usable side by side.
+      const limit = document.getElementById("tool-rail").getBoundingClientRect().left - 12;
+      const width = Math.min(360, limit - 324);
+      optionsParentLayout = { left: win.style.left, width: win.style.width, temporaryWidth: width, viewport: innerWidth };
+      win.style.left = "12px";
+      win.style.width = width + "px";
+      $("options").style.width = "300px";
+      $("options").style.left = (width + 24) + "px";
+      $("options").style.top = win.getBoundingClientRect().top + "px";
+    } else if (placeAutomatically) {
+      $("options").style.left = "8px";
+      $("options").style.top = "8px";
+    }
+  };
   $("options-done").onclick = () => $("options").close();
   $("options").onclose = () => {
+    if (optionsParentLayout) {
+      const prior = optionsParentLayout;
+      // Respect a subsequent manual drag/resize, or a screen-size change.
+      if (innerWidth === prior.viewport && win.style.left === "12px" && win.style.width === prior.temporaryWidth + "px") {
+        win.style.left = prior.left;
+        win.style.width = prior.width;
+      }
+      optionsParentLayout = null;
+    }
     if (win.open) $("open-options").focus({ preventScroll: true });
   };
   $("form").onsubmit = (event) => {

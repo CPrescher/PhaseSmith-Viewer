@@ -1,3 +1,4 @@
+from smoke import reveal_control
 """Portable project downloads reopen in a fresh browser on desktop and phone."""
 import asyncio
 import json
@@ -11,6 +12,7 @@ from history_smoke import idle, equivalent
 
 async def download_project(page):
     async with page.expect_download() as pending:
+        await reveal_control(page, "#project-save")
         await page.locator("#project-save").click()
     download = await pending.value
     return download.suggested_filename, Path(await download.path()).read_bytes()
@@ -45,10 +47,11 @@ async def check(browser, phone):
     await choose_tool(page, "#style-open")
     await page.locator("#style-target").select_option("element:Na")
     await page.locator("#style-swatches button:last-child").click()
-    await page.locator("#radius-details summary").click()
+    await reveal_control(page, "#radius-site")
     await page.locator("#radius-site").select_option("Na1")
     await page.locator("#radius-entry").select_option("1/VIII")
     radius_model = "atomic" if phone else "ionic"
+    await reveal_control(page, "#radius-model")
     await page.locator("#radius-model").select_option(radius_model)
     await choose_tool(page, "#mode-sites")
     await page.locator("#labels-toggle").check()
@@ -88,6 +91,7 @@ async def check(browser, phone):
     await page.wait_for_function("window.viewerDiagnostics?.().history.ready")
     await choose_tool(page, "#mode-export")
     async with page.expect_file_chooser() as chooser:
+        await reveal_control(page, "#project-open")
         await page.locator("#project-open").click()
     await (await chooser.value).set_files({"name": "shared.PSV", "mimeType": "application/json", "buffer": data})
     await page.wait_for_function("document.getElementById('project-status').textContent === 'Opened shared.PSV.' && viewerDiagnostics().history.ready")
@@ -116,6 +120,7 @@ async def check(browser, phone):
         await idle(page)
         assert equivalent((await diagnostics(page))["history"]["snapshot"], before)
     # Reopened projects also resume through the existing browser autosave.
+    await reveal_control(page, "#session-save")
     await page.locator("#session-save").click()
     await page.wait_for_function("document.getElementById('session-status').textContent.startsWith('Saved on this device')")
     await page.reload()
@@ -124,7 +129,8 @@ async def check(browser, phone):
     assert resumed["block"] == "second", (resumed["block"], resumed["session"])
     assert equivalent((await diagnostics(page))["history"]["snapshot"], before)
     assert not await page.evaluate("document.scrollingElement.scrollWidth > innerWidth")
-    assert await page.locator("#open").evaluate("el => el.getBoundingClientRect().right <= innerWidth"), "Header open button is clipped"
+    assert await page.locator("#file-menu-button").evaluate("el => el.getBoundingClientRect().right <= innerWidth"), "Header open button is clipped"
+    await reveal_control(page, "#project-save")
     await page.locator("#project-save").scroll_into_view_if_needed()
     await page.screenshot(path=f"/tmp/viewer-project-{'phone' if phone else 'desktop'}.png")
     # Both legacy formats use the current default at the saved scale.

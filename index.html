@@ -72,9 +72,39 @@
         </button>
         <button id="library-open" class="view-button" aria-label="Structure library" title="Structure library" aria-haspopup="dialog" aria-controls="structure-library"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M12 7c-3-3-6-3-9-2v14c3-1 6-1 9 2 3-3 6-3 9-2V5c-3-1-6-1-9 2Z"/><path d="M12 7v14"/></svg><span>Library</span></button>
 
-        <button id="open" class="primary" aria-label="Open structure or project file" title="Open a CIF structure or a saved .psv project">
-          ＋ Open<span class="desktop"> file</span></button
-        >
+        <button id="open" class="primary" aria-label="Open structure or project file" title="Open a CIF structure or a saved .psv project">Open<span class="open-kind"> file</span></button>
+        <button id="file-menu-button" class="view-button" popovertarget="file-menu" aria-label="Project and session menu" title="Project and session menu">⋯</button>
+        <div id="file-menu" class="file-menu" popover aria-label="Structure and project files">
+          <section>
+                  <div class="section-title session-title">
+              <h2 id="project-title">Project file</h2>
+            </div>
+            <p class="note">Save the structure and current view together in a .psv file. Open it later or on another computer.</p>
+            <div class="export-row session-actions">
+              <button id="project-save" type="button" class="primary" disabled>Save project</button>
+              <button id="project-open" type="button" class="secondary">Open project</button>
+              <!-- Keep this picker unfiltered too; iPadOS may not recognize .psv. -->
+              <input id="project-file" type="file" hidden />
+            </div>
+            <p id="project-status" class="note" role="status" aria-live="polite"></p>
+</section><details id="device-options" class="tool-options"><summary>This device</summary>
+                  <p class="note">Automatic recovery in this browser only. Save a project file to keep a portable copy.</p>
+                  <p id="session-status" class="note" role="status" aria-live="polite">
+                    Settings are saved on this device.
+                  </p>
+                  <div class="export-row session-actions">
+                    <button id="session-save" type="button" class="secondary">Save on this device</button>
+                    <button
+                      id="session-fresh"
+                      type="button"
+                      class="secondary"
+                      title="Discard the saved session on this device and start again with this page's structure"
+                    >
+                      Start fresh
+                    </button>
+                  </div>
+</details>
+        </div>
         <!-- No accept filter: iPadOS can disable CIF/PSV files with unrecognized types.
              The importer validates the selected file's contents. -->
         <input id="file" type="file" hidden />
@@ -87,7 +117,7 @@
         <h3>Unit cell</h3><dl id="info-cell"></dl>
         <h3>Crystal structure</h3><dl id="info-symmetry"></dl>
         <h3>Source</h3><dl id="info-source"></dl>
-        <p id="info-warnings" hidden></p>
+        <div id="info-warnings" hidden></div>
       </dialog>
       <dialog id="structure-library" aria-labelledby="library-title" aria-describedby="library-intro">
         <div class="library-head">
@@ -283,7 +313,6 @@
                   Details
                 </button>
                 <p id="selection">Tap an atom for its details.</p>
-                <button type="button" id="inspect-neighbors" hidden>Site neighbors</button>
               </div>
             </section>
           </div>
@@ -341,42 +370,52 @@
           aria-label="Tools"
           aria-expanded="false"
           aria-controls="tool-rail"
-          title="Tools: Pairs, Sites, Lattice, Extent, Plots, X-ray, Detector, Style, Export"
+          title="Tools: Bonds &amp; polyhedra, Sites, Lattice, Extent, Distances, Powder, Reflection, Detector, Style, Export, Help"
         >
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg><span class="tools-menu-label">Tools</span>
         </button>
           <nav id="tool-rail" class="tool-rail" aria-label="Tools">
-            <button id="mode-pairs" type="button" class="rail-button" data-tool="pairs" aria-pressed="false" title="Pairs: bonds, polyhedra, cutoffs and face opacity">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="7" r="3"/><path d="M8.4 15.2 15.6 8.8"/></svg><span class="rail-label">Pairs</span><span class="rail-hint" aria-hidden="true">bonds, polyhedra, cutoffs and face opacity</span>
+            <div class="rail-group" role="group" aria-label="Structure">
+              <button id="mode-pairs" type="button" class="rail-button" data-tool="pairs" aria-pressed="false" title="Bonds and polyhedra: bonds, polyhedra, cutoffs and face opacity">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="7" r="3"/><path d="M8.4 15.2 15.6 8.8"/></svg><span class="rail-label">Bonds &amp;<span class="rail-long"> polyhedra</span></span><span class="rail-hint" aria-hidden="true">bonds, polyhedra, cutoffs and face opacity</span>
             </button>
-            <button id="mode-sites" type="button" class="rail-button" data-tool="sites" aria-pressed="false" title="Sites: CIF sites, labels, CN and polyhedron volumes">
+              <button id="mode-sites" type="button" class="rail-button" data-tool="sites" aria-pressed="false" title="Sites: CIF sites, labels, CN and polyhedron volumes">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M4 14h16M10 9v11"/></svg><span class="rail-label">Sites</span><span class="rail-hint" aria-hidden="true">CIF sites, labels, CN and polyhedron volumes</span>
             </button>
-            <button id="mode-lattice" type="button" class="rail-button" data-tool="lattice" aria-pressed="false" title="Lattice: planes (hkl), directions [uvw] and symmetry elements">
+              <button id="mode-lattice" type="button" class="rail-button" data-tool="lattice" aria-pressed="false" title="Lattice: planes (hkl), directions [uvw] and symmetry elements">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16 10 6h10l-6 10H4Z"/><path d="M7 11h10M9 16l6-10"/></svg><span class="rail-label">Lattice</span><span class="rail-hint" aria-hidden="true">planes (hkl), directions [uvw] and symmetry elements</span>
             </button>
-            <button id="mode-extent" type="button" class="rail-button" data-tool="extent" aria-pressed="false" title="Extent: plotting range, cell edges and boundary atoms">
+              <button id="mode-extent" type="button" class="rail-button" data-tool="extent" aria-pressed="false" title="Extent: plotting range, cell edges and boundary atoms">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg><span class="rail-label">Extent</span><span class="rail-hint" aria-hidden="true">plotting range, cell edges and boundary atoms</span>
             </button>
-            <button id="mode-analysis" type="button" class="rail-button" aria-expanded="false" aria-controls="analysis-window" aria-haspopup="dialog" title="Plots: pair distances and theoretical powder diffraction in a floating window">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M7 17v-5M12 17V6M17 17v-8"/></svg><span class="rail-label">Plots</span><span class="rail-hint" aria-hidden="true">pair distances and theoretical powder diffraction</span>
+            </div>
+            <div class="rail-group" role="group" aria-label="Analysis">
+              <button id="mode-analysis" type="button" class="rail-button" aria-expanded="false" aria-controls="analysis-window" aria-haspopup="dialog" title="Distances: periodic interatomic distances">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M7 17v-5M12 17V6M17 17v-8"/></svg><span class="rail-label">Distances</span><span class="rail-hint" aria-hidden="true">periodic interatomic distances</span>
             </button>
-            <button id="mode-reflection" type="button" class="rail-button" aria-expanded="false" aria-controls="reflection-explorer" aria-haspopup="dialog" title="X-ray: crystal layers, ray paths, phases and reflection intensity">
-              <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7 16 19 29 7M4 23h24M7 28h18" opacity=".6"/><path d="m3 13 13 6L29 3M24 3h5v5"/><path d="m3 7 4 .5M3 7l.5 4"/><path d="m16 13 5 6-5 6-5-6Z" fill="currentColor" fill-opacity=".14"/><circle cx="16" cy="19" r="2" fill="currentColor" stroke="none"/></svg><span class="rail-label">X-ray</span><span class="rail-hint" aria-hidden="true">layers, phases and reflection intensity</span>
+              <button id="mode-powder" type="button" class="rail-button" aria-expanded="false" aria-controls="analysis-window" aria-haspopup="dialog" title="Powder diffraction: theoretical patterns and measured traces">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M4 18h3l2-5 2 5h3l2-12 2 12h3"/></svg><span class="rail-label">Powder</span><span class="rail-hint" aria-hidden="true">powder diffraction and measured traces</span>
             </button>
-            <button id="mode-detector" type="button" class="rail-button" aria-expanded="false" aria-controls="detector-window" aria-haspopup="dialog" title="Diffraction detector: rotate a crystal and predict X-ray spots">
+              <button id="mode-reflection" type="button" class="rail-button" aria-expanded="false" aria-controls="reflection-explorer" aria-haspopup="dialog" title="Reflection: crystal layers, ray paths, phases and reflection intensity">
+              <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7 16 19 29 7M4 23h24M7 28h18" opacity=".6"/><path d="m3 13 13 6L29 3M24 3h5v5"/><path d="m3 7 4 .5M3 7l.5 4"/><path d="m16 13 5 6-5 6-5-6Z" fill="currentColor" fill-opacity=".14"/><circle cx="16" cy="19" r="2" fill="currentColor" stroke="none"/></svg><span class="rail-label">Reflection</span><span class="rail-hint" aria-hidden="true">layers, phases and reflection intensity</span>
+            </button>
+              <button id="mode-detector" type="button" class="rail-button" aria-expanded="false" aria-controls="detector-window" aria-haspopup="dialog" title="Diffraction detector: rotate a crystal and predict X-ray spots">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="12" cy="12" r="6" stroke-dasharray="2 3"/><circle cx="12" cy="12" r="1"/><circle cx="17" cy="9" r="1.6" fill="currentColor"/></svg><span class="rail-label">Detector</span><span class="rail-hint" aria-hidden="true">Ewald sphere and single-crystal spots</span>
             </button>
-            <button id="style-open" type="button" class="rail-button rail-group-start" data-tool="style" aria-pressed="false" title="Appearance: colors and sizes of elements, pairs and single copies">
+            </div>
+            <div class="rail-group" role="group" aria-label="Appearance and output">
+              <button id="style-open" type="button" class="rail-button" data-tool="style" aria-pressed="false" title="Appearance: colors and sizes of elements, pairs and single copies">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.2-.3-.4-.5-.8-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg><span class="rail-label">Style</span><span class="rail-hint" aria-hidden="true">colors and sizes of elements, pairs and single copies</span>
             </button>
-            <button id="mode-export" type="button" class="rail-button" data-tool="export" aria-pressed="false" title="Export: PNG, turntable movie and the saved session">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 19h14"/></svg><span class="rail-label">Export</span><span class="rail-hint" aria-hidden="true">PNG, turntable movie and the saved session</span>
+              <button id="mode-export" type="button" class="rail-button" data-tool="export" aria-pressed="false" title="Export: PNG images and turntable movies">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 19h14"/></svg><span class="rail-label">Export</span><span class="rail-hint" aria-hidden="true">PNG images and turntable movies</span>
             </button>
-
-            <a id="documentation-open" class="rail-button rail-group-start" href="./docs/" target="_blank" rel="noopener" aria-label="Documentation (opens in a new tab)" title="Documentation: tutorials and user guide (opens in a new tab)">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4.3 1.7c-1.1.6-1.8 1.2-1.8 2.8M12 17h.01"/></svg><span class="rail-label">Help</span><span class="rail-hint" aria-hidden="true">tutorials and user guide</span>
+            </div>
+            <div class="rail-group" role="group" aria-label="Help">
+              <a id="documentation-open" class="rail-button" href="./docs/" target="_blank" rel="noopener" aria-label="Help, user guide and Impressum (opens in a new tab)" title="Help, user guide and Impressum (opens in a new tab)">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4.3 1.7c-1.1.6-1.8 1.2-1.8 2.8M12 17h.01"/></svg><span class="rail-label">Help</span><span class="rail-hint" aria-hidden="true">User guide, Impressum and privacy</span>
             </a>
+            </div>
           </nav>
           <!-- One bounded palette per tool; tool-windows.js adds the title
                bar (Tune · Close) and places them. -->
@@ -386,25 +425,16 @@
                 <section class="coordination" aria-labelledby="coord-title">
                   <div class="section-title">
                     <h2 id="coord-title" title="Bonds and coordination polyhedra">
-                      Pairs
+                      Bonds &amp; polyhedra
                     </h2>
-                    <label
-                      class="chip"
-                      title="Hide atoms that are not centers or vertices of an enabled polyhedron"
-                      ><input id="polyhedra-only" type="checkbox" aria-describedby="polyhedra-filter-help" /><span
-                        >Hide atoms outside polyhedra</span
-                      ></label
-                    ><button
-                      id="add-rule"
-                      class="text-button"
-                      aria-label="Add bond pair"
-                      title="Add pair"
-                    >
-                      ＋ Add
-                    </button>
+                    <button id="add-rule" type="button" class="text-button" aria-label="Add bond pair" title="Add pair">＋ Pair</button>
                   </div>
-                  <p id="polyhedra-filter-help" class="muted-note">Keeps only the centers and vertices of enabled polyhedra. Other atoms are hidden.</p>
                   <div id="pair-rules"></div>
+                  <details class="tool-options" id="pair-visibility-options">
+                    <summary>Atom visibility</summary>
+                    <label class="chip"><input id="polyhedra-only" type="checkbox" aria-describedby="polyhedra-filter-help" /><span>Hide atoms outside polyhedra</span></label>
+                    <p id="polyhedra-filter-help" class="muted-note">Keeps only the centers and vertices of enabled polyhedra. Other atoms are hidden.</p>
+                  </details>
                   <p id="isolation-note" class="note" role="status" hidden></p>
                 </section>
                 <p id="peel-note" class="peel-note" role="status" hidden></p>
@@ -418,7 +448,7 @@
                   aria-labelledby="style-title"
                 >
                   <div class="section-title">
-                    <h2 id="style-title">Appearance</h2>
+                    <h2 id="style-title">Style</h2>
                     <button
                       id="style-pick"
                       type="button"
@@ -426,10 +456,10 @@
                       aria-pressed="false"
                       title="Tap one atom or polyhedron in the crystal to style just that copy"
                     >
-                      ⌖ Pick one
+                      ⌖ Style one copy
                     </button>
                   </div>
-                  <label class="radius-field">Sphere radii
+                  <label class="radius-field">Radius model
                     <select id="radius-model">
                       <option value="crystal">Crystal (Shannon 1976)</option>
                       <option value="ionic">Effective ionic (Shannon 1976)</option>
@@ -612,13 +642,6 @@
             </section>
             <section id="tool-window-sites" class="tool-window" data-tool="sites" hidden>
               <div class="tool-window-body">
-                <div
-                  id="warnings"
-                  class="warnings"
-                  role="button"
-                  tabindex="0"
-                  hidden
-                ></div>
                 <section class="sites-panel" aria-labelledby="sites-title">
                   <div class="section-title">
                     <h2 id="sites-title">Sites</h2>
@@ -630,11 +653,12 @@
                       ></label
                     ><label class="chip" title="CIF site labels on visible atoms"
                       ><input id="labels-toggle" type="checkbox" /><span
-                        >Labels</span
+                        >Site labels</span
                       ></label
                     >
                   </div>
                   <p id="asym-note" class="note" role="status" hidden></p>
+                  <p class="note" id="shell-summary" aria-live="polite" hidden>Select a site to inspect its periodic neighbors.</p>
                   <div class="table-scroll">
                     <table id="site-table" class="data-table">
                       <caption class="sr-only">
@@ -654,10 +678,9 @@
                     </table>
                   </div>
                   <h3 class="table-title">Site coordination</h3>
-                  <p class="note" id="shell-summary">Select a site to inspect its periodic neighbors.</p>
                   <div id="shell-controls" hidden>
                     <label>All-ligand cutoff (Å) <input id="shell-cutoff" type="number" min="0.01" max="30" step="any" placeholder="Automatic"></label>
-                    <label><input type="checkbox" id="shell-outline" checked> Outline selected shell</label>
+                    <label title="Draw the neighbor hull around the visible copy of this site closest to the center of the plotted structure."><input type="checkbox" id="shell-outline" checked> Show coordination shell</label>
                     <div class="table-scroll"><table class="data-table"><thead><tr><th>Ligand</th><th>Element</th><th>Distance (Å)</th><th>Count</th></tr></thead><tbody id="shell-ligands"></tbody></table></div>
                   </div>
                   <h3 class="table-title">Polyhedra</h3>
@@ -680,32 +703,20 @@
                   </div>
                   <p id="poly-note" class="note"></p>
                 </section>
+                <div
+                  id="warnings"
+                  class="warnings"
+                  role="button"
+                  tabindex="0"
+                  hidden
+                ></div>
               </div>
             </section>
             <section id="tool-window-extent" class="tool-window" data-tool="extent" hidden>
               <div class="tool-window-body">
                 <section class="plot-range" aria-labelledby="range-title">
-                  <div class="section-title">
-                    <h2
-                      id="range-title"
-                      title="Fractional plotting range; polyhedra stay complete"
-                    >
-                      Extent
-                    </h2>
-                    <label class="chip" title="Show unit-cell edges"
-                      ><input id="cell" type="checkbox" checked /><span
-                        >Cell</span
-                      ></label
-                    ><label
-                      class="chip"
-                      title="Include atoms on the exact upper faces of the extent"
-                      ><input id="boundary" type="checkbox" checked /><span
-                        >Boundary</span
-                      ></label
-                    >
-                  </div>
                   <form id="range-form" novalidate>
-                    <div class="range-grid">
+                    <div class="range-grid" aria-label="Fractional cell coordinates">
                       <span></span><span class="col-label">Min</span><span></span
                       ><span class="col-label">Max</span>
                       <strong>a</strong
@@ -761,8 +772,7 @@
                       />
                     </div>
                     <div class="range-actions">
-                      <button type="submit" class="primary">Apply</button
-                      ><button
+                      <button
                         type="button"
                         id="range-reset"
                         class="secondary"
@@ -773,6 +783,26 @@
                     </div>
                     <p id="range-error" role="alert"></p>
                   </form>
+                  <div class="section-title">
+                    <h2
+                      id="range-title"
+                      title="Fractional plotting range; polyhedra stay complete"
+                    >
+                      Extent
+                    </h2>
+                    <label class="chip" title="Show unit-cell edges"
+                      ><input id="cell" type="checkbox" checked /><span
+                        >Cell</span
+                      ></label
+                    ><label
+                      class="chip"
+                      title="Include atoms on the exact upper faces of the extent"
+                      ><input id="boundary" type="checkbox" checked /><span
+                        >Boundary</span
+                      ></label
+                    >
+                  </div>
+
                 </section>
               </div>
             </section>
@@ -782,6 +812,16 @@
                   <div class="section-title">
                     <h2 id="export-title">Export</h2>
                   </div>
+                  <div class="export-row">
+                    <label class="chip small" title="PNG without the canvas background"
+                      ><input id="export-transparent" type="checkbox" /><span
+                        >Transparent</span
+                      ></label
+                    ><button id="export-png" type="button" class="primary">
+                      Save PNG
+                    </button>
+                  </div>
+                  <details class="tool-options" id="png-options" open><summary>PNG size and print resolution</summary>
                   <div class="export-row" role="radiogroup" aria-label="Export resolution">
                     <span class="tool-caption">Size</span>
                     <label class="chip small"
@@ -819,15 +859,7 @@
                     ><button type="button" class="chip small dpi-preset" data-dpi="600">600</button>
                   </div>
                   <p id="export-dims" class="note"></p>
-                  <div class="export-row">
-                    <label class="chip small" title="PNG without the canvas background"
-                      ><input id="export-transparent" type="checkbox" /><span
-                        >Transparent</span
-                      ></label
-                    ><button id="export-png" type="button" class="primary">
-                      Save PNG
-                    </button>
-                  </div>
+                  </details>
                   <h3 class="table-title">Movie</h3>
                   <div class="export-row">
                     <label class="export-select"
@@ -856,35 +888,6 @@
                   <progress id="export-progress" max="1" value="0" hidden></progress>
                   <p id="export-video-note" class="note"></p>
                   <p id="export-status" class="note" role="status" aria-live="polite"></p>
-                  <div class="section-title session-title">
-              <h2 id="project-title">Project file</h2>
-            </div>
-            <p class="note">Save the structure and current view together in a .psv file. Open it later or on another computer.</p>
-            <div class="export-row session-actions">
-              <button id="project-save" type="button" class="primary" disabled>Save project</button>
-              <button id="project-open" type="button" class="secondary">Open project</button>
-              <!-- Keep this picker unfiltered too; iPadOS may not recognize .psv. -->
-              <input id="project-file" type="file" hidden />
-            </div>
-            <p id="project-status" class="note" role="status" aria-live="polite"></p>
-            <!-- Local session (IndexedDB on this device only). -->
-                  <div class="section-title session-title">
-                    <h2 id="session-title">Session</h2>
-                  </div>
-                  <p id="session-status" class="note" role="status" aria-live="polite">
-                    Settings are saved on this device.
-                  </p>
-                  <div class="export-row session-actions">
-                    <button id="session-save" type="button" class="secondary">Save now</button>
-                    <button
-                      id="session-fresh"
-                      type="button"
-                      class="secondary"
-                      title="Discard the saved session on this device and start again with this page's structure"
-                    >
-                      Start fresh
-                    </button>
-                  </div>
                 </section>
               </div>
             </section>
@@ -896,16 +899,15 @@
     </div>
     <dialog id="analysis-window" class="analysis-window" aria-labelledby="analysis-title">
       <header id="analysis-head" class="analysis-head">
-        <h2 id="analysis-title">Structure plots</h2>
-        <button id="analysis-close" type="button" class="window-button" aria-label="Close structure plots" title="Close">
+        <h2 id="analysis-title">Interatomic distances</h2>
+        <button id="analysis-close" type="button" class="window-button" aria-label="Close plot" title="Close">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
         </button>
       </header>
       <div class="analysis-body">
         <form id="analysis-form">
-          <label class="analysis-view">Plot
-            <select id="analysis-mode"><option value="distances">Pair distances</option><option value="powder">Powder diffraction (X-ray)</option></select>
-          </label>
+          <input id="analysis-mode" type="hidden" value="distances" />
+          <details id="analysis-settings" class="tool-options" open><summary>Plot settings · range and appearance</summary>
           <div id="analysis-distance-fields" class="analysis-fields">
             <label>From (Å)<input id="analysis-rMin" type="number" min="0" max="30" step="any" value="0" required /></label>
             <label>To (Å)<input id="analysis-rMax" type="number" min="0.1" max="30" step="any" value="6" required /></label>
@@ -917,7 +919,9 @@
             <label>From 2θ (°)<input id="analysis-twoThetaMin" type="number" min="0.1" max="170" step="any" value="5" required /></label>
             <label>To 2θ (°)<input id="analysis-twoThetaMax" type="number" min="0.1" max="170" step="any" value="90" required /></label>
             <label class="analysis-pair-field">Peak FWHM (° 2θ; 0 = sticks)<input id="analysis-fwhm" type="number" min="0" max="2" step="any" value="0.15" required /></label>
+            <p class="hint" style="grid-column: 1 / -1; margin: 0">Selecting a reflection in Detector synchronizes the wavelength and extends this plot’s range to include it.</p>
           </div>
+          </details>
         </form>
         <div id="analysis-observed" hidden>
           <label>Measured powder trace (2θ in degrees, intensity) <input id="analysis-file" type="file" accept=".xy,.dat,.csv,.txt,.xye"></label>
@@ -947,30 +951,22 @@
       <header id="detector-head" class="analysis-head">
         <h2 id="detector-title">Diffraction detector</h2>
         <button id="detector-open-options" type="button" class="window-button tune-button" aria-haspopup="dialog" aria-controls="detector-options">Options</button>
+        <button id="detector-reveal" class="window-button tune-button" hidden>Show crystal</button>
         <button id="detector-close" class="window-button" aria-label="Close diffraction detector">✕</button>
       </header>
       <div class="detector-body">
+        <div class="detector-controls">
         <p class="detector-sample" id="detector-sample"></p>
         <form id="detector-form">
           <label for="detector-hkl">Find reflection (h k l)</label>
           <input id="detector-hkl" value="2 0 0" required spellcheck="false" enterkeyhint="go" title="Press Enter to rotate to this reflection">
           <button type="submit" id="detector-go" aria-label="Rotate to reflection" title="Rotate to reflection">▶</button>
         </form>
-        <div class="detector-views">
-          <figure><figcaption class="ewald-caption">Ewald sphere <span class="ewald-controls">
-              <button id="ewald-beam" type="button" title="Look from the sample toward the detector">Beam view</button>
-              <button id="ewald-out" type="button" aria-label="Zoom out on Ewald sphere">−</button>
-              <button id="ewald-in" type="button" aria-label="Zoom in on Ewald sphere">+</button>
-              <button id="ewald-reset" type="button" aria-label="Reset Ewald sphere view">Reset</button>
-            </span></figcaption><svg id="detector-ewald" viewBox="0 0 300 250" role="img" tabindex="0" aria-label="Ewald sphere with direct unit-cell axes a, b and c. Drag or use arrow keys to orbit O. Scroll, pinch or use plus and minus to zoom. Right-click to reset zoom."></svg>
-            <div><label class="reciprocal-size">Point size <input id="detector-point-size" type="range" min="50" max="250" step="10" value="100" title="Reciprocal-lattice ball diameter"><output id="detector-point-scale" for="detector-point-size">100%</output></label><small class="ewald-hint"><span class="incident-label">Incident</span> · <span class="spot-label">Diffracted</span> · <span id="detector-axis-caption"></span> · Drag to orbit O · Right-click to reset zoom</small></div></figure>
-          <figure><figcaption>Detector <small id="detector-size"></small></figcaption><svg id="detector-image" viewBox="0 0 250 250" aria-label="Diffraction spots viewed from the sample toward the detector"></svg><small class="ewald-hint" id="detector-view-caption">Viewed from sample toward detector</small></figure>
-        </div>
         <div class="detector-angles">
           <label for="detector-omega"><span id="detector-omega-label">Crystal rotation (ω)</span><output id="detector-omega-value" for="detector-omega"></output><input id="detector-omega" aria-labelledby="detector-omega-label" title="Drag through the marked reflection angles or use the arrow keys to step between crossings" type="range" min="-180" max="180" step="0.01" value="0"><svg id="detector-crossings" viewBox="0 0 360 5" preserveAspectRatio="none" aria-hidden="true"></svg></label>
           <label for="detector-azimuth"><span id="detector-azimuth-label">Rotation about beam (φ)</span><output id="detector-azimuth-value" for="detector-azimuth"></output><input id="detector-azimuth" aria-labelledby="detector-azimuth-label" type="range" min="-180" max="180" step="0.01" value="0"></label>
         </div>
-        <div class="detector-actions"><button type="button" id="detector-prev">Previous reflection</button><button type="button" id="detector-next">Next reflection</button>
+        <div class="detector-actions detector-navigation"><div class="detector-step-buttons"><button type="button" id="detector-prev">Previous reflection</button><button type="button" id="detector-next">Next reflection</button></div>
           <label><input type="checkbox" id="detector-animate" checked> Animate steps</label>
           <label><input type="checkbox" id="detector-ring" checked> Powder ring</label>
           <label><input type="checkbox" id="detector-link" title="Drag the main crystal through the fixed beam. The rotation snaps to Bragg crossings that land on the detector."> Link main view</label></div>
@@ -983,6 +979,23 @@
         <p id="detector-detail"></p>
         <p class="hint" id="detector-scope"></p>
 
+        </div>
+        <div class="detector-visuals">
+        <div class="detector-view-tabs" role="group" aria-label="Detector diagram">
+          <button type="button" data-detector-view="ewald" aria-pressed="true">Ewald sphere</button>
+          <button type="button" data-detector-view="image" aria-pressed="false">Detector spots</button>
+        </div>
+        <div class="detector-views" data-view="ewald">
+          <figure><figcaption class="ewald-caption">Ewald sphere <span class="ewald-controls">
+              <button id="ewald-beam" type="button" title="Look from the sample toward the detector">Beam view</button>
+              <button id="ewald-out" type="button" aria-label="Zoom out on Ewald sphere">−</button>
+              <button id="ewald-in" type="button" aria-label="Zoom in on Ewald sphere">+</button>
+              <button id="ewald-reset" type="button" aria-label="Reset Ewald sphere view">Reset</button>
+            </span></figcaption><svg id="detector-ewald" viewBox="0 0 300 250" role="img" tabindex="0" aria-label="Ewald sphere with direct unit-cell axes a, b and c. Drag or use arrow keys to orbit O. Scroll, pinch or use plus and minus to zoom. Right-click to reset zoom."></svg>
+            <div><label class="reciprocal-size">Point size <input id="detector-point-size" type="range" min="50" max="250" step="10" value="100" title="Reciprocal-lattice ball diameter"><output id="detector-point-scale" for="detector-point-size">100%</output></label><small class="ewald-hint"><span class="incident-label">Incident</span> · <span class="spot-label">Diffracted</span> · <span id="detector-axis-caption"></span> · Drag to orbit · Pinch or scroll to zoom · Reset restores view</small></div></figure>
+          <figure><figcaption>Detector <small id="detector-size"></small></figcaption><svg id="detector-image" viewBox="0 0 250 250" aria-label="Diffraction spots viewed from the sample toward the detector"></svg><small class="ewald-hint" id="detector-view-caption">Viewed from sample toward detector</small></figure>
+        </div>
+        </div>
       </div>
       <span id="detector-resize-left" title="Resize from lower left"></span>
     </dialog>
@@ -992,6 +1005,7 @@
         <button id="detector-options-done" type="button" class="window-button tune-button">Done</button>
       </header>
       <div class="analysis-body">
+        <p class="hint">Geometry updates immediately. Use Apply orientation after editing a mounting matrix.</p>
         <div id="detector-geometry-fields">
           <label>Wavelength (Å)<input id="detector-wavelength" type="number" min="0.001" step="any" value="1.5406" required></label>
           <label>Distance (mm)<input id="detector-distance" type="number" min="0.001" step="any" value="100" required></label>
@@ -1024,7 +1038,7 @@
           <form id="detector-mount-form">
             <label>Matrix convention<select id="detector-convention"><option value="U">U · rotation matrix</option><option value="rows">PhaseSmith · reciprocal basis rows (Å⁻¹)</option><option value="UB">UB · reciprocal basis columns (Å⁻¹)</option></select></label>
             <label>Matrix frame<select id="detector-frame"><option value="viewer">Viewer lab (+x beam, +z up)</option><option value="poni">PONI (+3 beam, +1 up)</option></select></label>
-            <label>Matrix at ω = 0°<textarea id="detector-matrix" rows="3" spellcheck="false">1 0 0
+            <label>Matrix at ω = 0°<textarea id="detector-matrix" rows="3" wrap="off" spellcheck="false">1 0 0
 0 1 0
 0 0 1</textarea></label>
             <div><label>Scan axis in viewer lab (x y z)<input id="detector-axis" value="0 0 1" required></label>

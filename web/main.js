@@ -31,6 +31,7 @@ import { createExporter, validDpi } from "./export.js";
 import { sceneExportBounds } from "./export-framing.js";
 import { createFaceSorter } from "./face-sort.js";
 import { createDepthPeeler } from "./peel.js";
+import { createLiveAntialias } from "./live-antialias.js";
 import { rotatedView } from "./view-rotation.js";
 import { createTurnControls } from "./turn-controls.js";
 import { createStructureLibrary, libraryEntry, libraryFilename, entryForFilename } from "./structure-library.js";
@@ -57,6 +58,19 @@ for (const type of ["gesturestart", "gesturechange"])
   document.addEventListener(type, (event) => event.preventDefault(), {
     passive: false,
   });
+for (const input of document.querySelectorAll('#analysis-file, #detector-poni, #detector-orientation-file')) {
+  const picker = document.createElement("div"), button = document.createElement("button"), name = document.createElement("span");
+  picker.className = "file-picker";
+  button.type = "button";
+  button.textContent = "Choose file…";
+  button.setAttribute("aria-label", `Choose ${input.id === "analysis-file" ? "measured powder trace" : input.id === "detector-poni" ? "PONI calibration" : "PhaseSmith JSON"} file`);
+  button.onclick = () => input.click();
+  name.textContent = "No file chosen";
+  input.addEventListener("change", () => name.textContent = input.files?.[0]?.name || "No file chosen");
+  input.hidden = true;
+  input.after(picker);
+  picker.append(button, name);
+}
 function initialize() {
   let renderer;
   try {
@@ -278,11 +292,17 @@ function initialize() {
     angle = null,
     measureMode = "info";
   scene.add(selectionGroup);
+  const liveAntialias = createLiveAntialias(renderer);
+  const livePixelRatio = (width, height) => Math.min(window.devicePixelRatio || 1, 2,
+    Math.sqrt(4_000_000 / Math.max(1, width * height)));
   function render(exportView) {
     frame = 0;
     if (!exportView?.crop) {
-      // Supersample translucent face edges on standard-density displays.
-      const scale = THREE.MathUtils.clamp(window.devicePixelRatio, 1.5, 2);
+      // Keep native display detail within the live pixel budget; FXAA smooths
+      // translucent edges without forcing extra supersampling on low-DPI screens.
+      // Bound live pixels: each transparency layer otherwise multiplies the
+      // full-screen Retina workload. Export frames use their own resolution.
+      const scale = livePixelRatio(viewport.clientWidth, viewport.clientHeight);
       if (renderer.getPixelRatio() !== scale) renderer.setPixelRatio(scale);
     }
     // Trackball emits change while damping moves the camera. That event
@@ -320,7 +340,10 @@ function initialize() {
         // them into the cropped frame after drawing the rendered geometry.
         syncViewCamera();
       }
-    } else peeler.render(scene, viewCamera);
+    } else {
+      peeler.render(scene, viewCamera);
+      liveAntialias.render();
+    }
     updateViewReadout();
     if (labelsOn || shownLabels) updateLabels();
     latticeTools.updateLabels(viewCamera, renderer.domElement);
@@ -438,7 +461,9 @@ function initialize() {
   renderer.domElement.addEventListener("wheel", invalidate, { passive: true });
   const resize = new ResizeObserver(() => {
     const { width, height } = viewport.getBoundingClientRect();
-    renderer.setSize(width, height);
+    // Resize and set density together so entering full screen never allocates
+    // a transient, oversized buffer at the previous smaller view's density.
+    renderer.setDrawingBufferSize(width, height, livePixelRatio(width, height));
     controls.handleResize();
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
@@ -814,6 +839,7 @@ function initialize() {
   }
   function resetRules() {
     nextRule = 0;
+    $("polyhedra-only").checked = false;
     const elements = [...new Set(structure.atoms.map((a) => a.element))];
     const oxideCenters = new Set(["Si", "Mg", "Al", "Fe", "Ca", "Ti", "C"]);
     rules = elements.includes("O")
@@ -840,7 +866,6 @@ function initialize() {
         r.cutoff = r.center === "Si" ? 1.8 : 2.3;
         r.polyhedra = true;
       });
-      $("polyhedra-only").checked = true;
       $("boundary").checked = false;
     } else if (currentFilename === "Wollastonite example") {
       rules = rules.filter((r) => r.center === "Si");
@@ -848,12 +873,15 @@ function initialize() {
         r.cutoff = 1.8;
         r.polyhedra = true;
       });
-      $("polyhedra-only").checked = true;
       $("boundary").checked = false;
-    } else $("polyhedra-only").checked = false;
+    }
     renderRules();
   }
   const pairName = (rule) => `${rule.center}–${rule.neighbor}`;
+  const pairTargetLabel = (rule) => {
+    const same = rules.filter(r => r.center === rule.center && r.neighbor === rule.neighbor);
+    return same.length > 1 ? `${pairName(rule)} #${same.indexOf(rule) + 1} (${formatCutoff(rule.cutoff)} Å)` : pairName(rule);
+  };
   const CUTOFF_MIN = 0.1;
   // At least hundredths are always shown (1.80); typed precision is shown
   // exactly as entered (2.123456 stays 2.123456, never rounded).
@@ -967,6 +995,8 @@ function initialize() {
         card.dataset.ruleId = rule.id;
         card.style.setProperty("--pair-color", ruleColor(rule));
         card.setAttribute("role", "group");
+        const cutoffMessage = make("p", { className: "micro", hidden: true });
+        cutoffMessage.setAttribute("role", "status");
         const inputs = {};
         for (const field of ["center", "neighbor", "cutoff"]) {
           let input;
@@ -994,11 +1024,12 @@ function initialize() {
           input.onchange = () => {
             if (field === "cutoff") {
               const value = parseCutoff(input.value);
-              input.setCustomValidity(
-                value === null ? `Enter a cutoff of at least ${CUTOFF_MIN} Å.` : "",
-              );
               if (value === null) {
-                input.reportValidity();
+                // Never leave text on screen that differs from the applied
+                // cutoff. Native validation bubbles can disappear on blur.
+                input.value = formatCutoff(rule.cutoff);
+                cutoffMessage.textContent = `Enter a number of at least ${CUTOFF_MIN} Å. Kept ${input.value} Å.`;
+                cutoffMessage.hidden = false;
                 return;
               }
               setCutoff(value, false);
@@ -1186,6 +1217,7 @@ function initialize() {
           rule.cutoff = value;
           field.value = formatCutoff(value);
           field.setCustomValidity("");
+          cutoffMessage.hidden = true;
           syncSlider();
           if (live) scheduleBuild();
           else build();
@@ -1214,7 +1246,7 @@ function initialize() {
         };
         // Any press on a closed field opens its tuner. Touch/pen open it
         // without focusing (no software keyboard; a second tap types);
-        // a mouse press also places the caret for exact editing, even
+        // a mouse press also focuses exact editing, even
         // when the field already has focus (e.g. after Done).
         //
         // Touch/pen: the tuner opens only once this tap's click has been
@@ -1223,6 +1255,16 @@ function initialize() {
         // without a click open after a clean release; pans and cancels
         // never open.
         let touchOpen = null;
+        let selectOnClick = false;
+        let selectionFrame = 0;
+        const selectValue = () => {
+          field.select();
+          cancelAnimationFrame(selectionFrame);
+          // Safari may finish placing its caret after click listeners.
+          selectionFrame = requestAnimationFrame(() => {
+            if (document.activeElement === field) field.select();
+          });
+        };
         const openFromTouch = () => {
           if (!touchOpen) return;
           clearTimeout(touchOpen.timer);
@@ -1230,6 +1272,7 @@ function initialize() {
           openTuner();
         };
         field.addEventListener("pointerdown", (e) => {
+          selectOnClick = document.activeElement !== field;
           if (!tuner.hidden) return;
           if (e.pointerType === "mouse") {
             openTuner();
@@ -1251,9 +1294,21 @@ function initialize() {
           clearTimeout(touchOpen?.timer);
           touchOpen = null;
         });
-        field.addEventListener("click", openFromTouch);
-        field.addEventListener("focus", openTuner);
+        field.addEventListener("click", () => {
+          openFromTouch();
+          // Pointer default actions can overwrite the focus selection.
+          // Repeat it after the first focusing click, but preserve a later
+          // deliberate caret placement within an already focused field.
+          if (selectOnClick && document.activeElement === field) selectValue();
+          selectOnClick = false;
+        });
+        field.addEventListener("focus", () => {
+          openTuner();
+          selectValue();
+        });
+        field.addEventListener("input", () => { cutoffMessage.hidden = true; });
         field.addEventListener("keydown", (e) => {
+          cancelAnimationFrame(selectionFrame);
           if (e.key === "ArrowUp" || e.key === "ArrowDown") {
             e.preventDefault();
             const typed = parseCutoff(field.value) ?? rule.cutoff;
@@ -1262,9 +1317,12 @@ function initialize() {
           } else if (e.key === "Escape" && !tuner.hidden) {
             e.preventDefault(); // the tuner, not the Pairs window
             tuner.close();
-          } else if (e.key === "Enter" && !tuner.hidden) {
-            // Typed value committed (change follows): the row under the
-            // field returns, so Bonds/Polyhedra/Opacity are one tap away.
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            // A text field has no implicit Enter commit outside a form.
+            // Blur commits through the native change/validation/history
+            // path once and dismisses the software keyboard.
+            field.blur();
             tuner.close();
           }
         });
@@ -1306,12 +1364,6 @@ function initialize() {
           input.dataset.field = field;
           toggles[field] = input;
           input.onchange = () => {
-            if (
-              field === "polyhedra" &&
-              input.checked &&
-              !rules.some((r) => r.polyhedra)
-            )
-              $("polyhedra-only").checked = true;
             rule[field] = input.checked;
             card.classList.toggle("no-faces", !rule.polyhedra);
             build();
@@ -1339,6 +1391,7 @@ function initialize() {
         });
         opacityInput.dataset.field = "opacity";
         opacityInput.setAttribute("aria-describedby", opacityValue.id);
+        opacityInput.setAttribute("aria-label", "Polyhedron face opacity");
         opacityValue.htmlFor = opacityInput.id;
         const showOpacity = () => {
           opacityValue.value = `${opacityInput.value}%`;
@@ -1394,7 +1447,7 @@ function initialize() {
         const slot = make("div", { className: "pair-slot" });
         slot.append(sub, tuner);
         card.dataset.tuneItem = `rule:${rule.id}`;
-        card.append(main, slot, counts);
+        card.append(main, cutoffMessage, slot, counts);
         return card;
       }),
     );
@@ -1788,7 +1841,7 @@ function initialize() {
           cell.textContent = text;
           row.append(cell);
         }
-        const choose = () => highlightSite(highlightedSite === s.label ? null : s.label);
+        const choose = () => selectSite(highlightedSite === s.label ? null : s.label);
         row.onclick = choose;
         row.onkeydown = (e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -1838,7 +1891,7 @@ function initialize() {
         }
         row.tabIndex = 0;
         row.title = `Highlight ${g.label} centers`;
-        const choose = () => highlightSite(highlightedSite === g.label ? null : g.label);
+        const choose = () => selectSite(highlightedSite === g.label ? null : g.label);
         row.onclick = choose;
         row.onkeydown = (e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -1857,11 +1910,23 @@ function initialize() {
   }
   // Highlight all visible copies of one CIF site (amber shells, capped).
   let highlightedSite = null;
+  let inspectedShellCenter = null;
   const siteGroup = new THREE.Group();
   scene.add(siteGroup);
+  function selectSite(label) {
+    // A table row inspects the equivalent site copies, not a previously
+    // picked individual atom. Keep distance/angle measurements separate.
+    if (measureMode === "info" && selection.length) {
+      selection = [];
+      updateSelection();
+    }
+    highlightSite(label);
+  }
   function inspectShell(center) {
+    inspectedShellCenter = center ?? null;
     $("shell-controls").hidden = !center;
     const summary = $("shell-summary"), body = $("shell-ligands");
+    summary.hidden = !center;
     body.replaceChildren();
     if (!center) { summary.textContent = "Select a site to inspect its periodic neighbors."; return; }
     try {
@@ -1888,7 +1953,13 @@ function initialize() {
     highlightedSite = label;
     dispose(siteGroup);
     siteGroup.clear();
-    inspectShell(label && (atoms.find(a => a.label === label && atomVisible(a)) ?? independentSites().find(a => a.label === label)));
+    // Rendered positions are relative to the plotted extent's Cartesian
+    // center. Pick a central equivalent copy, not the first boundary image;
+    // panning and rotating the camera must not move the inspected shell.
+    const copies = label ? atoms.filter(a => a.label === label && atomVisible(a)) : [];
+    const center = copies.reduce((best, atom) =>
+      !best || atom.position.lengthSq() < best.position.lengthSq() - 1e-10 ? atom : best, null);
+    inspectShell(label && (center ?? independentSites().find(a => a.label === label)));
     for (const row of document.querySelectorAll("#site-table tbody tr, #poly-table tbody tr"))
       row.classList.toggle("selected", Boolean(label) && row.cells[0].textContent === label);
     if (label) {
@@ -2064,7 +2135,6 @@ function initialize() {
     invalidate();
   }
   function updateSelection() {
-    $("inspect-neighbors").hidden = true;
     dispose(selectionGroup);
     selectionGroup.clear();
     // Selection is a crisp back-face shell: from any direction it reads as
@@ -2255,18 +2325,11 @@ function initialize() {
   }
   function showAtomInfo() {
     const a = selection[0];
-    $("inspect-neighbors").hidden = !a;
     $("distance").replaceChildren(document.createTextNode(a ? a.label : "—"));
     const lines = a ? atomInfoLines(a) : [];
     $("selection").textContent = a ? lines.join("\n") : $("show-atoms").checked ? "Tap an atom for its details." : "Show atoms to inspect.";
   }
   // Distance (2 atoms) · Angle (3) · Info (1). Each mode starts a fresh selection.
-  $("inspect-neighbors").onclick = () => {
-    if (!selection[0]) return;
-    toolWindows.choose("sites");
-    highlightSite(selection[0].label);
-    $("shell-summary").scrollIntoView({block:"nearest"});
-  };
   function setMeasureMode(mode) {
     if (mode !== measureMode) selection = [];
     measureMode = mode;
@@ -2496,7 +2559,9 @@ function initialize() {
       if (measureMode === "info") selection = [];
       else if (selection.length === (measureMode === "angle" ? 3 : 2)) selection = [];
       if (!selection.includes(atom)) selection.push(atom);
-      if (measureMode === "info" && $("mode-sites").getAttribute("aria-pressed") === "true") highlightSite(atom.label);
+      // A crystal pick always targets individual atoms, even with Sites
+      // open. Only an explicit table-row choice highlights a whole site.
+      if (highlightedSite) highlightSite(null);
       updateSelection();
     } else if (
       selection.length &&
@@ -2561,7 +2626,7 @@ function initialize() {
         })),
         ...rules.map((r) => ({
           value: `pair:${r.id}`,
-          label: `${pairName(r)} polyhedra`,
+          label: `${pairTargetLabel(r)} polyhedra`,
           group: "All polyhedra of pair",
         })),
         // Every individually styled copy stays selectable, so each one can
@@ -2625,7 +2690,7 @@ function initialize() {
       const opacity = rule.opacity ?? DEFAULT_FACE_OPACITY;
       if (type === "pair")
         return {
-          title: `All ${pairName(rule)} polyhedra`,
+          title: `All ${pairTargetLabel(rule)} polyhedra`,
           kind: "poly",
           color: ruleColor(rule),
           opacity,
@@ -2874,7 +2939,15 @@ function initialize() {
     );
     const warnings = data.warnings || [];
     $("warnings").hidden = !warnings.length;
-    $("warnings").textContent = warnings.join(" ");
+    const listedSetting = warning => warning.startsWith("space-group definitions disagree:") && warning.includes("explicit_operations");
+    $("warnings").dataset.full = warnings.join(" ");
+    $("warnings").dataset.summary = warnings.map(warning => listedSetting(warning)
+      ? "Symmetry uses the operations listed in this CIF; its other space-group definitions differ."
+      : warning.startsWith("invalid space-group definition")
+        ? "One space-group description in this CIF could not be recognized. Check the original CIF messages and the reported symmetry before interpreting the structure."
+        : warning).join(" ");
+    $("warnings").dataset.informational = String(warnings.length > 0 && warnings.every(listedSetting));
+    $("warnings").textContent = $("warnings").dataset.summary;
     $("warnings").title = warnings.join(" ");
     $("warnings").setAttribute("aria-expanded", "false");
     plotRanges = defaultRanges();
@@ -3091,10 +3164,23 @@ function initialize() {
   });
   // The [uvw] form is a label obstacle too while open.
   document.querySelector(".view-directions details")?.addEventListener("toggle", invalidate);
+  // Group supporting radius conventions after the direct target controls.
+  const radiusOptions = document.createElement("details");
+  radiusOptions.className = "tool-options";
+  radiusOptions.id = "radius-model-options";
+  radiusOptions.innerHTML = "<summary>Radius model &amp; displacement</summary>";
+  const radiusStart = $("radius-model").closest("label");
+  const radiusNodes = [];
+  for (let node = radiusStart; node && node !== $("style-target").closest("label"); node = node.nextElementSibling) radiusNodes.push(node);
+  radiusOptions.append(...radiusNodes);
+  $("style-editor").append(radiusOptions);
+  $("warnings").setAttribute("aria-label", "CIF import notes. Activate to expand or collapse the full explanation.");
+
   // CIF warnings stay to two lines until opened, keeping controls in reach.
   const toggleWarnings = () => {
     const open = $("warnings").getAttribute("aria-expanded") !== "true";
     $("warnings").setAttribute("aria-expanded", String(open));
+    $("warnings").textContent = open ? $("warnings").dataset.full : $("warnings").dataset.summary;
   };
   $("warnings").onclick = toggleWarnings;
   $("warnings").onkeydown = (e) => {
@@ -3112,7 +3198,7 @@ function initialize() {
   function applyRanges(next) {
     try {
       next = validateRanges(next);
-      // Blur-commit followed by Apply submits the same bounds twice; an
+      // Enter, change and blur may commit the same bounds more than once; an
       // unchanged extent needs no rebuild or refit.
       if (next.every((r, i) => r[0] === plotRanges[i][0] && r[1] === plotRanges[i][1])) {
         writeRanges();
@@ -3139,12 +3225,21 @@ function initialize() {
       ),
     );
   };
-  // Committing a bound (Enter, blur or stepper) applies the extent directly;
-  // the Apply button remains for explicit submission.
-  for (const input of document.querySelectorAll("#range-form input"))
-    input.addEventListener("change", () => {
-      if (structure) $("range-form").requestSubmit();
+  // Committing a bound (Enter, blur or stepper) applies the extent directly.
+  for (const input of document.querySelectorAll("#range-form input")) {
+    const commit = () => { if (structure) $("range-form").requestSubmit(); };
+    input.addEventListener("change", commit);
+    // Native change compares against the value when focus began. Enter can
+    // commit an intermediate value, so returning to that original value still
+    // needs an explicit blur commit to keep the scene in sync.
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        if (structure) $("range-form").requestSubmit();
+      }
     });
+  }
   $("range-reset").onclick = () => {
     if (structure) applyRanges(defaultRanges());
   };
@@ -3251,6 +3346,7 @@ function initialize() {
       })),
       translucentFaces: faceSorter.diagnostics(),
       transparency: peeler.diagnostics(),
+      rendering: { width: renderer.domElement.width, height: renderer.domElement.height, pixelRatio: renderer.getPixelRatio(), antialias: "FXAA" },
       appearance: {
         elements: Object.fromEntries(appearance.elements),
         atomOverrides: appearance.atoms.size,
@@ -3281,6 +3377,7 @@ function initialize() {
       windows: toolWindows.diagnostics(),
       stage: { x: stage.x, y: stage.y, clear: stage.clear && { ...stage.clear }, atFit: isAtFit() },
       highlightedSite,
+      shellCenterId: inspectedShellCenter?.id ?? null,
       polyhedra: coordinationStats.flatMap((s) =>
         s.environments.map((e) => ({
           pair: pairName(s),
@@ -3440,9 +3537,9 @@ function initialize() {
         seconds: Number($("export-seconds").value),
         fps: Number($("export-fps").value),
         scale: exportScale(),
-        onProgress: (p) => {
+        onProgress: (p, { slow }) => {
           progress.value = p;
-          $("export-status").textContent = `Recording turntable… ${Math.round(p * 100)}%`;
+          $("export-status").textContent = `Recording turntable… ${Math.round(p * 100)}%${slow ? " · Rendering is slow; the movie may last longer than requested." : ""}`;
         },
       });
       progress.hidden = false;
@@ -3453,7 +3550,7 @@ function initialize() {
         ? result.reason === "resized"
           ? "Recording stopped because the view was resized; nothing was saved. Record again at the new size."
           : "Recording canceled; nothing was saved."
-        : `Saved ${result.filename} (${result.width} × ${result.height}, ${result.frames} frames).`;
+        : `Saved ${result.filename} (${result.width} × ${result.height} px${result.duration === null ? "" : `, ${result.duration.toFixed(1)} s`}).${result.slow ? ` Requested ${result.requestedSeconds} s; rendering ran slowly. Lower the export size or frame rate to improve timing.` : ""}`;
       lastExport = result;
     } catch (error) {
       $("export-status").textContent = `Recording failed: ${error.message}`;
@@ -3480,9 +3577,11 @@ function initialize() {
       // compass keep the right edge; sheets stay below the rail.
       const view = viewport.getBoundingClientRect();
       const row = document.querySelector(".measure-row").getBoundingClientRect();
+      const details = document.querySelector(".measure-details").getBoundingClientRect();
       const rail = $("tool-rail").getBoundingClientRect();
       const bottomControls = [".view-bottom", "#view-readout", ".axis-compass", "#tools-menu"]
-        .map(selector => document.querySelector(selector).getBoundingClientRect()).filter(rect => rect.width && rect.height);
+        .map(selector => document.querySelector(selector)).filter(element => !element.classList.contains("in-science"))
+        .map(element => element.getBoundingClientRect()).filter(rect => rect.width && rect.height);
       const bottomGap = Math.ceil(Math.max(0, ...bottomControls.map(rect => view.bottom - rect.top)) + 8);
       viewport.style.setProperty("--bottom-controls-gap", `${bottomGap}px`);
       const cardMax = parseFloat(getComputedStyle(viewport).getPropertyValue("--card-max")) || 168;
@@ -3490,7 +3589,7 @@ function initialize() {
         paletteTop: row.bottom - view.top + 6 + cardMax + 10,
         railColumn: 92,
         railBottom: $("app").dataset.launcher === "rail" && rail.height ? rail.bottom - view.top : 0,
-        sheetTop: row.bottom - view.top + 6 + 88 + 8,
+        sheetTop: Math.max(row.bottom + 6 + 88, details.bottom) - view.top + 8,
         sideTop: row.bottom - view.top + 6,
         bottomGap: 40,
         sheetBottomGap: bottomGap,
@@ -3504,6 +3603,22 @@ function initialize() {
     },
     onChange: () => scheduleSave(),
   });
+  // Keep phone sheet headers clear of the info card when a long atom
+  // label wraps or the selection is cleared; never move the camera.
+  const measurementResize = new ResizeObserver(() => toolWindows.layout());
+  measurementResize.observe(document.querySelector(".measure-details"));
+
+  // Choosing a settings tool reveals its controls even when a science
+  // window covers that area. Closing a window preserves its values.
+  $("tool-rail").addEventListener("click", event => {
+    const button = event.target.closest("[data-tool]");
+    if (!button) return;
+    const open = ["analysis", "detector", "reflection"].filter(id =>
+      $(id === "reflection" ? "reflection-explorer" : `${id}-window`)?.open);
+    if (!open.length) return;
+    for (const id of open) $(`${id}-close`).click();
+    if (toolWindows.isOpen(button.dataset.tool)) toolWindows.close(button.dataset.tool);
+  }, true);
 
   // Light/dark theme: CSS follows data-theme; scene overlays that carry
   // their own colors are rebuilt with the new palette.
@@ -4061,6 +4176,7 @@ function initialize() {
   // Start fresh: autosave stays suspended so the old session is not
   // written back, then the page entrypoint loads cleanly.
   $("session-fresh").onclick = async () => {
+    if (!confirm("Discard this browser’s saved session and start fresh? Save a project file first if you want to keep the current scene.")) return;
     saveSuspended++;
     clearTimeout(saveTimer);
     saveTimer = 0;

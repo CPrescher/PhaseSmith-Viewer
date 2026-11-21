@@ -2,7 +2,8 @@
 // Older iPad Safari exposes only the prefixed version of the API.
 export function createFullscreenSwitch({ button, status }) {
   const doc = button.ownerDocument;
-  const root = doc.documentElement;
+  // Include both the app and its sibling dialogs in the fullscreen element.
+  const root = doc.body;
   const standard = typeof root.requestFullscreen === "function" &&
     typeof doc.exitFullscreen === "function" && doc.fullscreenEnabled !== false;
   const prefixed = typeof root.webkitRequestFullscreen === "function" &&
@@ -14,6 +15,7 @@ export function createFullscreenSwitch({ button, status }) {
     const full = active();
     button.setAttribute("aria-pressed", String(full));
     button.title = full ? "Exit full screen" : "Enter full screen";
+    button.setAttribute("aria-label", button.title);
     button.querySelector("[data-fullscreen-enter]").toggleAttribute("hidden", full);
     button.querySelector("[data-fullscreen-exit]").toggleAttribute("hidden", !full);
   }
@@ -44,6 +46,9 @@ export function createFullscreenSwitch({ button, status }) {
   });
   for (const event of ["fullscreenchange", "webkitfullscreenchange"])
     doc.addEventListener(event, () => {
+      // Some embedded browsers emit the state change before their request
+      // promise settles. The exit action must be available immediately.
+      button.disabled = false;
       status.hidden = true;
       sync();
     });

@@ -1,3 +1,4 @@
+from smoke import reveal_control
 """Native browser acceptance for independently editable fractional display bounds."""
 
 import asyncio
@@ -60,6 +61,7 @@ async def run(browser_type, touch):
     await row.locator('[data-field="cutoff"]').press("Enter")
     if not await row.locator('[data-field="polyhedra"]').is_checked():
         await click_control(page, row.locator('[data-field="polyhedra"]'), touch)
+    await reveal_control(page, "#polyhedra-only")
     if not await page.locator("#polyhedra-only").is_checked():
         await click_control(page, page.locator("#polyhedra-only"), touch)
     await settle(page)
@@ -72,9 +74,7 @@ async def run(browser_type, touch):
     async def bound(axis, end, value):
         control = page.locator(f"#range-{axis}-{end}")
         await control.fill(str(value))
-        await click_control(
-            page, page.locator('#range-form button[type="submit"]'), touch
-        )
+        await control.press('Enter')
         await settle(page)
 
     await bound("b", "max", 3)

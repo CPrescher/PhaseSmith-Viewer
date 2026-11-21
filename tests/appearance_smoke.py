@@ -1,3 +1,4 @@
+from smoke import reveal_control
 """Exercise element and pair styling while checking the underlying crystal."""
 
 import asyncio
@@ -33,6 +34,7 @@ async def check(browser, width, height):
         assert [r["counts"] for r in current["coordination"]["rules"]] == [[4], [6]]
         assert current["camera"] == before["camera"]
 
+    await reveal_control(page, "#radius-model")
     model = page.locator("#radius-model")
     assert await model.input_value() == "crystal"
     assert await model.locator('option[value="classic"]').count() == 0

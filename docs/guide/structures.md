@@ -1,8 +1,8 @@
 # Files and structure library
 
-Use **Library** or **Open file** in the header at the upper right, above the crystal view. These controls are separate from the right-hand tool rail. On narrow screens, Open file is shortened to **Open**.
+Use **Library** or the **Open file** button in the upper-right header, above the crystal view. Choose **Open file** for a CIF or **⋯ → Open project** for a saved scene.
 
-<ViewerFigure name="file-controls" alt="Actual Library and Open file buttons with labels pointing to each." />
+<ViewerFigure name="file-controls" alt="Library, Open file and project menu controls in the header." />
 
 ## Open a structure
 

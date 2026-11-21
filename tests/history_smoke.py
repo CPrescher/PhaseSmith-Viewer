@@ -1,3 +1,4 @@
+from smoke import reveal_control
 """Undo/redo through real controls, mouse and touch gestures (desktop/phone)."""
 import asyncio
 import math
@@ -362,6 +363,7 @@ async def check(browser, phone):
     # Autosave after undo survives a reload, with a fresh history.
     await press("#history-undo")
     saved = await state(page)
+    await reveal_control(page, "#session-save")
     await press("#session-save")
     await page.wait_for_function("!viewerDiagnostics().session.pending")
     await page.wait_for_timeout(200)

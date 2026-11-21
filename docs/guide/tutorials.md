@@ -10,13 +10,13 @@ Each example uses a bundled structure. Save a project before opening an example 
 
 ### 1. Open the example and check the pairs
 
-[Open the forsterite example](https://cprescher.github.io/PhaseSmith-Viewer/?example=forsterite). Choose **Pairs** on the right-hand tool rail (on a phone, open **Tools → Pairs**). Keep **Si–O = 1.80 Å** and **Mg–O = 2.30 Å**, with **Polyhedra** enabled in both pair cards.
+[Open the forsterite example](https://cprescher.github.io/PhaseSmith-Viewer/?example=forsterite). Choose **Bonds & polyhedra** on the right-hand tool rail (on a phone, open **Tools → Bonds & polyhedra**). Keep **Si–O = 1.80 Å** and **Mg–O = 2.30 Å**, with **Polyhedra** enabled in both pair cards.
 
 <ViewerFigure name="tutorial-forsterite-start" alt="Forsterite with blue silicon tetrahedra, green magnesium octahedra, and both pair controls enabled." caption="Starting point: blue Si–O tetrahedra and green Mg–O octahedra appear together. The two pair cards control them separately." />
 
 ### 2. Show only the silicon tetrahedra
 
-In the **Mg–O** card, clear **Polyhedra**. Keep it enabled for **Si–O**. Leave **Hide atoms outside polyhedra** enabled, as in the example.
+In the **Mg–O** card, clear **Polyhedra**. Keep it enabled for **Si–O**. Enable **Hide atoms outside polyhedra** to isolate the Si–O tetrahedra.
 
 <ViewerFigure name="tutorial-forsterite-silicon" alt="Forsterite with only the blue SiO4 tetrahedra visible and the Mg–O polyhedra checkbox cleared." caption="Four blue SiO₄ tetrahedra remain. The Si–O card reports CN 4: each silicon has four oxygen neighbors within 1.80 Å." />
 
@@ -34,7 +34,7 @@ Re-enable **Si–O Polyhedra** so both pairs are active. Choose **Sites** on the
 
 ### 5. Shorten the magnesium cutoff
 
-Return to **Pairs**. In the **Mg–O** card, enter **2.15 Å** in the cutoff field and press **Enter**.
+Return to **Bonds & polyhedra**. In the **Mg–O** card, enter **2.15 Å** in the cutoff field and press **Enter**.
 
 <ViewerFigure name="tutorial-forsterite-short-cutoff" alt="Forsterite after reducing the Mg–O cutoff to 2.15 angstroms, with fewer complete green polyhedra." caption="Some green octahedra disappear. Mg1 still has six neighbors, but Mg2 now has only three inside the cutoff, so its complete octahedron is no longer drawn. The blue silicon tetrahedra remain." />
 
@@ -102,7 +102,7 @@ These values apply to the ideal 5.64 Å cubic rock-salt model. Drawing a plane f
 
 ### 1. Open the powder calculation
 
-Keep the rock-salt model open, or load it as described above. Choose **Plots** on the tool rail (on a phone, **Tools → Plots**). In the window that opens, change **Plot** to **Powder diffraction (X-ray)**. Use **Wavelength = 1.5406 Å** and the default **5–90°** 2θ range.
+Keep the rock-salt model open, or load it as described above. Choose **Powder** on the tool rail (on a phone, **Tools → Powder**). Use **Wavelength = 1.5406 Å** and the default **5–90°** 2θ range.
 
 <ViewerFigure name="tutorial-powder-settings" alt="Rock-salt powder diffraction plot with wavelength 1.5406 angstroms, a 5 to 90 degree range, and the calculated reflection table." caption="Nine powder lines appear in this range. The strongest line is near 31.704° 2θ, with its relative integrated intensity set to 100. The table lists individual line values below the graph." />
 

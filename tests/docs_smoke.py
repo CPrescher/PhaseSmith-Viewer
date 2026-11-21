@@ -131,13 +131,16 @@ async def main():
         await page.goto(URL + '/')
         await page.wait_for_function('window.viewerDiagnostics?.().atoms.length > 0')
         await page.locator('#tools-menu').click()
-        help_link = page.get_by_role('link', name='Documentation (opens in a new tab)', exact=True)
+        help_link = page.get_by_role('link', name='Help, user guide and Impressum (opens in a new tab)', exact=True)
+        await help_link.scroll_into_view_if_needed()
         await expect(help_link).to_be_in_viewport()
         async with context.expect_page() as popup:
             await help_link.click()
         guide = await popup.value
         await expect(guide).to_have_url(DOCS)
         await expect(guide.locator('h1')).to_contain_text('PhaseSmith Viewer user guide')
+        await guide.locator('main a[href="#impressum"]').first.click()
+        await expect(guide.locator('address')).to_contain_text('Hermann-Herder-Straße 5')
         assert not errors, errors
         print(f'Documentation: {len(parsed)} pages, anchors, images, search, mobile navigation, screenshot themes, print and viewer Help passed')
         await browser.close()

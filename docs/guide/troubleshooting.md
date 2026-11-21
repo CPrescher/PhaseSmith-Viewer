@@ -44,7 +44,7 @@ For X-ray form factors, **sin(θ)/λ must be at most 6 Å⁻¹**. Reduce the upp
 
 ## An old structure returns when I reopen the viewer
 
-The browser restores its saved session. To start a particular example, use its direct link. To discard the stored state, use **Export → Session → Start fresh**. Save a `.psv` first if the scene matters to you.
+The browser restores its saved session. To start a particular example, use its direct link. To discard the stored state, use **⋯ → This device → Start fresh**. Save a `.psv` first if the scene matters to you.
 
 Private browsing, cleared browser data, or storage restrictions can prevent persistence. A project file is the portable backup.
 

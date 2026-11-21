@@ -17,7 +17,7 @@ async def check(browser):
     )
     await page.locator("#mode-extent").tap()
     await page.locator("#range-c-max").fill("20")
-    await page.locator('#range-form button[type="submit"]').tap()
+    await page.locator('#range-c-max').press('Enter')
     await page.locator("#view-c").tap()
     rect = await page.locator("canvas").bounding_box()
     x, y = rect["x"] + rect["width"] / 2, rect["y"] + rect["height"] / 2
