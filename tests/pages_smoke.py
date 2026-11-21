@@ -1,6 +1,7 @@
 from smoke import choose_tool, reveal_control
 """Portable browser check of the production build under its GitHub Pages path."""
 
+import argparse
 import asyncio
 import os
 from playwright.async_api import async_playwright
@@ -11,13 +12,20 @@ URL = os.environ.get("VIEWER_URL", "http://127.0.0.1:4181/PhaseSmith-Viewer").rs
 
 
 async def check_tablet_library(page):
-    await page.set_viewport_size({"width": 1024, "height": 700})
     for group in ("overlay", "analysis"):
         trigger = page.locator(f"#{group}-menu")
         await trigger.tap()
         choices = page.locator(f"#{group}-choices")
         box = await choices.bounding_box()
-        assert box and box["height"] <= 8 + 54 * await choices.locator("button").count()
+        buttons = choices.locator("button")
+        rail = await page.locator("#tool-rail").bounding_box()
+        assert box and rail and 0 <= box["x"] < box["x"] + box["width"] <= rail["x"]
+        assert box["height"] <= 8 + 54 * await buttons.count(), (group, box)
+        for button in (buttons.first, buttons.last):
+            assert await button.evaluate("""b => {
+                const r = b.getBoundingClientRect();
+                return b.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+            }"""), group
         await trigger.tap()
 
     await page.locator("#library-open").tap()
@@ -32,8 +40,21 @@ async def check_tablet_library(page):
     assert all(shell["faceCount"] == 1 and shell["edgeCount"] == 3 for shell in rule["environments"])
 
 
-async def main():
+async def main(tablet_webkit=False):
     async with async_playwright() as p:
+        if tablet_webkit:
+            browser = await p.webkit.launch()
+            page = await browser.new_page(**{
+                **p.devices["iPad (gen 7) landscape"],
+                "viewport": {"width": 1024, "height": 700},
+            })
+            await page.goto(URL + "/")
+            await page.wait_for_function("window.viewerDiagnostics?.().atoms.length > 0")
+            await check_tablet_library(page)
+            await browser.close()
+            print("WebKit tablet: compact menus, Library focus and aragonite faces passed")
+            return
+
         options = {"args": ["--enable-unsafe-swiftshader"]}
         if os.environ.get("CI"):
             options["args"] += ["--use-gl=angle", "--use-angle=swiftshader-webgl"]
@@ -101,6 +122,7 @@ async def main():
                 assert not await page.evaluate(
                     "document.scrollingElement.scrollWidth>innerWidth"
                 )
+                await page.set_viewport_size({"width": 1024, "height": 700})
                 await check_tablet_library(page)
             assert not errors, errors
             print(
@@ -112,4 +134,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tablet-webkit", action="store_true")
+    asyncio.run(main(parser.parse_args().tablet_webkit))

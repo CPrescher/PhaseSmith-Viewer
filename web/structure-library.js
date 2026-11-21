@@ -76,12 +76,13 @@ export function createStructureLibrary({ onSelect, isBusy }) {
   }
   search.addEventListener('input', render);
   collection.addEventListener('change', render);
-  opener.onclick = () => {
+  opener.onclick = event => {
     if (isBusy()) return;
     render();
     // Choose initial focus before opening so touch browsers never focus a
     // text field until the user taps Search.
-    close.autofocus = navigator.maxTouchPoints > 0;
+    close.autofocus = matchMedia('(pointer: coarse)').matches ||
+      event.pointerType === 'touch' || event.pointerType === 'pen';
     search.autofocus = !close.autofocus;
     dialog.showModal();
   };
