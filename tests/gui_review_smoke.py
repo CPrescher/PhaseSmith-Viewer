@@ -79,6 +79,18 @@ async def check(browser,w,h,theme):
     await choose_tool(page,'#mode-extent')
     assert await page.locator('#range-apply').count() == 0
     field = page.locator('#range-a-max')
+    increase = page.get_by_role('button', name='Increase a maximum by one cell')
+    decrease = page.get_by_role('button', name='Decrease a maximum by one cell')
+    assert await decrease.is_disabled()
+    await increase.tap()
+    assert await field.input_value() == '2'
+    assert len((await diagnostics(page))['atoms']) == 92
+    await decrease.tap()
+    assert await field.input_value() == '1' and await decrease.is_disabled()
+    await field.fill('1.25'); await field.press('Enter')
+    await increase.tap()
+    assert await field.input_value() == '2.25'
+    await page.locator('#range-reset').click()
     await field.fill('2'); await field.press('Enter')
     assert len((await diagnostics(page))['atoms']) == 92
     await field.fill('1'); await field.press('Tab')

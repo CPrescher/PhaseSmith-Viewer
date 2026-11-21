@@ -850,7 +850,7 @@ h2 {
 }
 .range-grid {
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) 10px minmax(0, 1fr);
+  grid-template-columns: auto repeat(2, minmax(0, 1fr));
   gap: 6px 4px;
   align-items: center;
 }
@@ -865,17 +865,41 @@ h2 {
   text-align: center;
 }
 .range-grid > .col-label {
-  text-align: left;
-  padding-left: 8px;
   font-size: 11px;
   line-height: 14px;
   color: var(--muted);
 }
-.range-grid input {
+.range-stepper {
+  display: grid;
+  grid-template-columns: clamp(26px, 26%, 44px) minmax(0, 1fr) clamp(26px, 26%, 44px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-field);
+  background: var(--field);
+}
+.range-stepper input,
+.range-stepper button {
   min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  text-align: center;
+}
+.range-stepper input {
   width: 100%;
-  padding: 0 8px;
   font-variant-numeric: tabular-nums;
+}
+.range-stepper button {
+  background: transparent;
+  color: var(--accent);
+  font-size: 18px;
+  touch-action: manipulation;
+}
+.range-stepper button:disabled {
+  color: var(--faint);
+  opacity: 0.45;
+}
+@media (hover: hover) {
+  .range-stepper button:enabled:hover { background: var(--line); }
 }
 .range-actions {
   display: grid;
@@ -3255,18 +3279,10 @@ button.element[aria-pressed="false"] .dot {
   #app[data-profile="side"] .element { padding: 0 5px; }
   #app[data-profile="side"] .element small { display: none; }
 }
-/* On shallow phones, compare all three axes across two compact rows. */
-#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid { grid-template-columns: 28px repeat(3, minmax(0, 1fr)); gap: 3px 4px; }
-#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid > span:not(.col-label) { display: none; }
-#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid > .col-label { grid-column: 1; padding: 0; }
-#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid > .col-label:nth-child(2) { grid-row: 2; }
-#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid > .col-label:nth-child(4) { grid-row: 3; }
-#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid strong { grid-row: 1; text-align: center; }
-#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid strong:nth-of-type(1), #app:is([data-profile="side"], [data-profile="sheet"]) .range-grid input[id^="range-a"] { grid-column: 2; }
-#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid strong:nth-of-type(2), #app:is([data-profile="side"], [data-profile="sheet"]) .range-grid input[id^="range-b"] { grid-column: 3; }
-#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid strong:nth-of-type(3), #app:is([data-profile="side"], [data-profile="sheet"]) .range-grid input[id^="range-c"] { grid-column: 4; }
-#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid input[id$="min"] { grid-row: 2; }
-#app:is([data-profile="side"], [data-profile="sheet"]) .range-grid input[id$="max"] { grid-row: 3; }
+@media (max-height: 450px) {
+  #app[data-profile="side"] .range-grid { row-gap: 2px; }
+  #app[data-profile="side"] .range-stepper input { min-height: 30px; }
+}
 #app:is([data-profile="side"], [data-profile="sheet"]) #range-form { margin-top: 0; }
 #app[data-profile="side"] .tool-window-body { padding-top: 2px; }
 /* Advanced detector inputs use the same field grammar as manual geometry. */

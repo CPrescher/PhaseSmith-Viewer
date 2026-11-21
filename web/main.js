@@ -3189,10 +3189,24 @@ function initialize() {
       toggleWarnings();
     }
   };
+  function updateRangeSteps() {
+    for (const axis of ["a", "b", "c"]) {
+      const lower = $(`range-${axis}-min`);
+      const upper = $(`range-${axis}-max`);
+      for (const field of [lower, upper]) {
+        for (const button of field.parentElement.querySelectorAll("[data-range-step]")) {
+          const next = field.valueAsNumber + Number(button.dataset.rangeStep);
+          button.disabled = !Number.isFinite(next)
+            || (field === lower ? next >= upper.valueAsNumber : next <= lower.valueAsNumber);
+        }
+      }
+    }
+  }
   function writeRanges() {
     for (const [i, axis] of ["a", "b", "c"].entries())
       for (const [j, end] of ["min", "max"].entries())
         $(`range-${axis}-${end}`).value = plotRanges[i][j];
+    updateRangeSteps();
     $("range-error").textContent = "";
   }
   function applyRanges(next) {
@@ -3225,6 +3239,16 @@ function initialize() {
       ),
     );
   };
+  $("range-form").addEventListener("input", updateRangeSteps);
+  $("range-form").addEventListener("click", event => {
+    const step = event.target.closest("[data-range-step]");
+    if (!step || !structure) return;
+    const field = step.parentElement.querySelector("input");
+    const next = field.valueAsNumber + Number(step.dataset.rangeStep);
+    field.value = Number(next.toPrecision(15));
+    updateRangeSteps();
+    $("range-form").requestSubmit();
+  });
   // Committing a bound (Enter, blur or stepper) applies the extent directly.
   for (const input of document.querySelectorAll("#range-form input")) {
     const commit = () => { if (structure) $("range-form").requestSubmit(); };

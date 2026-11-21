@@ -30,9 +30,9 @@ On a touchscreen, drag with one finger to rotate about the crystal center. Two f
 
 ## Plotting extent
 
-Open **Extent** on the right-hand tool rail, or **Tools → Extent** on a phone. Edit the lower and upper coordinate fields. Changes apply when you press Enter or leave a field.
+Open **Extent** on the right-hand tool rail, or **Tools → Extent** on a phone. Tap **−** or **+** beside a bound to move it by one unit cell. For a fractional bound, type the coordinate and press Enter or leave the field.
 
-<ViewerFigure name="extent" alt="Extent window with a, b and c plotting-range fields and the Apply button." />
+<ViewerFigure name="extent" alt="Extent window with a, b and c plotting-range fields." />
 
 Set the lower and upper fractional coordinates independently along **a**, **b**, and **c**. A range of 0 to 1 spans one cell, −1 to 1 spans two cells, and fractional limits select part of a cell. Applying the range repeats the structure by lattice translations and fits the new extent in the current orientation. Each translated atom remains individually selectable for distance measurements.
 

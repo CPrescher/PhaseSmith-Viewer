@@ -746,59 +746,40 @@
                 <section class="plot-range" aria-labelledby="range-title">
                   <form id="range-form" novalidate>
                     <div class="range-grid" aria-label="Fractional cell coordinates">
-                      <span></span><span class="col-label">Min</span><span></span
-                      ><span class="col-label">Max</span>
-                      <strong>a</strong
-                      ><input
-                        id="range-a-min"
-                        type="number"
-                        step="any"
-                        inputmode="decimal"
-                        value="0"
-                        aria-label="a minimum"
-                      /><span aria-hidden="true">–</span
-                      ><input
-                        id="range-a-max"
-                        type="number"
-                        step="any"
-                        inputmode="decimal"
-                        value="1"
-                        aria-label="a maximum"
-                      />
-                      <strong>b</strong
-                      ><input
-                        id="range-b-min"
-                        type="number"
-                        step="any"
-                        inputmode="decimal"
-                        value="0"
-                        aria-label="b minimum"
-                      /><span aria-hidden="true">–</span
-                      ><input
-                        id="range-b-max"
-                        type="number"
-                        step="any"
-                        inputmode="decimal"
-                        value="1"
-                        aria-label="b maximum"
-                      />
-                      <strong>c</strong
-                      ><input
-                        id="range-c-min"
-                        type="number"
-                        step="any"
-                        inputmode="decimal"
-                        value="0"
-                        aria-label="c minimum"
-                      /><span aria-hidden="true">–</span
-                      ><input
-                        id="range-c-max"
-                        type="number"
-                        step="any"
-                        inputmode="decimal"
-                        value="1"
-                        aria-label="c maximum"
-                      />
+                      <span></span><span class="col-label">Min</span><span class="col-label">Max</span>
+                      <strong>a</strong>
+                      <div class="range-stepper">
+                        <button type="button" data-range-step="-1" aria-label="Decrease a minimum by one cell">−</button>
+                        <input id="range-a-min" type="number" step="any" inputmode="decimal" value="0" aria-label="a minimum" />
+                        <button type="button" data-range-step="1" aria-label="Increase a minimum by one cell">+</button>
+                      </div>
+                      <div class="range-stepper">
+                        <button type="button" data-range-step="-1" aria-label="Decrease a maximum by one cell">−</button>
+                        <input id="range-a-max" type="number" step="any" inputmode="decimal" value="1" aria-label="a maximum" />
+                        <button type="button" data-range-step="1" aria-label="Increase a maximum by one cell">+</button>
+                      </div>
+                      <strong>b</strong>
+                      <div class="range-stepper">
+                        <button type="button" data-range-step="-1" aria-label="Decrease b minimum by one cell">−</button>
+                        <input id="range-b-min" type="number" step="any" inputmode="decimal" value="0" aria-label="b minimum" />
+                        <button type="button" data-range-step="1" aria-label="Increase b minimum by one cell">+</button>
+                      </div>
+                      <div class="range-stepper">
+                        <button type="button" data-range-step="-1" aria-label="Decrease b maximum by one cell">−</button>
+                        <input id="range-b-max" type="number" step="any" inputmode="decimal" value="1" aria-label="b maximum" />
+                        <button type="button" data-range-step="1" aria-label="Increase b maximum by one cell">+</button>
+                      </div>
+                      <strong>c</strong>
+                      <div class="range-stepper">
+                        <button type="button" data-range-step="-1" aria-label="Decrease c minimum by one cell">−</button>
+                        <input id="range-c-min" type="number" step="any" inputmode="decimal" value="0" aria-label="c minimum" />
+                        <button type="button" data-range-step="1" aria-label="Increase c minimum by one cell">+</button>
+                      </div>
+                      <div class="range-stepper">
+                        <button type="button" data-range-step="-1" aria-label="Decrease c maximum by one cell">−</button>
+                        <input id="range-c-max" type="number" step="any" inputmode="decimal" value="1" aria-label="c maximum" />
+                        <button type="button" data-range-step="1" aria-label="Increase c maximum by one cell">+</button>
+                      </div>
                     </div>
                     <div class="range-actions">
                       <button
