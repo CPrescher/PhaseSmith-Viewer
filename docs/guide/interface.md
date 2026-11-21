@@ -46,7 +46,7 @@ Tap **Tools** to reveal the labeled menu shown below, then choose the tool. Its 
 | --- | --- | --- |
 | **Bonds & polyhedra** | Bonds, coordination cutoffs and polyhedra | [Bonds and polyhedra](./coordination.md) |
 | **Sites** | CIF sites, labels, coordination numbers and volumes | [Measurements and sites](./measurements.md#site-labels-and-polyhedron-volumes) |
-| **Planes**, **Directions**, **Symmetry** (under **Overlays** when space is tight) | Planes, arrows and symmetry overlays | [Planes and directions](./lattice.md) |
+| **Planes**, **Directions**, **Symmetry** | Planes, arrows and symmetry overlays | [Planes and directions](./lattice.md) |
 | **Extent** | Displayed fractional-coordinate range | [Plotting extent](./navigation.md#plotting-extent) |
 | **Distances** | Periodic interatomic distance distribution | [Pair distances](./plots.md#pair-distances) |
 | **Powder** | Calculated powder diffraction and measured traces | [Powder diffraction](./plots.md#powder-diffraction-x-ray) |
@@ -54,6 +54,8 @@ Tap **Tools** to reveal the labeled menu shown below, then choose the tool. Its 
 | **Detector** | Ewald sphere, specimen rotation, and predicted detector spots | [Diffraction detector](./plots.md#explore-a-single-reflection) |
 | **Style** | Colors, sphere sizes and individual overrides | [Appearance](./navigation.md#appearance) |
 | **Export** | PNG images and turntable movies | [Saving and exporting](./saving.md) |
+
+When the launcher is short on space, **Overlays** opens Planes, Directions and Symmetry, and **Analysis** opens Distances, Powder, Reflection and Detector. Each group opens a narrow bar to its left. Choose a tool, or press Escape to return to the group.
 
 ## When a control is out of sight
 

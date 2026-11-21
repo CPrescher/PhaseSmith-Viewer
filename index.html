@@ -382,10 +382,10 @@
               <button id="mode-sites" type="button" class="rail-button" data-tool="sites" aria-pressed="false" title="Sites: CIF sites, labels, CN and polyhedron volumes">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M4 14h16M10 9v11"/></svg><span class="rail-label">Sites</span><span class="rail-hint" aria-hidden="true">CIF sites, labels, CN and polyhedron volumes</span>
             </button>
-              <button id="overlay-menu" type="button" class="rail-button" aria-controls="overlay-choices" hidden aria-expanded="false" title="Planes, directions and symmetry">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-5 9 5-9 5zM3 14l9 5 9-5"/></svg><span class="rail-label">Overlays ›</span><span class="rail-hint" aria-hidden="true">Planes, directions and symmetry</span>
+              <button id="overlay-menu" data-launcher-group type="button" class="rail-button" aria-controls="overlay-choices" hidden aria-expanded="false" title="Planes, directions and symmetry">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-5 9 5-9 5zM3 14l9 5 9-5"/></svg><span class="rail-label">Overlays</span><span class="rail-hint" aria-hidden="true">Planes, directions and symmetry</span>
             </button>
-              <div id="overlay-choices" role="group" aria-label="Crystal overlays">
+              <div id="overlay-choices" class="launcher-choices" role="group" aria-label="Crystal overlays">
               <button id="mode-lattice" type="button" class="rail-button" data-tool="lattice" data-overlay aria-pressed="false" title="Lattice planes (hkl)">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16 10 6h10l-6 10H4Z"/><path d="M7 11h10M9 16l6-10"/></svg><span class="rail-label">Planes</span><span class="rail-hint" aria-hidden="true">Lattice planes (hkl)</span>
             </button>
@@ -401,6 +401,10 @@
             </button>
             </div>
             <div class="rail-group" role="group" aria-label="Analysis">
+              <button id="analysis-menu" class="rail-button" data-launcher-group type="button" aria-controls="analysis-choices" aria-expanded="false" hidden title="Distances, powder diffraction, reflections and detector">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M6 15l4-5 4 3 5-8"/></svg><span class="rail-label">Analysis</span><span class="rail-hint" aria-hidden="true">Distances, Powder, Reflection and Detector</span>
+              </button>
+              <div id="analysis-choices" class="launcher-choices" role="group" aria-label="Analysis tools">
               <button id="mode-analysis" type="button" class="rail-button" aria-expanded="false" aria-controls="analysis-window" aria-haspopup="dialog" title="Distances: periodic interatomic distances">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M7 17v-5M12 17V6M17 17v-8"/></svg><span class="rail-label">Distances</span><span class="rail-hint" aria-hidden="true">periodic interatomic distances</span>
             </button>
@@ -413,6 +417,7 @@
               <button id="mode-detector" type="button" class="rail-button" aria-expanded="false" aria-controls="detector-window" aria-haspopup="dialog" title="Diffraction detector: rotate a crystal and predict X-ray spots">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="12" cy="12" r="6" stroke-dasharray="2 3"/><circle cx="12" cy="12" r="1"/><circle cx="17" cy="9" r="1.6" fill="currentColor"/></svg><span class="rail-label">Detector</span><span class="rail-hint" aria-hidden="true">Ewald sphere and single-crystal spots</span>
             </button>
+              </div>
             </div>
             <div class="rail-group" role="group" aria-label="Appearance and output">
               <button id="style-open" type="button" class="rail-button" data-tool="style" aria-pressed="false" title="Appearance: colors and sizes of elements, pairs and single copies">

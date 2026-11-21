@@ -326,44 +326,68 @@ export function createToolWindows(options) {
     body.addEventListener("focusin", track);
   }
 
-  const overlayButton = document.getElementById("overlay-menu");
-  const overlayLabel = overlayButton.querySelector(".rail-label");
-  function setOverlayMenu(open) {
-    if (open && !rail.classList.contains("overlay-submenu")) {
-      rail.style.setProperty("--overlay-menu-height", rail.getBoundingClientRect().height + "px");
-    }
-    rail.classList.toggle("overlay-submenu", open);
-    overlayButton.setAttribute("aria-expanded", String(open));
-    overlayLabel.textContent = open ? "‹ Back" : "Overlays ›";
-    overlayButton.title = open ? "Back to tools" : "Planes, directions and symmetry";
+  const groups = [...rail.querySelectorAll("[data-launcher-group]")].map(button => ({
+    button, choices: document.getElementById(button.getAttribute("aria-controls")),
+  }));
+  let activeGroup = null;
+  function closeGroup(refocus = false) {
+    if (!activeGroup) return;
+    const { button, choices } = activeGroup;
+    activeGroup = null;
+    choices.hidePopover();
+    button.setAttribute("aria-expanded", "false");
+    if (refocus) button.focus({ preventScroll: true });
   }
-  function fitOverlayChoices() {
+  function openGroup(group) {
+    closeGroup();
+    activeGroup = group;
+    const { button, choices } = group;
+    button.setAttribute("aria-expanded", "true");
+    choices.showPopover();
+    const trigger = button.getBoundingClientRect();
+    const bounds = viewport.getBoundingClientRect();
+    const x = rail.getBoundingClientRect().left - choices.offsetWidth - 6;
+    const y = Math.min(trigger.top, bounds.bottom - choices.offsetHeight - 8);
+    choices.style.left = Math.max(4, x) + "px";
+    choices.style.top = Math.max(bounds.top + 4, y) + "px";
+    choices.style.setProperty("--trigger-y", (trigger.top + trigger.height / 2 - choices.offsetTop) + "px");
+    choices.querySelector("button").focus({ preventScroll: true });
+  }
+  let lastFit = "";
+  function fitLauncherGroups() {
     if (!rail.clientHeight) return;
-    const wasOpen = rail.classList.contains("overlay-submenu");
-    rail.classList.remove("group-overlays", "overlay-submenu");
-    overlayButton.hidden = true;
-    const group = rail.scrollHeight > rail.clientHeight + 1;
-    rail.classList.toggle("group-overlays", group);
-    overlayButton.hidden = !group;
-    setOverlayMenu(group && wasOpen);
+    const key = [launcher, ws.width, ws.height, rail.style.maxHeight, rail.classList.contains("rail-dense")].join("/");
+    if (key === lastFit) return;
+    lastFit = key;
+    closeGroup();
+    rail.classList.remove("grouped");
+    for (const { button, choices } of groups) {
+      button.hidden = true;
+      choices.removeAttribute("popover");
+    }
+    const compact = rail.scrollHeight > rail.clientHeight + 1;
+    rail.classList.toggle("grouped", compact);
+    if (compact) for (const { button, choices } of groups) {
+      choices.setAttribute("popover", "manual");
+      button.hidden = false;
+    }
   }
-  overlayButton.onclick = () => {
-    const open = !rail.classList.contains("overlay-submenu");
-    setOverlayMenu(open);
-    (open ? rail.querySelector("[data-overlay]") : overlayButton).focus();
-  };
+  for (const group of groups) {
+    group.button.onclick = () => activeGroup === group ? closeGroup(true) : openGroup(group);
+  }
+  rail.addEventListener("scroll", () => closeGroup(), { passive: true });
   // Launcher buttons.
   for (const tool of TOOLS) {
     const b = document.getElementById(tool.button);
     b.setAttribute("aria-controls", `tool-window-${tool.id}`);
     b.onclick = (e) => {
-      const fromSubmenu = rail.classList.contains("overlay-submenu");
-      setOverlayMenu(false);
+      const fromSubmenu = activeGroup;
+      closeGroup();
       closeMenu();
       const closing = state.main === tool.id;
       commit(toggleTool(state, tool.id));
       if (closing && launcher === "menu") menuButton?.focus({ preventScroll: true });
-      else if (closing && fromSubmenu) overlayButton.focus({ preventScroll: true });
+      else if (closing && fromSubmenu) fromSubmenu.button.focus({ preventScroll: true });
       else if (!closing && (e.detail === 0 || launcher === "menu" || fromSubmenu)) windows.get(tool.id)?.title.focus({ preventScroll: true });
     };
   }
@@ -371,9 +395,9 @@ export function createToolWindows(options) {
   function setMenu(open) {
     rail.classList.toggle("menu-open", open);
     menuButton?.setAttribute("aria-expanded", String(open));
-    setOverlayMenu(false);
+    closeGroup();
     if (open) {
-      fitOverlayChoices();
+      fitLauncherGroups();
       const choices = [...rail.querySelectorAll("button")].filter(b => b.getClientRects().length);
       const target = choices.find(b => b.getAttribute("aria-pressed") === "true") ?? choices[0];
       rail.scrollTop = 0;
@@ -386,8 +410,8 @@ export function createToolWindows(options) {
   }
   // Independent science-window launchers also dismiss the phone list.
   rail.addEventListener("click", (event) => {
-    if (event.target.closest("button, a[href]") === overlayButton) return;
-    setOverlayMenu(false);
+    if (event.target.closest("[data-launcher-group]")) return;
+    closeGroup();
     if (event.target.closest("button, a[href]")) closeMenu();
   });
   menuButton?.addEventListener("click", () => setMenu(!rail.classList.contains("menu-open")));
@@ -395,13 +419,23 @@ export function createToolWindows(options) {
     "pointerdown",
     (e) => {
       if (rail.contains(e.target) || menuButton?.contains(e.target)) return;
-      if (rail.classList.contains("overlay-submenu")) setOverlayMenu(false);
+      closeGroup();
       if (!rail.classList.contains("menu-open")) return;
       setMenu(false);
     },
     true,
   );
   rail.addEventListener("keydown", (e) => {
+    if (activeGroup && ["Escape", "ArrowRight", "ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+      e.preventDefault();
+      if (e.key === "Escape" || e.key === "ArrowRight") return closeGroup(true);
+      const items = [...activeGroup.choices.querySelectorAll("button")];
+      const index = items.indexOf(document.activeElement);
+      const next = e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 :
+        (index + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+      items[next].focus();
+      return;
+    }
     if (launcher === "menu" && rail.classList.contains("menu-open") && ["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
       const choices = [...rail.querySelectorAll("button:not(:disabled), a[href]")].filter((b) => b.getClientRects().length);
       const index = choices.indexOf(document.activeElement);
@@ -411,11 +445,7 @@ export function createToolWindows(options) {
       choices[next]?.scrollIntoView({ block: "nearest", inline: "nearest" });
       return;
     }
-    if (e.key === "Escape" && rail.classList.contains("overlay-submenu")) {
-      e.preventDefault();
-      setOverlayMenu(false);
-      overlayButton.focus();
-    } else if (e.key === "Escape" && rail.classList.contains("menu-open")) {
+    if (e.key === "Escape" && rail.classList.contains("menu-open")) {
       e.preventDefault();
       setMenu(false);
       menuButton?.focus({ preventScroll: true });
@@ -433,7 +463,7 @@ export function createToolWindows(options) {
     commit(closeTool(state, tool));
     if (refocus) {
       const b = launcher === "rail" ? document.getElementById(TOOLS.find((t) => t.id === tool).button) : menuButton;
-      (b?.getClientRects().length ? b : overlayButton)?.focus({ preventScroll: true });
+      (b?.getClientRects().length ? b : groups.find(group => group.choices.contains(b))?.button)?.focus({ preventScroll: true });
     }
   }
   function currentRect(tool) {
@@ -580,13 +610,13 @@ export function createToolWindows(options) {
       const available = Math.max(80, ws.height - top - bottom);
       rail.classList.toggle("rail-dense", available < 680);
       rail.style.maxHeight = `${available}px`;
-      fitOverlayChoices();
+      fitLauncherGroups();
       const height = rail.getBoundingClientRect().height;
       rail.style.top = `${Math.max(top, Math.min((ws.height - height) / 2, ws.height - bottom - height))}px`;
     } else {
       rail.style.removeProperty("top");
       rail.style.removeProperty("max-height");
-      fitOverlayChoices();
+      fitLauncherGroups();
     }
   }
   function naturalHeight(win) {

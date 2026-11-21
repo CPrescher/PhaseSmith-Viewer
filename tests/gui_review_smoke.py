@@ -22,6 +22,24 @@ async def check(browser,w,h,theme):
     initial=await diagnostics(page)
     assert await page.locator('#tool-rail > [role=group]').count()==4
     assert await page.locator('#tool-window-export #project-save, #tool-window-export #session-save').count()==0
+    rail=page.locator('#tool-rail')
+    menu=page.locator('#tools-menu')
+    if not await rail.is_visible():await menu.click()
+    for group in ['overlay','analysis']:
+        trigger=page.locator('#'+group+'-menu')
+        if not await trigger.is_visible():continue
+        before=await rail.bounding_box()
+        await trigger.click()
+        flyout=page.locator('#'+group+'-choices')
+        box=await flyout.bounding_box()
+        assert box and box['x']>=0 and box['x']+box['width']<=before['x'], (w,h,group,box,before)
+        assert box['y']>=0 and box['y']+box['height']<=h
+        assert await rail.bounding_box()==before
+        await page.keyboard.press('ArrowDown')
+        assert await flyout.locator('button').nth(1).evaluate('b=>b===document.activeElement')
+        await page.keyboard.press('Escape')
+        assert not await flyout.is_visible() and await trigger.evaluate('b=>b===document.activeElement')
+    if await menu.get_attribute('aria-expanded')=='true':await menu.click()
     await page.locator('#file-menu-button').click()
     assert await hit(page.locator('#project-save'))
     assert await hit(page.locator('#project-open'))
@@ -174,13 +192,13 @@ async def check(browser,w,h,theme):
         assert await page.locator('#tool-window-pairs').is_visible()
         assert await hit(page.locator('#tools-menu')), 'launcher must return before the next input'
         await page.locator('#tools-menu').tap()
-        await page.locator('#mode-reflection').tap()
+        await choose_tool(page,'#mode-reflection',True)
         await page.locator('#reflection-close').tap()
     else:
         await page.locator('#detector-close').click()
         # Science inspectors must leave the entire tablet/desktop rail usable.
         for selector in ['#mode-analysis','#mode-powder','#mode-reflection','#mode-detector','#mode-analysis','#mode-reflection','#mode-detector','#mode-powder']:
-            await page.locator(selector).click()
+            await choose_tool(page,selector)
             expected={'#mode-analysis':'analysis-window','#mode-powder':'analysis-window','#mode-reflection':'reflection-explorer','#mode-detector':'detector-window'}[selector]
             assert await page.evaluate('''id=>{
               const win=document.getElementById(id);
@@ -190,7 +208,7 @@ async def check(browser,w,h,theme):
                 assert await hit(button), (w,h,selector,'covered rail action',await button.get_attribute('id'))
         await page.locator('#mode-sites').click()
         assert await hit(page.locator('#site-table tbody tr').first), 'settings must be reachable after science tools'
-        await page.locator('#mode-reflection').click()
+        await choose_tool(page,'#mode-reflection')
         await page.locator('#style-open').click()
         assert await hit(page.locator('#style-target')), 'Style must be reachable after Reflection'
     assert not errors,(w,h,errors[:5])

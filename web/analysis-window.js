@@ -1,6 +1,6 @@
 import { diffractionModule } from "./diffraction-engine.js";
 import { formatMillerIndices } from "./crystal-math.js";
-import { floatingDialog, isFrontDialog } from "./floating-dialog.js";
+import { focusLauncher, floatingDialog, isFrontDialog } from "./floating-dialog.js";
 import { readPowderTrace, powderFamilies } from "./powder-comparison.js";
 import { powderProfile } from "./structure-analysis.js";
 import { pairName, normalizePair, pairColors, pairSegments } from "./pair-presentation.js";
@@ -354,7 +354,7 @@ export function createAnalysisWindow({ getStructure, onExplain, onChange = () =>
     win.close();
     opener.setAttribute("aria-expanded", "false");
     powderOpener.setAttribute("aria-expanded", "false");
-    lastOpener.focus({ preventScroll: true });
+    focusLauncher(lastOpener);
     onChange();
   }
   for (const [button, mode] of [[opener, "distances"], [powderOpener, "powder"]]) {

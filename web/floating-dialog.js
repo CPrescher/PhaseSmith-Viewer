@@ -22,6 +22,12 @@ function placeToolsMenu() {
     if (menu.parentElement !== head) head.insertBefore(menu, head.lastElementChild);
   } else if (menu.previousSibling !== menuHome) menuHome.after(menu);
 }
+export function focusLauncher(opener) {
+  const group = opener?.closest(".launcher-choices");
+  const trigger = group && document.querySelector(`[aria-controls="${group.id}"]`);
+  const target = [opener, trigger, document.getElementById("tools-menu")].find(el => el?.getClientRects().length);
+  target?.focus({ preventScroll: true });
+}
 export function floatingDialog(win, opener, handle, close) {
   const files = document.createElement("button");
   files.type = "button";

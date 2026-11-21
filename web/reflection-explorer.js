@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { ViewControls } from "./view-controls.js";
-import { floatingDialog, isFrontDialog } from "./floating-dialog.js";
+import { focusLauncher, floatingDialog, isFrontDialog } from "./floating-dialog.js";
 import { formatMillerIndices, clipPlaneToBox, planeOffsets, parseMillerIndices, matVec } from "./crystal-math.js";
 import { translatedSites, defaultRanges, rangeEdges } from "./plot-range.js";
 import { elementColor } from "./elements.js";
@@ -93,7 +93,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     </div>
     <div class="reflection-intensity"><div><strong>Reflection intensity · I ∝ |F(hkl)|²</strong><p>Structure-factor contribution; experimental corrections are separate.</p></div><output id="reflection-intensity"></output></div>`;
   document.body.append(dialog);
-  const closeReflection = () => { dialog.close(); opener?.focus({ preventScroll: true }); };
+  const closeReflection = () => { dialog.close(); focusLauncher(opener); };
   const showReflection = floatingDialog(dialog, opener, dialog.querySelector(".reflection-head"), closeReflection);
   const $ = id => dialog.querySelector(`#${id}`), stage = $("reflection-stage");
   dialog.dataset.view = "crystal";

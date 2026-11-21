@@ -46,12 +46,12 @@ async def main():
                 await page.locator("#structure-info-close").click()
                 # Exercise both plot workers on the deployed base path as part
                 # of the short release check; full interactions have their own suite.
-                await page.locator("#mode-analysis").click()
+                await choose_tool(page, "#mode-analysis")
                 await page.wait_for_function("document.querySelector('#analysis-table tbody tr')")
                 assert await page.locator("#analysis-chart .analysis-stick").count() > 0
                 assert await page.locator("#analysis-legend [data-pair]").count() > 0
                 assert await page.locator('#analysis-pair option[value="Na–Cl"]').count() == 1
-                await page.locator("#mode-powder").click()
+                await choose_tool(page, "#mode-powder")
                 await page.wait_for_function("document.querySelector('#analysis-table th')?.textContent === '2θ (°)'")
                 await page.locator("#analysis-close").click()
             if example == "forsterite":

@@ -46,8 +46,9 @@ async def choose_tool(page, button, touch=None):
         menu = page.locator("#tools-menu")
         if await menu.is_visible() and not await page.locator("#tool-rail").is_visible():
             await (menu.tap() if touch else menu.click())
-        group = page.locator("#overlay-menu")
-        if not await target.is_visible() and await group.is_visible():
+        if not await target.is_visible():
+            choices = target.locator("xpath=ancestor::*[contains(@class, 'launcher-choices')]")
+            group = page.locator(f'[aria-controls="{await choices.get_attribute("id")}"]')
             await (group.tap() if touch else group.click())
         await target.wait_for(state="visible")
     await (target.tap() if touch else target.click())

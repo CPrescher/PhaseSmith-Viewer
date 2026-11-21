@@ -16,7 +16,7 @@ import {
   transpose,
 } from "./detector-orientation.js";
 import { cameraAxes, ewaldCamera } from "./ewald-camera.js";
-import { floatingDialog, isFrontDialog } from "./floating-dialog.js";
+import { focusLauncher, floatingDialog, isFrontDialog } from "./floating-dialog.js";
 
 const millimeters = (value) => (Math.abs(value) < 0.005 ? 0 : value).toFixed(2);
 
@@ -127,7 +127,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
     win.close();
     onMainView(null, true);
     opener.setAttribute("aria-expanded", "false");
-    opener.focus({ preventScroll: true });
+    focusLauncher(opener);
   }
   function select(spot) {
     chosen = spot;
