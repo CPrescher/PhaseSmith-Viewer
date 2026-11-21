@@ -18,6 +18,7 @@ import { buildCoordinationEnvironments, convexHull } from "./coordination.js";
 import { elementColor as defaultColor } from "./elements.js";
 import { createRadiusControls } from "./radius-controls.js";
 import { createStructureInfo } from "./structure-info.js";
+import { formulaLabel } from "./structure-notation.js";
 import { siteShell } from "./site-shell.js";
 import { estimatePairCutoff } from "./pair-defaults.js";
 import { angleAt, hullVolume } from "./crystal-math.js";
@@ -2815,20 +2816,18 @@ function initialize() {
     hiddenElements.clear();
     $("show-atoms").checked = true;
     $("show-polyhedra").checked = true;
-    $("name").textContent = data.name || data.block || "Crystal structure";
     const reference = entryForFilename(currentFilename);
     $("source").replaceChildren();
     if (reference) {
-      $("name").textContent = reference.name;
       const link = document.createElement("a");
       link.href = reference.source.url;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
-      link.textContent = `${reference.formula} · ${reference.source.label} ↗`;
+      link.append(formulaLabel(reference.formula), ` · ${reference.source.label} ↗`);
       link.title = reference.source.citation;
       $("source").append(link);
     } else $("source").textContent = currentFilename || "Example structure · built in";
-    updateStructureInfo(data, $("name").textContent, currentFilename, reference);
+    updateStructureInfo(data, reference?.name || data.name || data.block || "Crystal structure", currentFilename, reference);
     $("stats").replaceChildren(
       textStat("V", `${Number(data.volume).toFixed(2)} Å³`),
       textStat("Sites", data.atoms.length.toLocaleString()),

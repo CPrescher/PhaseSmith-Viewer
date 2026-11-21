@@ -38,6 +38,11 @@ async def main():
             assert state["measureMode"] == "info", state["measureMode"]
             assert state["viewReadout"]["visible"]
             if not example:
+                await page.locator("#structure-info-open").click()
+                group = page.locator("#info-symmetry dt", has_text="Space group").locator("+ dd")
+                assert await group.inner_text() == "Fm3\u0305m"
+                assert await page.locator("#info-name").inner_text() == "NaCl"
+                await page.locator("#structure-info-close").click()
                 # Exercise both plot workers on the deployed base path as part
                 # of the short release check; full interactions have their own suite.
                 await page.locator("#mode-analysis").click()
