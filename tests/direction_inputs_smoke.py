@@ -50,17 +50,45 @@ async def check(browser, width, height, touch=True):
     await field.fill(".5 -1 0")
     await field.press("Enter")
     assert not await page.locator("#direction-error").inner_text()
+    await field.fill("110")
+    await field.press("Enter")
+    assert await field.input_value() == "1 1 0"
     await activate(page.locator('.view-directions summary'))
 
     await choose_tool(page, "#mode-directions", touch)
     await activate(page.locator("#arrow-add"))
     row = page.locator("[data-arrow-id]").first
     field = row.locator('[data-field="uvw"]')
-    await enter(field, row.locator(".numeric-keys"))
+    await enter(field, row.locator('.numeric-keys[data-for="uvw"]'))
     assert (await diagnostics(page))["lattice"]["arrows"][0]["uvw"] == [12, -3, 4]
     await field.fill(".5 -1 0")
     await field.press("Enter")
     assert (await diagnostics(page))["lattice"]["arrows"][0]["uvw"] == [.5, -1, 0]
+    assert await row.get_by_role("button", name="Remove arrow [0.5 -1 0]").count() == 1
+    for field_name, text in [("origin", "0.5 0 0"), ("length", "2")]:
+        field = row.locator(f'[data-field="{field_name}"]')
+        await field.fill(text)
+        if touch:
+            await row.locator(f'[data-for="{field_name}"] [data-key="done"]').tap()
+        else:
+            await field.press("Enter")
+    arrow = (await diagnostics(page))["lattice"]["arrows"][0]
+    assert arrow["endFrac"] == [1.5, -2, 0]
+
+    for tool in ["reflection", "detector"]:
+        await choose_tool(page, f"#mode-{tool}", touch)
+        field = page.locator(f"#{tool}-hkl")
+        if not touch:
+            await field.blur()
+            await field.click()
+            assert await field.evaluate("e => e.selectionEnd - e.selectionStart === e.value.length")
+        await field.fill("200")
+        if touch:
+            await page.locator(f'[data-for="{tool}-hkl"] [data-key="done"]').tap()
+        else:
+            await field.press("Enter")
+        assert await field.input_value() == "2 0 0"
+        await activate(page.locator(f"#{tool}-close"))
     assert not errors, errors
     assert await page.evaluate("document.scrollingElement.scrollWidth <= innerWidth")
     await page.close()

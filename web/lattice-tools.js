@@ -19,7 +19,7 @@ import {
   operationString,
 } from "./crystal-math.js";
 import { PEEL_LAYER } from "./peel.js";
-import { numericKeys } from "./numeric-input.js";
+import { enableTripletSelection, numericKeys } from "./numeric-input.js";
 
 const PLANE_COLORS = ["#f2c14e", "#7fb7ff", "#ef7fb0", "#8cdf9b"];
 const ARROW_COLORS = ["#ff8a5c", "#5cc8ff", "#c6a0ef", "#e7edf3"];
@@ -943,21 +943,6 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     input.onchange = () => onCommit(input);
     return input;
   };
-  function enableTripletSelection(input) {
-    let firstMouseClick = false;
-    let mousePress = false;
-    input.addEventListener("pointerdown", (event) => {
-      mousePress = event.pointerType === "mouse" && event.button === 0;
-      firstMouseClick = mousePress && document.activeElement !== input;
-    });
-    input.addEventListener("click", () => {
-      if (firstMouseClick && input.selectionStart === input.selectionEnd) input.select();
-      firstMouseClick = false;
-    });
-    input.addEventListener("dblclick", () => {
-      if (mousePress) input.select();
-    });
-  }
   // Text inputs retain selection support and accept signed, spaced indices;
   // numericEdits enforces the allowed characters independently of the keyboard.
   const numericEdits = (input, pattern) => {
@@ -1012,9 +997,13 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     wrap.append(text, input);
     return wrap;
   };
+  const setRemoveLabel = (button, label) => {
+    button.title = label;
+    button.setAttribute("aria-label", label);
+  };
   const removeButton = (label, onClick) => {
-    const b = make("button", { type: "button", className: "icon-button delete-button", title: label });
-    b.setAttribute("aria-label", label);
+    const b = make("button", { type: "button", className: "icon-button delete-button" });
+    setRemoveLabel(b, label);
     b.onclick = onClick;
     return b;
   };
@@ -1048,6 +1037,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           commit(input, plane, (text) => {
             const v = parseMillerIndices(text);
             plane.hkl = v;
+            setRemoveLabel(remove, `Remove plane ${name()}`);
             setHKL(v.join(" "));
             // Until m is edited by hand, it follows the indices so the
             // plane cuts through the middle of the displayed range.
@@ -1080,6 +1070,11 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         // label) is drawn. Captions sit inside the fields to save width.
         const show = chip("Show", plane.visible, (v) => ((plane.visible = v), rebuild()));
         show.input.dataset.field = "visible";
+        const remove = removeButton(`Remove plane ${name()}`, () => {
+          planes = planes.filter((p) => p !== plane);
+          renderPlaneList();
+          rebuild();
+        });
         const top = make("div", { className: "tool-line" });
         top.append(
           show.label,
@@ -1090,11 +1085,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           }),
           captioned(hkl, "(hkl)"),
           captioned(m, "offset m"),
-          removeButton(`Remove plane ${name()}`, () => {
-            planes = planes.filter((p) => p !== plane);
-            renderPlaneList();
-            rebuild();
-          }),
+          remove,
         );
         const family = chip(
           "Parallel planes",
@@ -1102,7 +1093,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           (v) => ((plane.family = v), rebuild()),
           "Planes at m + n (integer n) through the plotting range, spaced d",
         );
-        family.label.classList.add("parallel-planes");
+        family.label.className += " compact";
         family.input.dataset.field = "family";
         // Display size of this entry's faces (all family members): the
         // clipping box grows about the range centre; the plane equation,
@@ -1179,6 +1170,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
             const v = parseTriple(text, { label: "components" });
             if (v.every((x) => x === 0)) throw Error("Direction [uvw] must not be zero.");
             arrow.uvw = v;
+            setRemoveLabel(remove, `Remove arrow [${v.join(" ")}]`);
             input.value = v.join(" ");
           }),
         );
@@ -1188,6 +1180,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           commit(input, arrow, (text) => (arrow.origin = parseTriple(text, { label: "coordinates" }))),
         );
         origin.dataset.field = "origin";
+        enableTripletSelection(origin);
         const length = textField(fmt(arrow.length), "Length as a multiple of the direct-lattice vector [uvw]", "length", (input) =>
           commit(input, arrow, (text) => {
             const v = Number(text.replace(",", "."));
@@ -1198,6 +1191,11 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         length.dataset.field = "length";
         const show = chip("Show", arrow.visible, (v) => ((arrow.visible = v), rebuild()));
         show.input.dataset.field = "visible";
+        const remove = removeButton(`Remove arrow [${arrow.uvw.join(" ")}]`, () => {
+          arrows = arrows.filter((a) => a !== arrow);
+          renderArrowList();
+          rebuild();
+        });
         const top = make("div", { className: "tool-line" });
         top.append(
           show.label,
@@ -1208,17 +1206,19 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           }),
           captioned(uvw, "[uvw]"),
           captioned(length, "length ×"),
-          removeButton(`Remove arrow [${arrow.uvw.join(" ")}]`, () => {
-            arrows = arrows.filter((a) => a !== arrow);
-            renderArrowList();
-            rebuild();
-          }),
+          remove,
         );
         const readout = make("span", { className: "tool-readout" });
         readout.dataset.readout = "arrow";
         const bottom = make("div", { className: "tool-line" });
         bottom.append(captioned(origin, "origin x y z"), readout);
-        row.append(top, numericKeys(uvw, "[uvw]", true, { inputMode: "decimal" }), bottom);
+        row.append(
+          top,
+          numericKeys(uvw, "[uvw]", true, { inputMode: "decimal" }),
+          numericKeys(length, "Length"),
+          bottom,
+          numericKeys(origin, "Origin", true, { inputMode: "decimal" }),
+        );
         return row;
       }),
     );

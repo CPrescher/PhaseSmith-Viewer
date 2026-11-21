@@ -20,6 +20,9 @@ function setup(t) {
     get childElementCount() { return this.children.length; }
     setAttribute() {}
     addEventListener() {}
+    closest(selector) {
+      return selector === "label" ? this.parentLabel : null;
+    }
     querySelector(selector) {
       return this.children.find((c) => c.className === selector.split(".").at(-1)) ?? null;
     }
@@ -29,7 +32,11 @@ function setup(t) {
   const document = {
     documentElement: { dataset: { theme: "light" } },
     getElementById(id) {
-      if (!nodes.has(id)) nodes.set(id, new Element());
+      if (!nodes.has(id)) {
+        const field = new Element();
+        if (id === "plane-label-position") field.parentLabel = new Element();
+        nodes.set(id, field);
+      }
       return nodes.get(id);
     },
     createElement: () => new Element(),

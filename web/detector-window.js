@@ -1,3 +1,4 @@
+import { enableTripletSelection, numericKeys } from "./numeric-input.js";
 import { maxScatteringVector } from "./diffraction-engine.js";
 import { circularDetector, rectangularDetector, readPoni, calibratedDetector } from "./detector-geometry.js";
 import { formatMillerIndices, parseMillerIndices, matMul } from "./crystal-math.js";
@@ -26,6 +27,9 @@ const dragSnapPixels = 5;
 
 export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainView, getMainRotation }) {
   const $ = (id) => document.getElementById("detector-" + id);
+  enableTripletSelection($("hkl"));
+  const indexKeys = numericKeys($("hkl"), "(hkl)", true, { onDone: () => $("form").requestSubmit() });
+  $("form").append(indexKeys);
   const win = $("window"),
     opener = document.getElementById("mode-detector");
   const show = floatingDialog(win, opener, $("head"), close);
@@ -345,7 +349,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
           "The reciprocal point is on the sphere, but the structure factor cancels. No spot for this reflection.";
     }
     render(p);
-    if (message) $("hkl").value = hkl.join(" ");
+    $("hkl").value = hkl.join(" ");
   }
   function next(direction = 1, animate = false) {
     const event = model.next(animationGoal?.angle ?? rock, direction);

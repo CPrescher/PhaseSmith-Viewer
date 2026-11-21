@@ -50,7 +50,7 @@ export function floatingDialog(win, opener, handle, close) {
     const rail = document.getElementById("tool-rail");
     return {
       left: 8,
-      top: innerWidth >= 1000 && innerHeight > 600
+      top: innerHeight > 600
         ? document.querySelector("#app > header").getBoundingClientRect().bottom + 8 : 8,
       right: document.getElementById("app").dataset.launcher === "rail"
         ? rail.getBoundingClientRect().left - 8 : innerWidth - 8,
@@ -102,12 +102,13 @@ export function floatingDialog(win, opener, handle, close) {
   handle.onpointerdown = (event) => {
     if (drag || resize || !event.isPrimary || event.button !== 0 || event.target.closest("button")) return;
     const r = win.getBoundingClientRect();
-    drag = { x: event.clientX - r.left, y: event.clientY - r.top };
+    drag = { x: event.clientX - r.left, y: event.clientY - r.top, height: r.height };
     handle.setPointerCapture(event.pointerId);
     event.preventDefault();
   };
   handle.onpointermove = (event) => {
     if (!drag) return;
+    if (!win.dataset.userMoved) win.style.height = drag.height + "px";
     win.dataset.userMoved = "true";
     win.style.left = event.clientX - drag.x + "px";
     win.style.top = event.clientY - drag.y + "px";

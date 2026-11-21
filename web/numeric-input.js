@@ -17,6 +17,22 @@ if (typeof window !== "undefined") {
   window.addEventListener("blur", releaseMouse);
 }
 
+export function enableTripletSelection(input) {
+  let firstMouseClick = false;
+  let mousePress = false;
+  input.addEventListener("pointerdown", (event) => {
+    mousePress = event.pointerType === "mouse" && event.button === 0;
+    firstMouseClick = mousePress && document.activeElement !== input;
+  });
+  input.addEventListener("click", () => {
+    if (firstMouseClick && input.selectionStart === input.selectionEnd) input.select();
+    firstMouseClick = false;
+  });
+  input.addEventListener("dblclick", () => {
+    if (mousePress) input.select();
+  });
+}
+
 export function numericKeys(input, caption, withSpace = false, { inputMode, onDone } = {}) {
   input.inputMode = inputMode ?? (withSpace ? "numeric" : "decimal");
   input.setAttribute("autocorrect", "off");
@@ -72,7 +88,7 @@ export function numericKeys(input, caption, withSpace = false, { inputMode, onDo
     key("−", "Insert minus sign", () => edit(() => input.setRangeText("-", input.selectionStart, input.selectionEnd, "end")), "minus");
     key("Space", "Insert space between indices", () => edit(() => input.setRangeText(" ", input.selectionStart, input.selectionEnd, "end")), "space");
   } else {
-    key("±", "Toggle offset sign", () => edit(() => {
+    key("±", `Toggle sign for ${caption}`, () => edit(() => {
       const start = input.selectionStart, end = input.selectionEnd;
       const negative = input.value.startsWith("-");
       const signed = /^[+-]/.test(input.value);

@@ -21,9 +21,9 @@ import { createStructureInfo } from "./structure-info.js";
 import { formulaLabel } from "./structure-notation.js";
 import { siteShell } from "./site-shell.js";
 import { estimatePairCutoff } from "./pair-defaults.js";
-import { angleAt, hullVolume } from "./crystal-math.js";
+import { angleAt, hullVolume, parseTriple } from "./crystal-math.js";
 import { createLatticeTools } from "./lattice-tools.js";
-import { numericKeys } from "./numeric-input.js";
+import { enableTripletSelection, numericKeys } from "./numeric-input.js";
 import { createAxisCompass } from "./axis-compass.js";
 import { createThemeSwitch } from "./theme.js";
 import { createFullscreenSwitch } from "./fullscreen.js";
@@ -52,6 +52,30 @@ import {
 const $ = (id) => document.getElementById(id),
   viewport = $("viewport");
 createFullscreenSwitch({ button: $("fullscreen-toggle"), status: $("fullscreen-status") });
+// The project menu can open from the main header or a floating inspector.
+const fileMenu = $("file-menu");
+let fileMenuButton = $("file-menu-button");
+function positionFileMenu() {
+  const rect = fileMenuButton.getBoundingClientRect();
+  const below = innerHeight - rect.bottom - 14;
+  const above = rect.top - 14;
+  const opensAbove = below < 300 && above > below;
+  const right = Math.max(8, Math.min(innerWidth - rect.right, innerWidth - fileMenu.offsetWidth - 8));
+  fileMenu.style.setProperty("--menu-right", `${right}px`);
+  fileMenu.style.setProperty("--menu-top", opensAbove ? "auto" : `${rect.bottom + 6}px`);
+  fileMenu.style.setProperty("--menu-bottom", opensAbove ? `${innerHeight - rect.top + 6}px` : "auto");
+  fileMenu.style.setProperty("--menu-height", `${Math.max(0, opensAbove ? above : below)}px`);
+}
+document.addEventListener("click", event => {
+  const button = event.target.closest('[popovertarget="file-menu"]');
+  if (button) fileMenuButton = button;
+}, true);
+fileMenu.addEventListener("toggle", () => {
+  if (fileMenu.matches(":popover-open")) positionFileMenu();
+});
+window.addEventListener("resize", () => {
+  if (fileMenu.matches(":popover-open")) positionFileMenu();
+});
 // Safari also emits native gesture events over headers and modal dialogs.
 // Cancel browser magnification without intercepting the pointer events used
 // for crystal pinch/rotation, or one-finger scrolling in the controls.
@@ -1994,6 +2018,7 @@ function initialize() {
       // Translating the target and camera together keeps [uvw] exact.
       reset(true);
       setActiveView(viewId, dir);
+      if (viewId === "uvw") $("view-direction").value = indices.join(" ");
       $("direction-error").textContent = "";
       invalidate();
     } catch (error) {
@@ -2010,25 +2035,13 @@ function initialize() {
   setActiveView(null);
   $("direction-form").onsubmit = (event) => {
     event.preventDefault();
-    const text = $("view-direction")
-      .value.replace(/−/g, "-")
-      .replace(/[\[\](),]/g, " ")
-      .trim();
-    // Compact notation is restricted to three single-digit indices so a
-    // multi-digit component remains unambiguous when separated by spaces.
-    const fields = /^[+-]?\d[+-]?\d[+-]?\d$/.test(text)
-      ? text.match(/[+-]?\d/g)
-      : text.split(/\s+/);
-    if (
-      fields.length !== 3 ||
-      fields.some((value) => !Number.isFinite(Number(value)))
-    ) {
-      $("direction-error").textContent =
-        "Enter three finite components, such as 1 0 −1, or compact single-digit indices like [110] or [1-10].";
-      return;
+    try {
+      orient(parseTriple($("view-direction").value, { label: "components" }));
+    } catch (error) {
+      $("direction-error").textContent = error.message;
     }
-    orient(fields.map(Number));
   };
+  enableTripletSelection($("view-direction"));
   $("direction-form").insertBefore(
     numericKeys($("view-direction"), "[uvw]", true, {
       inputMode: "decimal",

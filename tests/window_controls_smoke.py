@@ -57,6 +57,13 @@ async def main():
    assert await page.locator('#name').evaluate('e=>e.scrollWidth<=e.clientWidth+1'), 'formula should fit before optional header text'
    if w==1440:
     await coordinate_click(page,'#fullscreen-toggle');await page.wait_for_function('!!document.fullscreenElement')
+    # Embedded desktop chrome can intercept native clicks above the web page.
+    for control in ['#structure-info-open','#fullscreen-toggle','#theme-toggle','#library-open','#open','#file-menu-button']:
+     assert (await page.locator(control).bounding_box())['y'] >= 70
+    await coordinate_click(page,'#file-menu-button');await page.locator('#file-menu').wait_for()
+    assert await hit(page.locator('#file-menu-button')) and await hit(page.locator('#project-save'))
+    await coordinate_click(page,'#file-menu-button')
+    assert not await page.locator('#file-menu').is_visible()
     await coordinate_click(page,'#theme-toggle');assert await page.locator('html').get_attribute('data-theme')=='dark'
     await coordinate_click(page,'#structure-info-open');assert await page.locator('#structure-info').is_visible();await page.locator('#structure-info-close').click()
     await coordinate_click(page,'#library-open');assert await page.locator('#structure-library').is_visible();await page.locator('#library-close').click()

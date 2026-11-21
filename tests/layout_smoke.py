@@ -83,13 +83,17 @@ async def check(browser, engine, width, height, touch, theme):
     tracked = ["#viewport", "canvas", launcher, WINDOW, "#measure-info", "#measure-distance", "#measure-angle", "#clear"]
 
     baseline = None
+    profile = await page.evaluate("viewerDiagnostics().windows.profile")
 
     def stationary(selector, current, original):
-        if phone and selector == WINDOW:
+        if selector == WINDOW and profile == "sheet":
             # Selection can grow the info card. Only the sheet's top edge
             # may move, keeping its bottom anchor and both side edges fixed.
             return same([current[0],current[2],current[1]+current[3]],
                         [original[0],original[2],original[1]+original[3]])
+        if selector == WINDOW:
+            # Floating and side panels fit their content from the top edge.
+            return same(current[:3], original[:3])
         return same(current, original)
 
     async def settle(action=""):
@@ -146,7 +150,10 @@ async def check(browser, engine, width, height, touch, theme):
     await press("#mode-pairs")
     await press("#view-c")
     assert await shown_tool() == "pairs", (where, "Pairs opens first")
-    if (await page.evaluate("viewerDiagnostics().windows.profile")) == "sheet":
+    if profile == "sheet":
+        # Frame the fixture above a populated sheet. An empty Pairs panel
+        # now fits its content and is shorter than the later three-plane list.
+        await press("#style-open")
         window = await page.locator(WINDOW).bounding_box()
         atom = next(a for a in (await page.evaluate("viewerDiagnostics()"))["atoms"] if a["label"] == "B")
         await page.locator(WINDOW + ' [data-action=close]').click()

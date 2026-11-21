@@ -175,8 +175,9 @@ async def check(browser,w,h,theme):
     assert await page.locator('#analysis-window').is_visible(), 'File dismisses before its underlying plot'
     await page.locator('#analysis-close').click()
     await choose_tool(page,'#mode-reflection')
-    if w==1440:
-        assert await hit(page.locator('#library-open')) and await hit(page.locator('#structure-info-open')), 'Reflection must leave the desktop header reachable'
+    if h > 600:
+        for control in ['#open', '#file-menu-button', '#library-open', '#structure-info-open']:
+            assert await hit(page.locator(control)), (w, h, 'Reflection covers the header', control)
     await page.locator('#reflection-hkl').fill('1 3 0')
     await page.locator('#reflection-hkl').press('Enter')
     compact=await page.locator('.reflection-mobile-tabs').is_visible()

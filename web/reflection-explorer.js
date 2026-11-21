@@ -1,3 +1,4 @@
+import { enableTripletSelection, numericKeys } from "./numeric-input.js";
 import * as THREE from "three";
 import { ViewControls } from "./view-controls.js";
 import { focusLauncher, floatingDialog, isFrontDialog } from "./floating-dialog.js";
@@ -96,6 +97,9 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
   const closeReflection = () => { dialog.close(); focusLauncher(opener); };
   const showReflection = floatingDialog(dialog, opener, dialog.querySelector(".reflection-head"), closeReflection);
   const $ = id => dialog.querySelector(`#${id}`), stage = $("reflection-stage");
+  enableTripletSelection($("reflection-hkl"));
+  const indexKeys = numericKeys($("reflection-hkl"), "(hkl)", true, { onDone: () => $("reflection-form").requestSubmit() });
+  $("reflection-form").querySelector('button[type="submit"]').after(indexKeys);
   dialog.dataset.view = "crystal";
   const compactLayout = matchMedia("(max-width: 900px), (max-height: 500px)");
   const reflectionOptions = dialog.querySelector(".reflection-options");
@@ -398,7 +402,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
   }
 
   function drawSum() {
-    const chart = $("reflection-phasors"), width = chart.clientWidth, height = 245;
+    const chart = $("reflection-phasors"), width = chart.clientWidth;
     if (!width) return;
     chart.replaceChildren();
     $("reflection-tag-note").hidden = true;
@@ -406,12 +410,13 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     $("reflection-sum-note").textContent = realOnly
       ? "All imaginary components are zero. Rows separate the arrows for visibility; vertical spacing has no phase meaning. Every arrow uses the same length scale."
       : "Arrow angle is phase. Arrow length includes all positions in the phase group. Sum amplitudes, then calculate |F|².";
-    chart.style.height = "245px";
+    chart.style.removeProperty("height");
     if (realOnly) {
       drawRealSum(chart, width);
       updateSumReadout(chart);
       return;
     }
+    const height = chart.clientHeight;
     // Keep one scale throughout the step-through calculation.
     let minX = 0, maxX = 0, minY = 0, maxY = 0;
     for (const contribution of result.groups) {
@@ -808,7 +813,9 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
   $("reflection-step-back").addEventListener("click", () => stepTo(count - 1));
   $("reflection-step-next").addEventListener("click", () => stepTo(count + 1));
   $("reflection-all").addEventListener("click", () => stepTo(result.groups.length));
-  new ResizeObserver(resize).observe(stage);
+  const layoutObserver = new ResizeObserver(resize);
+  layoutObserver.observe(stage);
+  layoutObserver.observe($("reflection-content"));
   function snapshot() {
     if (!result) return null;
     return {

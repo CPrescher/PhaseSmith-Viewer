@@ -74,6 +74,7 @@ async def check(browser, width, height, theme):
         await page.mouse.move(head["x"] + 200, head["y"] + 52, steps=6)
         await page.mouse.up()
         moved = await page.locator("#analysis-window").bounding_box()
+        assert abs(moved["height"] - box["height"]) < 2, "dragging the plot should preserve its height"
         assert abs(moved["x"] - box["x"] - 60) < 2 and abs(moved["y"] - box["y"] - 30) < 2
     if await page.locator("#analysis-settings").get_attribute("open") is None:
         await page.locator("#analysis-settings > summary").click()
