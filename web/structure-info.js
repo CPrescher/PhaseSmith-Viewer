@@ -1,9 +1,11 @@
+import { formatSpaceGroup, formulaLabel } from "./structure-notation.js";
+
 const symmetrySources = {
   explicit_operations: "Operations listed in the CIF",
   hermann_mauguin: "Hermann–Mauguin symbol",
   hall: "Hall symbol",
   international_number: "International Tables number",
-  assumed_p1: "P 1 assumed during import",
+  assumed_p1: "P1 assumed during import",
 };
 
 function rows(id, entries) {
@@ -34,15 +36,20 @@ export function createStructureInfo() {
 
   return (structure, name, filename, reference) => {
     const meta = structure.metadata;
+    const formula = meta.chemical_formula_sum || meta.chemical_formula_structural;
+    const formulaTitle = !reference && (name === formula || name === meta.chemical_formula_structural);
+    for (const id of ["name", "info-name"]) {
+      $(id).replaceChildren(formulaTitle ? formulaLabel(name) : name);
+    }
     const assumed = meta.symmetry_source === "assumed_p1";
-    const symbol = assumed ? "P 1 (assumed)" : meta.space_group_hm || structure.matchedGroup?.symbol;
+    const symbol = assumed ? "P 1" : meta.space_group_hm || structure.matchedGroup?.symbol;
     const number = meta.space_group_number || structure.matchedGroup?.number;
     const operations = structure.symmetryOperations.length;
-    const group = symbol || (number ? `No. ${number}` : meta.space_group_hall || `${operations} sym. op.`);
+    const formattedSymbol = symbol && formatSpaceGroup(symbol, structure.matchedGroup?.symbol) + (assumed ? " (assumed)" : "");
+    const group = formattedSymbol || (number ? `No. ${number}` : meta.space_group_hall || `${operations} sym. op.`);
     $("space-group-symbol").textContent = group;
-    button.setAttribute("aria-label", `Structure info for ${name}, ${group}`);
+    button.setAttribute("aria-label", `Structure info for ${$("name").textContent}, ${group}`);
     button.disabled = false;
-    $("info-name").textContent = name;
     const parameters = ["a", "b", "c", "α", "β", "γ"].map((label, i) => {
       const uncertainty = structure.cellUncertainties[i];
       const unit = i < 3 ? " Å" : "°";
@@ -51,13 +58,13 @@ export function createStructureInfo() {
     });
     rows("info-cell", [...parameters, ["Volume", structure.volume.toFixed(3) + " Å³"]]);
     rows("info-symmetry", [
-      ["Space group", symbol || (number || meta.space_group_hall ? null : "Symbol not reported")],
+      ["Space group", formattedSymbol || (number || meta.space_group_hall ? null : "Symbol not reported")],
       ["International Tables No.", number],
       ["Hall symbol", meta.space_group_hall],
       ["Crystal system", structure.crystalSystem],
       ["Symmetry taken from", symmetrySources[meta.symmetry_source]],
       ["Symmetry operations", operations],
-      ["Formula in CIF", meta.chemical_formula_sum || meta.chemical_formula_structural],
+      ["Formula in CIF", formula && formulaLabel(formula)],
       ["Formula units per cell (Z)", meta.formula_units_per_cell],
       ["Independent sites", structure.independentSites.length],
       ["Positions in unit cell", structure.atoms.length],

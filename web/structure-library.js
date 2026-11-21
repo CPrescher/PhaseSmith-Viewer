@@ -1,4 +1,5 @@
 import entries from './structure-library.json' with { type: 'json' };
+import { formatSpaceGroup, formulaLabel } from './structure-notation.js';
 
 export const structureLibrary = entries;
 export const libraryEntry = (id) => entries.find((entry) => entry.id === id);
@@ -10,7 +11,7 @@ export function searchLibrary(query = '', collection = '') {
   const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
   return entries.filter((entry) => (!collection || entry.collections.includes(collection)) &&
     terms.every((term) => normalize([
-      entry.name, entry.formula, entry.family, entry.description, entry.spaceGroup,
+      entry.name, entry.formula, entry.family, entry.description, entry.spaceGroup, formatSpaceGroup(entry.spaceGroup),
       ...entry.aliases, entry.source.label,
     ].join(' ')).includes(term)));
 }
@@ -37,13 +38,15 @@ export function createStructureLibrary({ onSelect, isBusy }) {
       button.type = 'button';
       button.dataset.structure = entry.id;
       button.setAttribute('aria-label', `Open ${entry.name}`);
-      button.append(el('strong', '', entry.name), el('span', 'library-formula', entry.formula));
+      const formula = el('span', 'library-formula');
+      formula.append(formulaLabel(entry.formula));
+      button.append(el('strong', '', entry.name), formula);
       button.onclick = () => {
         if (isBusy()) return;
         dialog.close();
         onSelect(entry);
       };
-      card.append(button, el('p', 'library-meta', `${entry.family} · ${entry.spaceGroup}`),
+      card.append(button, el('p', 'library-meta', `${entry.family} · ${formatSpaceGroup(entry.spaceGroup)}`),
         el('p', 'library-description', entry.description));
       const details = el('details', 'library-reference');
       details.append(el('summary', '', `${entry.kind} · ${entry.source.label}`));
