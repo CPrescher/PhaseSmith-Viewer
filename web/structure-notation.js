@@ -10,15 +10,12 @@ export function formatSpaceGroup(symbol, matchedSymbol) {
   if (matchedSymbol && reported === matchedSymbol.replace(/\s/g, "")) {
     axes = matchedSymbol;
   }
-  const formatted = axes
+  const compact = axes
     .replace(/[-−]([1346])/g, (_, axis) => formatMillerIndices([-Number(axis)]))
     .replace(/(?<![\d\u0305])(2_?1|3_?[12]|4_?[123]|6_?[1-5])(?=[\s/a-z]|$)/g, screw =>
       screw[0] + subscripts[screw.at(-1)])
-    // Keep neighboring numeric directions distinct, as in P3₂ 2 1.
-    .split(/(?<=[0-9₀-₉\u0305])\s+(?=[0-9])/)
-    .map(part => part.replace(/\s+/g, ""))
-    .join(" ");
-  return setting ? `${formatted}:${setting}` : formatted;
+    .replace(/\s+/g, "");
+  return setting ? `${compact}:${setting}` : compact;
 }
 
 // Preserve the reported composition, including fractional occupancies and
