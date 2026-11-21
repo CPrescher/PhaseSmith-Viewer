@@ -67,6 +67,7 @@ async def check(browser, w, h):
         )
     await plane.locator('[data-field="family"]').uncheck()
     await change(plane.locator('[data-field="m"]'), 1)
+    await choose_tool(page, "#mode-directions")
     await page.locator("#arrow-add").tap()
     arrow = page.locator("[data-arrow-id]").first
     await change(arrow.locator('[data-field="uvw"]'), "1 0 0")
@@ -85,6 +86,7 @@ async def check(browser, w, h):
         for a, b in zip(overlay["arrows"][0]["endFrac"], [1.2, 0.2, 0.2])
     )
     assert math.isclose(overlay["arrows"][0]["lengthAngstrom"], 4.749)
+    await choose_tool(page, "#mode-symmetry")
     await page.locator("#sym-toggle").check()
     await settle(page)
     symmetry = (await diagnostics(page))["lattice"]["symmetry"]

@@ -44,7 +44,11 @@ async def choose_tool(page, button, touch=None):
         return
     if not await target.is_visible():
         menu = page.locator("#tools-menu")
-        await (menu.tap() if touch else menu.click())
+        if await menu.is_visible() and not await page.locator("#tool-rail").is_visible():
+            await (menu.tap() if touch else menu.click())
+        group = page.locator("#overlay-menu")
+        if not await target.is_visible() and await group.is_visible():
+            await (group.tap() if touch else group.click())
         await target.wait_for(state="visible")
     await (target.tap() if touch else target.click())
     await settle(page)

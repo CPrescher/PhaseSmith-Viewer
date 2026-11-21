@@ -20,7 +20,7 @@ async def check(browser,w,h,theme):
     await page.goto(URL+'/?example=forsterite')
     await page.wait_for_function('window.viewerDiagnostics?.().coordination.polyhedronCount===12')
     initial=await diagnostics(page)
-    assert await page.locator('#tool-rail [role=group]').count()==4
+    assert await page.locator('#tool-rail > [role=group]').count()==4
     assert await page.locator('#tool-window-export #project-save, #tool-window-export #session-save').count()==0
     await page.locator('#file-menu-button').click()
     assert await hit(page.locator('#project-save'))
@@ -186,7 +186,7 @@ async def check(browser,w,h,theme):
               const win=document.getElementById(id);
               return win.open && [...document.querySelectorAll('dialog[open]')].every(other=>other===win || Number(getComputedStyle(other).zIndex)<Number(getComputedStyle(win).zIndex));
             }''',expected), 'selected science window must come to the front'
-            for button in await page.locator('#tool-rail button').all():
+            for button in await page.locator('#tool-rail button:visible').all():
                 assert await hit(button), (w,h,selector,'covered rail action',await button.get_attribute('id'))
         await page.locator('#mode-sites').click()
         assert await hit(page.locator('#site-table tbody tr').first), 'settings must be reachable after science tools'

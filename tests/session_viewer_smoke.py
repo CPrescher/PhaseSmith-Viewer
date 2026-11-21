@@ -1,4 +1,4 @@
-from smoke import reveal_control
+from smoke import choose_tool, reveal_control
 """Full viewer settings and ordered measurements survive an actual browser restart."""
 
 import asyncio
@@ -107,7 +107,7 @@ async def run(profile):
         await page.locator("#mode-extent").click()
         await page.locator("#range-c-max").fill("2")
         await page.locator("#range-c-max").press("Enter")
-        await page.locator("#mode-lattice").click()
+        await choose_tool(page, "#mode-lattice")
         await page.locator("#plane-add").click()
         row = page.locator("[data-plane-id]").first
         await change(row.locator("[data-field=hkl]"), "1 1 0")
@@ -116,10 +116,12 @@ async def run(profile):
         await row.locator("[data-field=opacity]").press("End")
         await page.locator("#lattice-label-offsets").uncheck()
         await page.locator("#plane-label-position").select_option("edge")
+        await choose_tool(page, "#mode-directions")
         await page.locator("#arrow-add").click()
         arrow = page.locator("[data-arrow-id]").first
         await change(arrow.locator("[data-field=uvw]"), "1 1 0")
         await change(arrow.locator("[data-field=origin]"), ".2 .3 .4")
+        await choose_tool(page, "#mode-symmetry")
         await page.locator("#sym-toggle").check()
         await page.locator("#mode-sites").click()
         await page.locator("#labels-toggle").check()

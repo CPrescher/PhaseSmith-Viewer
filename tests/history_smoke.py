@@ -83,6 +83,7 @@ async def check(browser, phone):
     await roundtrip(before, await state(page))
     assert not await page.locator("#lattice-label-offsets").is_checked()
     before = await state(page)
+    await choose_tool(page, "#mode-symmetry")
     await press("#sym-toggle")
     await roundtrip(before, await state(page))
     before = await state(page)

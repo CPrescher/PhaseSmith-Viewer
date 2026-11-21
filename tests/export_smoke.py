@@ -7,7 +7,7 @@ import struct
 import zlib
 from pathlib import Path
 from playwright.async_api import async_playwright
-from smoke import URL, diagnostics, settle
+from smoke import choose_tool, URL, diagnostics, settle
 
 
 def png_dpi(data):
@@ -40,8 +40,9 @@ async def check(browser):
     await page.wait_for_function(
         "window.viewerDiagnostics?.().coordination.polyhedronCount===12"
     )
-    await page.locator("#mode-lattice").tap()
+    await choose_tool(page, "#mode-lattice", True)
     await page.locator("#plane-add").tap()
+    await choose_tool(page, "#mode-directions")
     await page.locator("#arrow-add").tap()
     await page.locator("#mode-sites").tap()
     await page.locator("#labels-toggle").check()

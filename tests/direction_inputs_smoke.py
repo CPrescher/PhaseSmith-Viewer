@@ -52,7 +52,7 @@ async def check(browser, width, height, touch=True):
     assert not await page.locator("#direction-error").inner_text()
     await activate(page.locator('.view-directions summary'))
 
-    await choose_tool(page, "#mode-lattice", touch)
+    await choose_tool(page, "#mode-directions", touch)
     await activate(page.locator("#arrow-add"))
     row = page.locator("[data-arrow-id]").first
     field = row.locator('[data-field="uvw"]')

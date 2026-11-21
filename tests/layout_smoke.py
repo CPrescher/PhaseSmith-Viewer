@@ -21,6 +21,7 @@ import os
 from playwright.async_api import async_playwright
 from browser_test_config import QUICK
 from phone_measure_smoke import CIF
+from smoke import choose_tool
 
 URL = os.environ.get("VIEWER_URL", "http://127.0.0.1:4179").rstrip("/")
 SIZES = [(390, 844, True), (768, 1024, True), (700, 900, False), (1440, 900, False)]
@@ -102,13 +103,10 @@ async def check(browser, engine, width, height, touch, theme):
     async def press(selector):
         locator = page.locator(selector).first
         launcher_button = selector.startswith("#mode-") or selector == "#style-open"
-        if launcher_button and await locator.get_attribute("aria-pressed") == "true":
-            return
-        if launcher_button and not await locator.is_visible():  # phone: Tools menu
-            menu = page.locator("#tools-menu")
-            await (menu.tap() if touch else menu.click())
-            await locator.wait_for(state="visible")
-        await (locator.tap() if touch else locator.click())
+        if launcher_button:
+            await choose_tool(page, selector, touch)
+        else:
+            await (locator.tap() if touch else locator.click())
         await settle(selector)
         assert await page.evaluate(NO_PAGE_SCROLL), (where, "page scrolled", selector)
 
@@ -210,10 +208,12 @@ async def check(browser, engine, width, height, touch, theme):
     hkl = page.locator("[data-plane-id] [data-field=hkl]").last
     await hkl.fill("1 1 0")
     await hkl.press("Tab")
+    await choose_tool(page, "#mode-directions")
     await press("#arrow-add")
     uvw = page.locator("[data-arrow-id] [data-field=uvw]").last
     await uvw.fill("1 1 0")
     await uvw.press("Tab")
+    await choose_tool(page, "#mode-lattice")
 
     # Genuine scrolling inside the tool window; the window outline stays.
     await scroll_window(400)

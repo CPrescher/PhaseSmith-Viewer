@@ -212,7 +212,9 @@ async def check(browser, width, height, theme):
     # m=0 can be included or omitted explicitly, not implicitly suppressed.
     await change(hkl, "1 -1 0")
     await change(offset, 0)
+    await choose_tool(page, "#mode-directions")
     await activate(page.locator("#arrow-add"))
+    await choose_tool(page, "#mode-lattice")
     before = await state()
     assert any("m=0" in text for text in before["labels"]["anchors"])
     arrows = [text for text in before["labels"]["anchors"] if text.startswith("[")]

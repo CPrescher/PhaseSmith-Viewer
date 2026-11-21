@@ -370,7 +370,7 @@
           aria-label="Tools"
           aria-expanded="false"
           aria-controls="tool-rail"
-          title="Tools: Bonds &amp; polyhedra, Sites, Lattice, Extent, Distances, Powder, Reflection, Detector, Style, Export, Help"
+          title="Tools: Bonds &amp; polyhedra, Sites, Planes, Directions, Symmetry, Extent, Distances, Powder, Reflection, Detector, Style, Export, Help"
         >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg><span class="tools-menu-label">Tools</span>
         </button>
@@ -382,9 +382,20 @@
               <button id="mode-sites" type="button" class="rail-button" data-tool="sites" aria-pressed="false" title="Sites: CIF sites, labels, CN and polyhedron volumes">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M4 14h16M10 9v11"/></svg><span class="rail-label">Sites</span><span class="rail-hint" aria-hidden="true">CIF sites, labels, CN and polyhedron volumes</span>
             </button>
-              <button id="mode-lattice" type="button" class="rail-button" data-tool="lattice" aria-pressed="false" title="Lattice: planes (hkl), directions [uvw] and symmetry elements">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16 10 6h10l-6 10H4Z"/><path d="M7 11h10M9 16l6-10"/></svg><span class="rail-label">Lattice</span><span class="rail-hint" aria-hidden="true">planes (hkl), directions [uvw] and symmetry elements</span>
+              <button id="overlay-menu" type="button" class="rail-button" aria-controls="overlay-choices" hidden aria-expanded="false" title="Planes, directions and symmetry">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-5 9 5-9 5zM3 14l9 5 9-5"/></svg><span class="rail-label">Overlays ›</span><span class="rail-hint" aria-hidden="true">Planes, directions and symmetry</span>
             </button>
+              <div id="overlay-choices" role="group" aria-label="Crystal overlays">
+              <button id="mode-lattice" type="button" class="rail-button" data-tool="lattice" data-overlay aria-pressed="false" title="Lattice planes (hkl)">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16 10 6h10l-6 10H4Z"/><path d="M7 11h10M9 16l6-10"/></svg><span class="rail-label">Planes</span><span class="rail-hint" aria-hidden="true">Lattice planes (hkl)</span>
+            </button>
+              <button id="mode-directions" type="button" class="rail-button" data-tool="directions" data-overlay aria-pressed="false" title="Direction arrows [uvw]">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20 20 4M11 4h9v9"/></svg><span class="rail-label">Directions</span><span class="rail-hint" aria-hidden="true">Direction arrows [uvw]</span>
+            </button>
+              <button id="mode-symmetry" type="button" class="rail-button" data-tool="symmetry" data-overlay aria-pressed="false" title="Axes, planes and inversion centers">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20" stroke-dasharray="3 2"/><path d="m3 16 6-10v10zm18 0L15 6v10z"/></svg><span class="rail-label">Symmetry</span><span class="rail-hint" aria-hidden="true">Axes, planes and inversion centers</span>
+            </button>
+              </div>
               <button id="mode-extent" type="button" class="rail-button" data-tool="extent" aria-pressed="false" title="Extent: plotting range, cell edges and boundary atoms">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg><span class="rail-label">Extent</span><span class="rail-hint" aria-hidden="true">plotting range, cell edges and boundary atoms</span>
             </button>
@@ -584,8 +595,15 @@
                     >
                   </div>
                   <div id="plane-list" class="tool-list"></div>
+                </section>
+              </div>
+            </section>
+            <section id="tool-window-directions" class="tool-window" data-tool="directions" hidden>
+              <div class="tool-window-body">
+                <section class="lattice-panel" aria-labelledby="arrow-title">
                   <div class="section-title">
                     <h2 id="arrow-title">Directions <span class="scientific-notation">[uvw]</span></h2>
+                    <label class="chip small" title="Labels on drawn planes and direction arrows"><input id="direction-labels-toggle" type="checkbox" checked aria-label="Plane and direction labels"><span>Labels</span></label>
                     <button
                       id="arrow-add"
                       class="text-button"
@@ -595,6 +613,12 @@
                     </button>
                   </div>
                   <div id="arrow-list" class="tool-list"></div>
+                </section>
+              </div>
+            </section>
+            <section id="tool-window-symmetry" class="tool-window" data-tool="symmetry" hidden>
+              <div class="tool-window-body">
+                <section class="lattice-panel" aria-labelledby="sym-title">
                   <div class="section-title">
                     <h2 id="sym-title">Symmetry</h2>
                     <label

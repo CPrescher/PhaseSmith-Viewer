@@ -53,7 +53,9 @@ async def check(browser, theme, mode):
     if mode == "lattice":
         await choose_tool(page, "#mode-lattice", True)
         await page.locator("#plane-add").tap()
+        await choose_tool(page, "#mode-directions")
         await page.locator("#arrow-add").tap()
+        await choose_tool(page, "#mode-lattice")
     elif mode == "style":
         await choose_tool(page, "#style-open", True)
     else:

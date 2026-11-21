@@ -23,7 +23,7 @@ async def main():
   b=await p.chromium.launch(channel='chrome')
   for w,h in [(1440,900),(1280,720),(1024,768)]:
    page=await b.new_page(viewport={'width':w,'height':h});await page.goto(URL+'/?example=forsterite');await page.wait_for_function('window.viewerDiagnostics?.().atoms.length>0')
-   for e in await page.locator('#tool-rail .rail-button').all():assert await hit(e),await e.get_attribute('id')
+   for e in await page.locator('#tool-rail .rail-button:visible').all():assert await hit(e),await e.get_attribute('id')
    assert await page.locator('#tool-rail').evaluate('e=>e.scrollHeight<=e.clientHeight+1'), 'Laptop rail must show every label without scrolling'
    assert await page.locator('#name').evaluate('e=>e.scrollWidth<=e.clientWidth+1'), 'formula should fit before optional header text'
    if w==1440:
@@ -36,7 +36,7 @@ async def main():
     else:
      await coordinate_click(page,'#fullscreen-toggle');await page.wait_for_function('!!document.fullscreenElement');await coordinate_click(page,'#fullscreen-toggle');await page.wait_for_function('!document.fullscreenElement')
     async with page.expect_file_chooser():await coordinate_click(page,'#open')
-    for tool in ['pairs','sites','lattice','extent','export','style']:
+    for tool in ['pairs','sites','lattice','directions','symmetry','extent','export','style']:
      await choose_tool(page,'#style-open' if tool=='style' else '#mode-'+tool)
      await resize_left(page,'#tool-window-'+tool,'#tool-window-'+tool+' .window-grip-left')
      # Each test starts at the default rectangle, through the documented reset.
@@ -45,8 +45,13 @@ async def main():
      box=await panel.bounding_box();grip=await panel.locator('.window-grip:not(.window-grip-left)').bounding_box()
      await page.mouse.move(grip['x']+grip['width']-4,grip['y']+grip['height']-4);await page.mouse.down()
      await page.mouse.move(grip['x']+grip['width']-4,box['y']+180,steps=8);await page.mouse.up()
-     await panel.locator('[data-action=compact]').click()
-     assert (await panel.bounding_box())['height'] <= (await panel.locator('.tool-window-head').bounding_box())['height']+3
+     compact=panel.locator('[data-action=compact]')
+     fold=(await compact.get_attribute('aria-label')).startswith('Fold')
+     full_height=(await panel.bounding_box())['height']
+     await compact.click()
+     compact_height=(await panel.bounding_box())['height']
+     if fold:assert compact_height <= (await panel.locator('.tool-window-head').bounding_box())['height']+3
+     else:assert compact_height < full_height
      assert await hit(panel.locator('[data-action=close]')), 'Folded panel grips must not cover Close'
      await panel.locator('[data-action=close]').click();assert not await panel.is_visible()
      await choose_tool(page,'#style-open' if tool=='style' else '#mode-'+tool)
@@ -59,7 +64,7 @@ async def main():
      await page.mouse.move(grip['x']+grip['width']-4,grip['y']+4);await page.mouse.down()
      await page.mouse.move(w-1,grip['y']+4,steps=8);await page.mouse.up()
      assert await hit(panel.locator('[data-action=close]')), 'The launcher must not cover Close after right resize'
-     for button in await page.locator('#tool-rail .rail-button').all():assert await hit(button)
+     for button in await page.locator('#tool-rail .rail-button:visible').all():assert await hit(button)
      await panel.locator('.tool-window-title').dblclick()
      # Drag high enough that Close overlaps the fixed measurement toolbar.
      head=await panel.locator('.tool-window-title').bounding_box()

@@ -82,9 +82,9 @@ Download the [ideal rock-salt CIF](https://cprescher.github.io/PhaseSmith-Viewer
 
 ### 2. Display the (111) family
 
-Choose **Lattice** on the tool rail (on a phone, **Tools → Lattice**), then **＋ Plane**. Enter `1 1 1` in **h k l**, set the offset **m = 0**, and enable **Parallel planes**. Press **Enter** after editing a field. Keep the oblique view so you can see the separation between planes.
+Choose **Planes** in the launcher (under **Overlays** if space is tight), then **＋ Plane**. Enter `1 1 1` in **h k l**, set the offset **m = 0**, and enable **Parallel planes**. Press **Enter** after editing a field. Keep the oblique view so you can see the separation between planes.
 
-<ViewerFigure name="tutorial-planes-111" alt="Rock salt with the parallel 111 planes enabled at offset zero and a spacing of approximately 3.256 angstroms." caption="Parallel (111) sheets cross the cubic cell. With m = 0, one plane passes through the origin. The Lattice card reports d ≈ 3.256 Å." />
+<ViewerFigure name="tutorial-planes-111" alt="Rock salt with the parallel 111 planes enabled at offset zero and a spacing of approximately 3.256 angstroms." caption="Parallel (111) sheets cross the cubic cell. With m = 0, one plane passes through the origin. The Planes panel reports d ≈ 3.256 Å." />
 
 ### 3. Change to (222) and compare
 

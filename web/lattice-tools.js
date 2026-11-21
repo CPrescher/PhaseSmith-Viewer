@@ -897,6 +897,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
   // while labels are off.
   function syncLabelOptions() {
     const offsets = $("lattice-label-offsets");
+    $("direction-labels-toggle").checked = $("lattice-labels-toggle").checked = labelsOn;
     offsets.checked = labelOffsets;
     offsets.disabled = !labelsOn;
     const position = $("plane-label-position");
@@ -909,8 +910,8 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     labelPosition = ["outside", "edge", "center"].includes(value) ? value : "outside";
     invalidate();
   };
-  $("lattice-labels-toggle").onchange = () => {
-    labelsOn = $("lattice-labels-toggle").checked;
+  $("direction-labels-toggle").onchange = $("lattice-labels-toggle").onchange = (event) => {
+    labelsOn = event.target.checked;
     syncLabelOptions();
     collectLabelAnchors();
     invalidate();

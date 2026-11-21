@@ -4,7 +4,9 @@
 export const TOOLS = [
   { id: "pairs", label: "Bonds & polyhedra", title: "Bonds & polyhedra", button: "mode-pairs", hint: "Bonds and polyhedra: cutoffs and face opacity" },
   { id: "style", label: "Style", title: "Style", button: "style-open", hint: "Appearance: colors and sizes of elements, pairs and single copies" },
-  { id: "lattice", label: "Lattice", title: "Lattice", button: "mode-lattice", hint: "Lattice: planes (hkl), directions [uvw] and symmetry elements" },
+  { id: "lattice", label: "Planes", title: "Planes", button: "mode-lattice", hint: "Lattice planes (hkl)" },
+  { id: "directions", label: "Directions", title: "Directions", button: "mode-directions", hint: "Direction arrows [uvw]" },
+  { id: "symmetry", label: "Symmetry", title: "Symmetry", button: "mode-symmetry", hint: "Axes, planes and inversion centers" },
   { id: "sites", label: "Sites", title: "Sites & volumes", button: "mode-sites", hint: "Sites: CIF sites, labels, CN and polyhedron volumes" },
   { id: "extent", label: "Extent", title: "Extent", button: "mode-extent", hint: "Extent: plotting range, cell edges and boundary atoms" },
   { id: "export", label: "Export", title: "Export", button: "mode-export", hint: "Export: PNG images and turntable movies" },
@@ -324,24 +326,56 @@ export function createToolWindows(options) {
     body.addEventListener("focusin", track);
   }
 
+  const overlayButton = document.getElementById("overlay-menu");
+  const overlayLabel = overlayButton.querySelector(".rail-label");
+  function setOverlayMenu(open) {
+    if (open && !rail.classList.contains("overlay-submenu")) {
+      rail.style.setProperty("--overlay-menu-height", rail.getBoundingClientRect().height + "px");
+    }
+    rail.classList.toggle("overlay-submenu", open);
+    overlayButton.setAttribute("aria-expanded", String(open));
+    overlayLabel.textContent = open ? "‹ Back" : "Overlays ›";
+    overlayButton.title = open ? "Back to tools" : "Planes, directions and symmetry";
+  }
+  function fitOverlayChoices() {
+    if (!rail.clientHeight) return;
+    const wasOpen = rail.classList.contains("overlay-submenu");
+    rail.classList.remove("group-overlays", "overlay-submenu");
+    overlayButton.hidden = true;
+    const group = rail.scrollHeight > rail.clientHeight + 1;
+    rail.classList.toggle("group-overlays", group);
+    overlayButton.hidden = !group;
+    setOverlayMenu(group && wasOpen);
+  }
+  overlayButton.onclick = () => {
+    const open = !rail.classList.contains("overlay-submenu");
+    setOverlayMenu(open);
+    (open ? rail.querySelector("[data-overlay]") : overlayButton).focus();
+  };
   // Launcher buttons.
   for (const tool of TOOLS) {
     const b = document.getElementById(tool.button);
     b.setAttribute("aria-controls", `tool-window-${tool.id}`);
     b.onclick = (e) => {
+      const fromSubmenu = rail.classList.contains("overlay-submenu");
+      setOverlayMenu(false);
       closeMenu();
       const closing = state.main === tool.id;
       commit(toggleTool(state, tool.id));
       if (closing && launcher === "menu") menuButton?.focus({ preventScroll: true });
-      else if (!closing && (e.detail === 0 || launcher === "menu")) windows.get(tool.id)?.title.focus({ preventScroll: true });
+      else if (closing && fromSubmenu) overlayButton.focus({ preventScroll: true });
+      else if (!closing && (e.detail === 0 || launcher === "menu" || fromSubmenu)) windows.get(tool.id)?.title.focus({ preventScroll: true });
     };
   }
   // Phone menu.
   function setMenu(open) {
     rail.classList.toggle("menu-open", open);
     menuButton?.setAttribute("aria-expanded", String(open));
+    setOverlayMenu(false);
     if (open) {
-      const target = rail.querySelector('[aria-pressed="true"]') ?? rail.querySelector("button");
+      fitOverlayChoices();
+      const choices = [...rail.querySelectorAll("button")].filter(b => b.getClientRects().length);
+      const target = choices.find(b => b.getAttribute("aria-pressed") === "true") ?? choices[0];
       rail.scrollTop = 0;
       target?.focus({ preventScroll: true });
       target?.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -352,14 +386,17 @@ export function createToolWindows(options) {
   }
   // Independent science-window launchers also dismiss the phone list.
   rail.addEventListener("click", (event) => {
+    if (event.target.closest("button, a[href]") === overlayButton) return;
+    setOverlayMenu(false);
     if (event.target.closest("button, a[href]")) closeMenu();
   });
   menuButton?.addEventListener("click", () => setMenu(!rail.classList.contains("menu-open")));
   document.addEventListener(
     "pointerdown",
     (e) => {
-      if (!rail.classList.contains("menu-open")) return;
       if (rail.contains(e.target) || menuButton?.contains(e.target)) return;
+      if (rail.classList.contains("overlay-submenu")) setOverlayMenu(false);
+      if (!rail.classList.contains("menu-open")) return;
       setMenu(false);
     },
     true,
@@ -374,7 +411,11 @@ export function createToolWindows(options) {
       choices[next]?.scrollIntoView({ block: "nearest", inline: "nearest" });
       return;
     }
-    if (e.key === "Escape" && rail.classList.contains("menu-open")) {
+    if (e.key === "Escape" && rail.classList.contains("overlay-submenu")) {
+      e.preventDefault();
+      setOverlayMenu(false);
+      overlayButton.focus();
+    } else if (e.key === "Escape" && rail.classList.contains("menu-open")) {
       e.preventDefault();
       setMenu(false);
       menuButton?.focus({ preventScroll: true });
@@ -392,7 +433,7 @@ export function createToolWindows(options) {
     commit(closeTool(state, tool));
     if (refocus) {
       const b = launcher === "rail" ? document.getElementById(TOOLS.find((t) => t.id === tool).button) : menuButton;
-      b?.focus({ preventScroll: true });
+      (b?.getClientRects().length ? b : overlayButton)?.focus({ preventScroll: true });
     }
   }
   function currentRect(tool) {
@@ -539,11 +580,13 @@ export function createToolWindows(options) {
       const available = Math.max(80, ws.height - top - bottom);
       rail.classList.toggle("rail-dense", available < 680);
       rail.style.maxHeight = `${available}px`;
+      fitOverlayChoices();
       const height = rail.getBoundingClientRect().height;
       rail.style.top = `${Math.max(top, Math.min((ws.height - height) / 2, ws.height - bottom - height))}px`;
     } else {
       rail.style.removeProperty("top");
       rail.style.removeProperty("max-height");
+      fitOverlayChoices();
     }
   }
   function naturalHeight(win) {

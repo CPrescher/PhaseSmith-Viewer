@@ -46,7 +46,7 @@ Tap **Tools** to reveal the labeled menu shown below, then choose the tool. Its 
 | --- | --- | --- |
 | **Bonds & polyhedra** | Bonds, coordination cutoffs and polyhedra | [Bonds and polyhedra](./coordination.md) |
 | **Sites** | CIF sites, labels, coordination numbers and volumes | [Measurements and sites](./measurements.md#site-labels-and-polyhedron-volumes) |
-| **Lattice** | Planes, arrows and symmetry overlays | [Planes and directions](./lattice.md) |
+| **Planes**, **Directions**, **Symmetry** (under **Overlays** when space is tight) | Planes, arrows and symmetry overlays | [Planes and directions](./lattice.md) |
 | **Extent** | Displayed fractional-coordinate range | [Plotting extent](./navigation.md#plotting-extent) |
 | **Distances** | Periodic interatomic distance distribution | [Pair distances](./plots.md#pair-distances) |
 | **Powder** | Calculated powder diffraction and measured traces | [Powder diffraction](./plots.md#powder-diffraction-x-ray) |

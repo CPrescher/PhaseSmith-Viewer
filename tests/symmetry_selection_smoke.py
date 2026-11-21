@@ -16,7 +16,7 @@ async def check(browser, width, height):
     page.on("pageerror", lambda error: errors.append(str(error)))
     await page.goto(URL + "/?structure=almandine")
     await page.wait_for_function("window.viewerDiagnostics?.().atoms.length > 0")
-    await choose_tool(page, "#mode-lattice")
+    await choose_tool(page, "#mode-symmetry")
     await page.locator("#sym-toggle").check()
     await page.locator("#sym-axes-only").click()
     await page.locator("#sym-types-none").click()
@@ -54,7 +54,7 @@ async def check(browser, width, height):
     restored = (await diagnostics(page))["lattice"]["symmetry"]
     assert len(restored["visibleElements"]) == 7
     assert restored["hiddenTypes"] == space["hiddenTypes"]
-    await choose_tool(page, "#mode-lattice")
+    await choose_tool(page, "#mode-symmetry")
     assert len((await diagnostics(page))["lattice"]["symmetry"]["visibleElements"]) == 7
     await page.locator("#sym-types-all").click()
     assert len((await diagnostics(page))["lattice"]["symmetry"]["visibleElements"]) > 7

@@ -1,4 +1,4 @@
-from smoke import reveal_control
+from smoke import choose_tool, reveal_control
 """Portable browser check of the production build under its GitHub Pages path."""
 
 import asyncio
@@ -56,7 +56,7 @@ async def main():
                 await page.locator("#analysis-close").click()
             if example == "forsterite":
                 assert state["coordination"]["polyhedronCount"] == 12
-                await page.locator("#mode-lattice").click()
+                await choose_tool(page, "#mode-lattice")
                 await page.locator("#plane-add").click()
                 hkl = page.locator("[data-plane-id] [data-field=hkl]").first
                 await hkl.fill("-1 -1 -1")

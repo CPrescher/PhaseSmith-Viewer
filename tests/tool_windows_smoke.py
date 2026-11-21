@@ -7,24 +7,25 @@ from browser_test_config import QUICK
 from smoke import URL, diagnostics, settle, choose_tool
 from gui_review_smoke import hit
 
-TOOLS=['#mode-pairs','#mode-lattice','#style-open','#mode-sites','#mode-extent','#mode-export']
+TOOLS=['#mode-pairs','#mode-lattice','#mode-directions','#mode-symmetry','#style-open','#mode-sites','#mode-extent','#mode-export']
 SIZES=[(1440,900),(1920,1080),(1024,768),(768,1024),(390,844),(375,667),(844,390),(667,375),(960,1050)]
 async def ready(page):
  await page.goto(URL+'/?example=forsterite')
  await page.wait_for_function('window.viewerDiagnostics?.().coordination.polyhedronCount===12 && !viewerDiagnostics().session.suspended')
  await settle(page)
 async def launcher(page,button):
- if not await page.locator(button).is_visible():
+ if not await page.locator(button).is_visible() and not await page.locator('#tool-rail').is_visible():
   prior=await diagnostics(page)
   await page.locator('#tools-menu').click()
   await settle(page)
   unchanged(prior,await diagnostics(page))
   menu=await page.locator('#tool-rail').bounding_box();trigger=await page.locator('#tools-menu').bounding_box()
   if page.viewport_size['height'] < 500:
-   for action in await page.locator('#tool-rail .rail-button').all():
+   for action in await page.locator('#tool-rail .rail-button:visible').all():
     assert await action.evaluate("e=>{const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));}"), 'landscape action covered'
   else:
    assert menu['y']+menu['height']<=trigger['y']-4,(menu,trigger)
+ if not await page.locator(button).is_visible():await page.locator('#overlay-menu').click()
  await page.locator(button).click()
  await settle(page)
 def unchanged(before,after):

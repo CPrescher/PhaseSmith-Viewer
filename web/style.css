@@ -3596,3 +3596,8 @@ body:fullscreen, body:-webkit-full-screen { width: 100%; height: 100%; backgroun
   #style-editor label:has(> #adp-ellipsoids) { display: flex; align-items: center; gap: 6px; min-height: 44px; }
   #radius-details > summary { min-height: 44px; align-content: center; }
 }
+
+#overlay-choices { display: contents; }
+.tool-rail.overlay-submenu { height: var(--overlay-menu-height); align-content: start; justify-content: flex-start; }
+.tool-rail.group-overlays:not(.overlay-submenu) #overlay-choices,
+.tool-rail.overlay-submenu .rail-button:not(#overlay-menu, [data-overlay]) { display: none; }
