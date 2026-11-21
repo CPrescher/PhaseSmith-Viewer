@@ -76,7 +76,7 @@ Each release includes a universal macOS DMG, offline Windows installers for x64 
 
 For the next version, update `package.json`, `package-lock.json`, `src-tauri/Cargo.toml` and `src-tauri/Cargo.lock` together. The workflow checks that their versions agree before starting the builds.
 
-For Mac Developer ID signing, set the repository Actions secrets `APPLE_CERTIFICATE` (base64-encoded P12), `APPLE_CERTIFICATE_PASSWORD` and `APPLE_SIGNING_IDENTITY`. For notarization, also set `APPLE_ID`, `APPLE_PASSWORD` (an app-specific password) and `APPLE_TEAM_ID`. The release workflow checks the Developer ID signature, the stapled notarization ticket, and Gatekeeper acceptance of the app inside the DMG. The Windows installers are unsigned. The release notes identify the signing status of each platform. [Tauri macOS signing guide](https://v2.tauri.app/distribute/sign/macos/)
+For Mac Developer ID signing, set the repository Actions secrets `APPLE_CERTIFICATE` (base64-encoded P12), `APPLE_CERTIFICATE_PASSWORD` and `APPLE_SIGNING_IDENTITY`. For notarization, also set `APPLE_ID`, `APPLE_PASSWORD` (an app-specific password) and `APPLE_TEAM_ID`. The release workflow checks the Developer ID signatures, stapled notarization tickets, and Gatekeeper acceptance of both the downloaded DMG and the app inside it. The Windows installers are unsigned. The release notes identify the signing status of each platform. [Tauri macOS signing guide](https://v2.tauri.app/distribute/sign/macos/)
 
 ## Sources and attribution
 

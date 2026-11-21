@@ -141,6 +141,21 @@ jobs:
           [[ ${#dmg[@]} -eq 1 ]]
           output="out/PhaseSmith-Viewer-$VERSION-$PLATFORM.dmg"
           mv "${dmg[0]}" "$output"
+          # Tauri staples the app before packaging. Gatekeeper also assesses the downloaded DMG.
+          codesign --verify --strict "$output"
+          xcrun notarytool submit "$output" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" --wait --output-format json > "$RUNNER_TEMP/dmg-notarization.json"
+          python3 - "$RUNNER_TEMP/dmg-notarization.json" <<'PYTHON'
+          import json, sys
+          with open(sys.argv[1]) as receipt:
+              result = json.load(receipt)
+          print(f"Apple disk image submission {result['id']}: {result['status']}")
+          if result['status'] != 'Accepted':
+              sys.exit('Apple did not accept the disk image')
+          PYTHON
+          xcrun stapler staple "$output"
+          xcrun stapler validate "$output"
+          spctl --assess --type open --context context:primary-signature "$output"
           mount=$(mktemp -d)
           hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$output"
           trap 'result=$?; hdiutil detach "$mount" || exit 1; exit "$result"' EXIT
@@ -152,7 +167,7 @@ jobs:
           echo "Verified the Developer ID signature on the universal app in the DMG."
           xcrun stapler validate "$app"
           spctl --assess --type execute "$app"
-          echo 'macOS: Developer ID signed and notarized by Apple.' > out/macOS.txt
+          echo 'macOS: the app and DMG are Developer ID signed and notarized by Apple.' > out/macOS.txt
       - name: Build and verify the Windows offline installer
         if: runner.os == 'Windows'
         shell: pwsh
