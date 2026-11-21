@@ -3643,3 +3643,18 @@ body:fullscreen, body:-webkit-full-screen { width: 100%; height: 100%; backgroun
   content: ""; position: absolute; right: 4px; top: 4px; width: 5px; height: 5px;
   border-radius: 50%; background: var(--accent);
 }
+
+/* Phone science windows can shrink around a short result or a collapsed
+   settings group. The viewport limits still bound long tables and diagrams. */
+body:has(#app[data-launcher="menu"]) :is(#analysis-window, #reflection-explorer, #detector-window, #detector-options) {
+  height: auto;
+  min-height: 0;
+}
+body:has(#app[data-launcher="menu"]) #detector-window .detector-body { flex-basis: auto; }
+body:has(#app[data-launcher="menu"]) #detector-window.showing-crystal {
+  height: auto !important;
+  max-height: min(320px, calc(100dvh - 80px)) !important;
+}
+@media (max-width: 540px) and (min-height: 501px) {
+  #detector-options { max-height: 270px; }
+}

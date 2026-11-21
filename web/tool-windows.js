@@ -1,5 +1,5 @@
 // One settings palette over the canvas. The rail toggles its active tool;
-// choosing another tool swaps content without changing bounds or camera.
+// switching tools keeps the camera fixed and the palette anchored.
 // Desktop palettes can move/resize; touch layouts use a sheet and Tune.
 export const TOOLS = [
   { id: "pairs", label: "Bonds & polyhedra", title: "Bonds & polyhedra", button: "mode-pairs", hint: "Bonds and polyhedra: cutoffs and face opacity" },
@@ -654,7 +654,7 @@ export function createToolWindows(options) {
       const tuning = markTunePath(id);
       win.el.dataset.tune = String(tuning);
       let r = rectFor(id);
-      if (tuning || (id === "extent" && profile !== "float")) {
+      if (tuning || (profile !== "float" && (launcher === "menu" || id === "extent"))) {
         // Measure at the final width so wrapped controls and validation
         // messages count toward the height of the docked panel.
         win.el.style.width = `${r.w}px`;
@@ -759,7 +759,11 @@ export function createToolWindows(options) {
     if (!drag) apply();
   });
   resize.observe(viewport);
-  resize.observe(windows.get("extent").body.querySelector(".plot-range"));
+  // The body is a capped scroll container. Its contents can grow or shrink
+  // while its own height stays fixed (adding a rule or opening a disclosure).
+  for (const { body } of windows.values()) {
+    for (const content of body.children) resize.observe(content);
+  }
   window.visualViewport?.addEventListener("resize", () => { if (!drag) apply(); });
   window.visualViewport?.addEventListener("scroll", () => { if (!drag) apply(); });
   // Restore ordinary placement when editing ends, including native Done.

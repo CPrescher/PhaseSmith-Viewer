@@ -68,10 +68,20 @@ async def matrix(browser):
     if phone_launcher:assert await page.locator('#tools-menu').bounding_box()==trigger
     assert len(d['windows']['visible'])==1
     rect=await page.locator('.tool-window:not([hidden])').bounding_box()
-    body=await page.locator('.tool-window:not([hidden]) .tool-window-body').bounding_box()
-    assert body['height']>=120,('Editor too small for usable controls',w,h,body)
-    if bounds: assert rect==bounds,('Tool switch moved palette',w,h,rect,bounds)
-    bounds=rect
+    body=page.locator('.tool-window:not([hidden]) .tool-window-body')
+    profile=d['windows']['profile']
+    fitted=profile!='float' and (phone_launcher or tool=='#mode-extent')
+    if fitted:
+     # Short panels fit their contents. Longer panels retain scrolling room.
+     assert await body.evaluate('e=>e.clientHeight>=119 || e.scrollHeight<=e.clientHeight+1')
+     if bounds:
+      assert (rect['x'],rect['width'])==(bounds['x'],bounds['width'])
+      anchor=lambda r: r['y']+r['height'] if profile=='sheet' else r['y']
+      assert abs(anchor(rect)-anchor(bounds))<1,('Tool switch shifted the dock',rect,bounds)
+    else:
+     assert (await body.bounding_box())['height']>=120
+     if bounds: assert rect==bounds,('Tool switch moved palette',w,h,rect,bounds)
+    if not fitted or phone_launcher: bounds=rect
     assert rect['x']>=0 and rect['y']>=0 and rect['x']+rect['width']<=w+.5 and rect['y']+rect['height']<=h+.5
     if d['windows']['profile'] in ['sheet','side']:
      for selector in ['.view-bottom','#view-readout','.axis-compass','#tools-menu']:

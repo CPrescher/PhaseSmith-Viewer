@@ -76,6 +76,15 @@ async def check(browser,w,h,theme):
         await compact_button.click()
         restored=await page.locator('#tool-window-lattice').bounding_box()
         assert restored==before
+    if w < 500:
+        await choose_tool(page,'#mode-directions')
+        panel = page.locator('#tool-window-directions')
+        empty = await panel.bounding_box()
+        assert await hit(page.locator('#arrow-add'))
+        await page.locator('#arrow-add').click()
+        await page.wait_for_function('h => document.querySelector("#tool-window-directions").offsetHeight > h', arg=empty['height'])
+        await panel.get_by_role('button', name='Remove arrow', exact=False).click()
+        await page.wait_for_function('h => document.querySelector("#tool-window-directions").offsetHeight === h', arg=empty['height'])
     await choose_tool(page,'#mode-extent')
     assert await page.locator('#range-apply').count() == 0
     if w < 500:
