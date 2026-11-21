@@ -904,7 +904,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     const position = $("plane-label-position");
     position.value = labelPosition;
     position.disabled = !labelsOn;
-    $("plane-label-options").hidden = !planes.length;
+    position.closest("label").hidden = !planes.length;
   }
   $("plane-label-position").onchange = () => {
     const value = $("plane-label-position").value;

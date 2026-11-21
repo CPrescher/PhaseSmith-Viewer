@@ -35,6 +35,7 @@ async def check(browser, width, height, theme):
         return (await diagnostics(page))["lattice"]
 
     await choose_tool(page, "#mode-lattice", touch)
+    assert await page.locator("#lattice-label-offsets").is_visible()
     await activate(page.locator("#plane-add"))
     row = page.locator("[data-plane-id]").first
     hkl, offset = row.locator("[data-field=hkl]"), row.locator("[data-field=m]")
@@ -218,6 +219,12 @@ async def check(browser, width, height, theme):
     before = await state()
     assert any("m=0" in text for text in before["labels"]["anchors"])
     arrows = [text for text in before["labels"]["anchors"] if text.startswith("[")]
+    labels_box = await page.locator('label:has(#lattice-labels-toggle)').bounding_box()
+    offset_label = page.locator('label:has(#lattice-label-offsets)')
+    offset_box = await offset_label.bounding_box()
+    assert (await offset_label.inner_text()).strip() == "m"
+    assert abs(labels_box["y"] - offset_box["y"]) < 1
+    assert 0 <= offset_box["x"] - labels_box["x"] - labels_box["width"] <= 8
     await page.locator("#lattice-label-offsets").uncheck()
     after = await state()
     assert not any("m=" in text for text in after["labels"]["anchors"])
@@ -225,7 +232,9 @@ async def check(browser, width, height, theme):
         text for text in after["labels"]["anchors"] if text.startswith("[")
     ] == arrows
     await page.locator("#lattice-labels-toggle").uncheck()
+    assert await offset_label.is_visible()
     assert await page.locator("#lattice-label-offsets").is_disabled()
+    assert await offset_label.evaluate("el => Number(getComputedStyle(el).opacity) < 1")
     assert await page.locator("#plane-label-position").is_disabled()
     await settle(page)
     assert not (await state())["labels"]["shown"]

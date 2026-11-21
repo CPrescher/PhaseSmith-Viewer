@@ -562,36 +562,24 @@
                 <section class="lattice-panel" aria-labelledby="plane-title">
                   <div class="section-title">
                     <h2 id="plane-title">Planes <span class="scientific-notation">(hkl)</span></h2>
-                    <label
-                      class="chip small"
-                      title="Labels on drawn planes and direction arrows"
-                      ><input
-                        id="lattice-labels-toggle"
-                        type="checkbox"
-                        checked
-                        aria-label="Plane and direction labels"
-                      /><span>Labels</span></label>
-                  </div>
-                  <!-- Label text option for planes; shown once a plane exists. -->
-                  <div id="plane-label-options" class="tool-options" hidden>
-                    <label
-                      class="chip small"
-                      title="Label text only: adds “· m=…” to plane labels. Planes stay where they are."
-                      ><input
-                        id="lattice-label-offsets"
-                        type="checkbox"
-                        checked
-                        aria-label="Show plane offsets in labels"
-                      /><span>Show m in labels</span></label
-                    ><label
-                      class="export-select label-position"
-                      title="Where plane labels sit: outside an edge with a short leader, on an edge, or at the center of the plane"
-                      ><span class="tool-caption">Position</span
-                      ><select id="plane-label-position" aria-label="Plane label position">
+                    <div class="plane-label-toggles">
+                      <label class="chip small" title="Labels on drawn planes and direction arrows">
+                        <input id="lattice-labels-toggle" type="checkbox" checked aria-label="Plane and direction labels" />
+                        <span>Labels</span>
+                      </label>
+                      <label class="chip small" title="Include the plane offset m in plane labels">
+                        <input id="lattice-label-offsets" type="checkbox" checked aria-label="Show plane offset m in labels" />
+                        <span><i>m</i></span>
+                      </label>
+                    </div>
+                    <label class="export-select label-position" title="Where the plane label appears" hidden>
+                      <span class="tool-caption">Position</span>
+                      <select id="plane-label-position" aria-label="Plane label position">
                         <option value="outside" selected>Outside</option>
                         <option value="edge">Edge</option>
                         <option value="center">Center</option>
-                      </select></label>
+                      </select>
+                    </label>
                   </div>
                   <div class="tool-list">
                     <div id="plane-list" class="tool-list-items"></div>
