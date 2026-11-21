@@ -994,6 +994,8 @@ function initialize() {
         card.dataset.ruleId = rule.id;
         card.style.setProperty("--pair-color", ruleColor(rule));
         card.setAttribute("role", "group");
+        const cutoffMessage = make("p", { className: "micro", hidden: true });
+        cutoffMessage.setAttribute("role", "status");
         const inputs = {};
         for (const field of ["center", "neighbor", "cutoff"]) {
           let input;
@@ -1021,11 +1023,12 @@ function initialize() {
           input.onchange = () => {
             if (field === "cutoff") {
               const value = parseCutoff(input.value);
-              input.setCustomValidity(
-                value === null ? `Enter a cutoff of at least ${CUTOFF_MIN} Å.` : "",
-              );
               if (value === null) {
-                input.reportValidity();
+                // Never leave text on screen that differs from the applied
+                // cutoff. Native validation bubbles can disappear on blur.
+                input.value = formatCutoff(rule.cutoff);
+                cutoffMessage.textContent = `Enter a number of at least ${CUTOFF_MIN} Å. Kept ${input.value} Å.`;
+                cutoffMessage.hidden = false;
                 return;
               }
               setCutoff(value, false);
@@ -1213,6 +1216,7 @@ function initialize() {
           rule.cutoff = value;
           field.value = formatCutoff(value);
           field.setCustomValidity("");
+          cutoffMessage.hidden = true;
           syncSlider();
           if (live) scheduleBuild();
           else build();
@@ -1241,7 +1245,7 @@ function initialize() {
         };
         // Any press on a closed field opens its tuner. Touch/pen open it
         // without focusing (no software keyboard; a second tap types);
-        // a mouse press also places the caret for exact editing, even
+        // a mouse press also focuses exact editing, even
         // when the field already has focus (e.g. after Done).
         //
         // Touch/pen: the tuner opens only once this tap's click has been
@@ -1250,6 +1254,16 @@ function initialize() {
         // without a click open after a clean release; pans and cancels
         // never open.
         let touchOpen = null;
+        let selectOnClick = false;
+        let selectionFrame = 0;
+        const selectValue = () => {
+          field.select();
+          cancelAnimationFrame(selectionFrame);
+          // Safari may finish placing its caret after click listeners.
+          selectionFrame = requestAnimationFrame(() => {
+            if (document.activeElement === field) field.select();
+          });
+        };
         const openFromTouch = () => {
           if (!touchOpen) return;
           clearTimeout(touchOpen.timer);
@@ -1257,6 +1271,7 @@ function initialize() {
           openTuner();
         };
         field.addEventListener("pointerdown", (e) => {
+          selectOnClick = document.activeElement !== field;
           if (!tuner.hidden) return;
           if (e.pointerType === "mouse") {
             openTuner();
@@ -1278,9 +1293,21 @@ function initialize() {
           clearTimeout(touchOpen?.timer);
           touchOpen = null;
         });
-        field.addEventListener("click", openFromTouch);
-        field.addEventListener("focus", openTuner);
+        field.addEventListener("click", () => {
+          openFromTouch();
+          // Pointer default actions can overwrite the focus selection.
+          // Repeat it after the first focusing click, but preserve a later
+          // deliberate caret placement within an already focused field.
+          if (selectOnClick && document.activeElement === field) selectValue();
+          selectOnClick = false;
+        });
+        field.addEventListener("focus", () => {
+          openTuner();
+          selectValue();
+        });
+        field.addEventListener("input", () => { cutoffMessage.hidden = true; });
         field.addEventListener("keydown", (e) => {
+          cancelAnimationFrame(selectionFrame);
           if (e.key === "ArrowUp" || e.key === "ArrowDown") {
             e.preventDefault();
             const typed = parseCutoff(field.value) ?? rule.cutoff;
@@ -1289,9 +1316,12 @@ function initialize() {
           } else if (e.key === "Escape" && !tuner.hidden) {
             e.preventDefault(); // the tuner, not the Pairs window
             tuner.close();
-          } else if (e.key === "Enter" && !tuner.hidden) {
-            // Typed value committed (change follows): the row under the
-            // field returns, so Bonds/Polyhedra/Opacity are one tap away.
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            // A text field has no implicit Enter commit outside a form.
+            // Blur commits through the native change/validation/history
+            // path once and dismisses the software keyboard.
+            field.blur();
             tuner.close();
           }
         });
@@ -1416,7 +1446,7 @@ function initialize() {
         const slot = make("div", { className: "pair-slot" });
         slot.append(sub, tuner);
         card.dataset.tuneItem = `rule:${rule.id}`;
-        card.append(main, slot, counts);
+        card.append(main, cutoffMessage, slot, counts);
         return card;
       }),
     );
