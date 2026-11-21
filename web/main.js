@@ -1909,6 +1909,7 @@ function initialize() {
   }
   // Highlight all visible copies of one CIF site (amber shells, capped).
   let highlightedSite = null;
+  let inspectedShellCenter = null;
   const siteGroup = new THREE.Group();
   scene.add(siteGroup);
   function selectSite(label) {
@@ -1921,6 +1922,7 @@ function initialize() {
     highlightSite(label);
   }
   function inspectShell(center) {
+    inspectedShellCenter = center ?? null;
     $("shell-controls").hidden = !center;
     const summary = $("shell-summary"), body = $("shell-ligands");
     summary.hidden = !center;
@@ -1950,7 +1952,13 @@ function initialize() {
     highlightedSite = label;
     dispose(siteGroup);
     siteGroup.clear();
-    inspectShell(label && (atoms.find(a => a.label === label && atomVisible(a)) ?? independentSites().find(a => a.label === label)));
+    // Rendered positions are relative to the plotted extent's Cartesian
+    // center. Pick a central equivalent copy, not the first boundary image;
+    // panning and rotating the camera must not move the inspected shell.
+    const copies = label ? atoms.filter(a => a.label === label && atomVisible(a)) : [];
+    const center = copies.reduce((best, atom) =>
+      !best || atom.position.lengthSq() < best.position.lengthSq() - 1e-10 ? atom : best, null);
+    inspectShell(label && (center ?? independentSites().find(a => a.label === label)));
     for (const row of document.querySelectorAll("#site-table tbody tr, #poly-table tbody tr"))
       row.classList.toggle("selected", Boolean(label) && row.cells[0].textContent === label);
     if (label) {
@@ -3370,6 +3378,7 @@ function initialize() {
       windows: toolWindows.diagnostics(),
       stage: { x: stage.x, y: stage.y, clear: stage.clear && { ...stage.clear }, atFit: isAtFit() },
       highlightedSite,
+      shellCenterId: inspectedShellCenter?.id ?? null,
       polyhedra: coordinationStats.flatMap((s) =>
         s.environments.map((e) => ({
           pair: pairName(s),

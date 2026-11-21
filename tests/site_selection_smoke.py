@@ -34,6 +34,17 @@ async def check(browser, width, height, touch):
     assert await row.evaluate("e => e.classList.contains('selected')")
     assert 'CN 6' in await page.locator('#shell-summary').inner_text()
     assert d['camera'] == camera
+    # A site row must inspect a central copy, even though the rendered atom
+    # list begins at the boundary. Measure in Cartesian space for skew cells.
+    middle = [sum(r) / 2 for r in d['ranges']]
+    center = [sum(middle[j] * d['basis'][j][i] for j in range(3)) for i in range(3)]
+    copies = [a for a in d['atoms'] if a['label'] == label and a['visible']]
+    distance2 = lambda a: sum((a['cartesian'][i] - center[i]) ** 2 for i in range(3))
+    shell_center = next(a for a in copies if a['id'] == d['shellCenterId'])
+    assert abs(distance2(shell_center) - min(map(distance2, copies))) < 1e-8
+    await page.locator('#shell-outline').uncheck()
+    await page.locator('#shell-outline').check()
+    assert (await diagnostics(page))['shellCenterId'] == shell_center['id']
     # Picking with a group already highlighted must remove every old group halo.
     await pick()
     # Keyboard row activation follows the same explicit group-selection path.
