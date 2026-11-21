@@ -36,10 +36,10 @@ export function createStructureInfo() {
 
   return (structure, name, filename, reference) => {
     const meta = structure.metadata;
-    const formula = meta.chemical_formula_sum || meta.chemical_formula_structural;
-    const formulaTitle = !reference && (name === formula || name === meta.chemical_formula_structural);
+    const formula = reference?.formula || meta.chemical_formula_structural || meta.chemical_formula_sum;
+    const formulaTitle = !reference && (name === meta.chemical_formula_sum || name === meta.chemical_formula_structural);
     for (const id of ["name", "info-name"]) {
-      $(id).replaceChildren(formulaTitle ? formulaLabel(name) : name);
+      $(id).replaceChildren(formulaTitle ? formulaLabel(formula) : name);
     }
     const assumed = meta.symmetry_source === "assumed_p1";
     const symbol = assumed ? "P 1" : meta.space_group_hm || structure.matchedGroup?.symbol;
@@ -64,7 +64,7 @@ export function createStructureInfo() {
       ["Crystal system", structure.crystalSystem],
       ["Symmetry taken from", symmetrySources[meta.symmetry_source]],
       ["Symmetry operations", operations],
-      ["Formula in CIF", formula && formulaLabel(formula)],
+      [reference ? "Library formula" : "Chemical formula", formula && formulaLabel(formula)],
       ["Formula units per cell (Z)", meta.formula_units_per_cell],
       ["Independent sites", structure.independentSites.length],
       ["Positions in unit cell", structure.atoms.length],
