@@ -76,18 +76,7 @@ async def main():
      box=await panel.bounding_box();grip=await panel.locator('[data-edge=se]').bounding_box()
      await page.mouse.move(grip['x']+grip['width']-4,grip['y']+grip['height']-4);await page.mouse.down()
      await page.mouse.move(grip['x']+grip['width']-4,box['y']+180,steps=8);await page.mouse.up()
-     compact=panel.locator('[data-action=compact]')
-     fold=(await compact.get_attribute('aria-label')).startswith('Fold')
-     full_height=(await panel.bounding_box())['height']
-     await compact.click()
-     compact_height=(await panel.bounding_box())['height']
-     if fold:assert compact_height <= (await panel.locator('.tool-window-head').bounding_box())['height']+3
-     else:assert compact_height < full_height
-     assert await hit(panel.locator('[data-action=close]')), 'Folded panel grips must not cover Close'
-     await panel.locator('[data-action=close]').click();assert not await panel.is_visible()
-     await choose_tool(page,'#style-open' if tool=='style' else '#mode-'+tool)
-     await panel.locator('[data-action=compact]').click()
-     assert await panel.locator('[data-edge=sw]').is_visible(), 'Expand must restore corner resizing'
+     assert await hit(panel.locator('[data-action=close]'))
      await panel.locator('.tool-window-title').dblclick()
      # Resizing right into the permanent launcher must stop before its
      # buttons can cover the palette header (and leave both usable).

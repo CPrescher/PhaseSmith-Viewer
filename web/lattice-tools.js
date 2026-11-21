@@ -1,3 +1,4 @@
+import { revealAddedRow } from "./tool-windows.js";
 // Lattice tools: (hkl) planes, [uvw] direction arrows and symmetry
 // elements. Owns its sidebar UI, its Three.js groups and its state; the
 // viewer supplies coordinate conversion and structure access.
@@ -1311,16 +1312,6 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     );
   }
 
-  function revealAddedRow(list) {
-    const row = list.lastElementChild;
-    row.tabIndex = -1;
-    row.focus({ preventScroll: true });
-    requestAnimationFrame(() => {
-      if (row.isConnected && document.activeElement === row) {
-        row.scrollIntoView({ block: "nearest", inline: "nearest" });
-      }
-    });
-  }
   $("plane-add").onclick = () => {
     if (!getStructure()) return;
     planes.push({

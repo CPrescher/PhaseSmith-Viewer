@@ -443,9 +443,11 @@
                     <h2 id="coord-title" title="Bonds and coordination polyhedra">
                       Bonds &amp; polyhedra
                     </h2>
-                    <button id="add-rule" type="button" class="text-button" aria-label="Add bond pair" title="Add pair">＋ Pair</button>
                   </div>
-                  <div id="pair-rules"></div>
+                  <div class="tool-list pair-grid">
+                    <div id="pair-rules" class="tool-list-items"></div>
+                    <button id="add-rule" type="button" class="secondary" aria-label="Add bond pair">+ Pair</button>
+                  </div>
                   <details class="tool-options" id="pair-visibility-options">
                     <summary>Atom visibility</summary>
                     <label class="chip"><input id="polyhedra-only" type="checkbox" aria-describedby="polyhedra-filter-help" /><span>Hide atoms outside polyhedra</span></label>
@@ -592,8 +594,8 @@
                       </select></label>
                   </div>
                   <div class="tool-list">
-                    <div id="plane-list" class="overlay-rows"></div>
-                    <button id="plane-add" type="button" class="secondary add-overlay" aria-label="Add lattice plane (hkl)">+ Plane</button>
+                    <div id="plane-list" class="tool-list-items"></div>
+                    <button id="plane-add" type="button" class="secondary" aria-label="Add lattice plane (hkl)">+ Plane</button>
                   </div>
                 </section>
               </div>
@@ -606,8 +608,8 @@
                     <label class="chip small" title="Labels on drawn planes and direction arrows"><input id="direction-labels-toggle" type="checkbox" checked aria-label="Plane and direction labels"><span>Labels</span></label>
                   </div>
                   <div class="tool-list">
-                    <div id="arrow-list" class="overlay-rows"></div>
-                    <button id="arrow-add" type="button" class="secondary add-overlay" aria-label="Add direction arrow [uvw]">+ Arrow</button>
+                    <div id="arrow-list" class="tool-list-items"></div>
+                    <button id="arrow-add" type="button" class="secondary" aria-label="Add direction arrow [uvw]">+ Arrow</button>
                   </div>
                 </section>
               </div>

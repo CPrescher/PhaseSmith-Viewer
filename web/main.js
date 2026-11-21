@@ -35,7 +35,8 @@ import { createLiveAntialias } from "./live-antialias.js";
 import { rotatedView } from "./view-rotation.js";
 import { createTurnControls } from "./turn-controls.js";
 import { createStructureLibrary, libraryEntry, libraryFilename, entryForFilename } from "./structure-library.js";
-import { createToolWindows, TOOL_IDS } from "./tool-windows.js";
+import { installPanelScrollbars } from "./panel-scrollbars.js";
+import { createToolWindows, revealAddedRow, TOOL_IDS } from "./tool-windows.js";
 import { setDiffractionModule } from "./diffraction-engine.js";
 import { createDetectorWindow } from "./detector-window.js";
 import { createAnalysisWindow } from "./analysis-window.js";
@@ -1467,6 +1468,7 @@ function initialize() {
     });
     renderRules();
     build();
+    revealAddedRow($("pair-rules"));
   };
   $("polyhedra-only").onchange = () => {
     if (structure) build();
@@ -3625,10 +3627,7 @@ function initialize() {
     },
     onChange: () => scheduleSave(),
   });
-  // Keep phone sheet headers clear of the info card when a long atom
-  // label wraps or the selection is cleared; never move the camera.
-  const measurementResize = new ResizeObserver(() => toolWindows.layout());
-  measurementResize.observe(document.querySelector(".measure-details"));
+  installPanelScrollbars();
 
   // Choosing a settings tool reveals its controls even when a science
   // window covers that area. Closing a window preserves its values.

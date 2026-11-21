@@ -58,24 +58,37 @@ async def check(browser,w,h,theme):
         assert rail['y']+rail['height']/2<=view['y']+view['height']/2+1, 'rail may move up from center, not down'
     await choose_tool(page,'#mode-pairs')
     assert await hit(page.locator('[data-field=cutoff]').first)
-    assert await hit(page.locator('#add-rule'))
+    add_pair = page.locator('#add-rule')
+    await add_pair.scroll_into_view_if_needed()
+    assert await hit(add_pair)
+    if w == 768:
+        await add_pair.tap()
+        await settle(page)
+        last = page.locator('#pair-rules .pair-rule').last
+        assert await last.evaluate('el => el === document.activeElement')
+        card, button = await last.bounding_box(), await add_pair.bounding_box()
+        assert button['x'] >= card['x']+card['width'] and abs(card['y']-button['y']) < 1
+        body = page.locator('#tool-window-pairs .tool-window-body')
+        assert await body.evaluate('el => el.scrollHeight > el.clientHeight')
+        track = page.locator('#tool-window-pairs .panel-scroll-track:visible').first
+        assert await hit(track)
+        await body.evaluate('el => el.scrollTop = 0')
+        await settle(page)
+        thumb = await track.locator('span').bounding_box()
+        x, y = thumb['x']+thumb['width']/2, thumb['y']+thumb['height']/2
+        await page.mouse.move(x, y)
+        await page.mouse.down()
+        await page.mouse.move(x, y+24, steps=4)
+        await page.mouse.up()
+        assert await body.evaluate('el => el.scrollTop > 0')
+        await last.get_by_role('button', name='Delete', exact=False).click()
     assert (await diagnostics(page))['camera']==initial['camera']
     await reveal_control(page,'#polyhedra-only')
     assert not await page.locator('#polyhedra-only').is_checked()
     await choose_tool(page,'#mode-sites')
     assert await hit(page.locator('#site-table tbody tr').first), 'Sites must lead with data'
     await choose_tool(page,'#mode-lattice')
-    compact_button=page.locator('#tool-window-lattice [data-action=compact]')
-    if await compact_button.is_visible():
-        before=(await page.locator('#tool-window-lattice').bounding_box())
-        pose=(await diagnostics(page))['camera']
-        await compact_button.click()
-        after=await page.locator('#tool-window-lattice').bounding_box()
-        assert after['height']<before['height']-40
-        assert (await diagnostics(page))['camera']==pose
-        await compact_button.click()
-        restored=await page.locator('#tool-window-lattice').bounding_box()
-        assert restored==before
+    assert await page.locator('.tool-window [data-action=compact]').count() == 0
     if w == 768:
         for tool,item in [('lattice','plane'), ('directions','arrow')]:
             if tool != 'lattice':
@@ -96,6 +109,7 @@ async def check(browser,w,h,theme):
         await choose_tool(page,'#mode-directions')
         panel = page.locator('#tool-window-directions')
         empty = await panel.bounding_box()
+        assert await panel.locator('.panel-scroll-track:visible').count() == 0
         assert await hit(page.locator('#arrow-add'))
         await page.locator('#arrow-add').click()
         await page.wait_for_function('h => document.querySelector("#tool-window-directions").offsetHeight > h', arg=empty['height'])
@@ -118,11 +132,6 @@ async def check(browser,w,h,theme):
         if h >= 800:
             assert await hit(page.locator('#boundary'))
             assert await panel.locator('.tool-window-body').evaluate('e => e.scrollHeight === e.clientHeight')
-        pose = (await diagnostics(page))['camera']
-        await panel.get_by_role('button', name='Fold Extent panel').click()
-        await panel.get_by_role('button', name='Expand Extent panel').click()
-        assert 0 <= await bottom_gap() <= 20
-        assert (await diagnostics(page))['camera'] == pose
     field = page.locator('#range-a-max')
     increase = page.get_by_role('button', name='Increase a maximum by one cell')
     decrease = page.get_by_role('button', name='Decrease a maximum by one cell')

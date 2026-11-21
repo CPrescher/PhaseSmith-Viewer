@@ -59,10 +59,10 @@ When the launcher is short on space, **Overlays** opens Planes, Directions and S
 
 ## When a control is out of sight
 
-Scroll **inside the open settings window** to see its lower sections. Export, for example, has movie controls below the PNG settings. Project files and local saves are in the header’s three-dot menu. Use **Compact** when a panel has unused space; the **Expand** icon restores its full height. This changes only the panel, not the camera. Close or switch the tool from the rail/menu to reach another set of settings. Choosing a settings tool closes the science windows while retaining their values, so the selected controls are immediately reachable. Close a panel temporarily to reach atoms behind it, then reopen it to continue editing.
+A scrollbar shows when more content is available. Scroll inside the panel to reach it. Export, for example, has movie controls below the PNG settings. Project files and local saves are in the header’s three-dot menu. Close or switch the tool from the rail/menu to reach another set of settings. Choosing a settings tool closes the science windows while retaining their values, so the selected controls are immediately reachable. Close a panel temporarily to reach atoms behind it, then reopen it to continue editing.
 
 The crystal stays in place while you open and switch tools. Drag on the crystal to rotate it; drag inside a scrollable panel to scroll its settings on touch screens.
 
-Dense panels offer a **Fold** icon to leave only their header visible while you inspect or measure the crystal. The **Expand** icon restores the panel without moving the structure. In a phone science window, **Tools** moves into its header so it cannot cover results.
+In a phone science window, **Tools** moves into its header so it cannot cover results.
 
-Floating tool windows can be resized from either bottom corner. Phone sheets adapt to the available space automatically.
+Drag any edge or corner to resize a tool panel.

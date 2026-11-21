@@ -205,13 +205,19 @@ export function validateState(raw) {
 
 // ---- DOM window manager -----------------------------------------------------
 
-const ICONS = {
-  fold: '<path d="M4 5h16M7 14l5-5 5 5M12 9v11"/>',
-  expand: '<path d="M4 5h16M7 14l5 5 5-5M12 9v10"/>',
-  close: '<path d="M6 6l12 12M18 6 6 18"/>',
-};
 const svg = (paths) =>
   `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+
+export function revealAddedRow(list) {
+  const row = list.lastElementChild;
+  row.tabIndex = -1;
+  row.focus({ preventScroll: true });
+  requestAnimationFrame(() => {
+    if (row.isConnected && document.activeElement === row) {
+      row.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  });
+}
 
 /**
  * options: {
@@ -235,7 +241,6 @@ export function createToolWindows(options) {
   const dockedRects = new Map(); // independent manual bounds in each touch layout
   const visible = new Set();
   const windows = new Map();
-  const compactHeights = new Map(); // explicit per-tool size, fixed until expanded
 
   for (const tool of TOOLS) {
     const el = document.getElementById(`tool-window-${tool.id}`);
@@ -248,40 +253,21 @@ export function createToolWindows(options) {
     title.tabIndex = -1;
     title.innerHTML = `<span class="tool-icon" aria-hidden="true">${document.getElementById(tool.button)?.querySelector("svg")?.outerHTML ?? ""}</span><span class="tool-name"></span>`;
     title.querySelector(".tool-name").textContent = tool.title;
-    const button = (action, label, html, extra = "") => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = `window-button ${extra}`;
-      b.dataset.action = action;
-      b.setAttribute("aria-label", `${label} ${tool.title}`);
-      b.title = label;
-      b.innerHTML = html;
-      return b;
-    };
-    const close = button("close", "Close", svg(ICONS.close));
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "window-button";
+    close.dataset.action = "close";
+    close.title = "Close";
+    close.setAttribute("aria-label", `Close ${tool.title}`);
+    close.innerHTML = svg('<path d="M6 6l12 12M18 6 6 18"/>');
     head.append(title);
-    if (tool.id === "pairs") {
-      const add = document.getElementById("add-rule");
-      add.classList.add("window-button");
-      head.append(add);
-    }
     if (tool.id === "style") head.append(document.getElementById("style-pick"));
-    const compact = button("compact", "Compact", svg(ICONS.fold), "compact-button");
-    compact.onclick = () => {
-      if (compactHeights.has(tool.id)) compactHeights.delete(tool.id);
-      else {
-        const win = windows.get(tool.id), natural = naturalHeight(win);
-        compactHeights.set(tool.id, natural < win.el.getBoundingClientRect().height - 48
-          ? natural : win.head.getBoundingClientRect().height + 2);
-      }
-      apply();
-    };
-    head.append(compact, close);
+    head.append(close);
     el.prepend(head);
-    const edges = addResizeEdges(el, (event, edge) => startDrag(event, tool.id, edge));
+    addResizeEdges(el, (event, edge) => startDrag(event, tool.id, edge));
     el.setAttribute("aria-labelledby", title.id);
     el.setAttribute("role", "region");
-    windows.set(tool.id, { tool, el, body, head, title, buttons: { compact, close }, edges, scroll: 0 });
+    windows.set(tool.id, { tool, el, body, head, title, scroll: 0 });
 
     close.onclick = () => closeWindow(tool.id, true);
     head.addEventListener("pointerdown", (e) => startDrag(e, tool.id, "move"));
@@ -291,7 +277,6 @@ export function createToolWindows(options) {
     head.addEventListener("dblclick", (e) => {
       if (e.target.closest("button")) return;
       dockedRects.delete(`${profile}:${tool.id}`);
-      compactHeights.delete(tool.id);
       if (profile === "float") commit(moveTool(state, tool.id, null));
       else apply();
     });
@@ -459,7 +444,6 @@ export function createToolWindows(options) {
     const win = windows.get(tool);
     e.preventDefault();
     const r = currentRect(tool);
-    if (kind !== "move") compactHeights.delete(tool);
     drag = { tool, kind, profile, bounds: resizeBounds(), id: e.pointerId, x: e.clientX, y: e.clientY, r, next: r, target: e.currentTarget };
     e.currentTarget.setPointerCapture?.(e.pointerId);
     win.el.classList.add(kind === "move" ? "moving" : "resizing");
@@ -598,12 +582,6 @@ export function createToolWindows(options) {
         const h = Math.min(naturalHeight(win), r.h);
         r = { ...r, y: profile === "sheet" ? r.y + r.h - h : r.y, h };
       }
-      // Compact is an explicit request, never an automatic camera or palette
-      // reframe. Keep that height stable even if content subsequently changes.
-      if (compactHeights.has(id)) {
-        const h = Math.min(r.h, Math.max(win.head.getBoundingClientRect().height + 2, compactHeights.get(id)));
-        r = { ...r, y: profile === "sheet" ? r.y + r.h - h : r.y, h };
-      }
       // iOS keyboards shrink the visual viewport, not the canvas/layout
       // viewport. Move only the edited toolbox into that visible area;
       // keep the camera, launcher profile and saved palette bounds intact.
@@ -621,15 +599,6 @@ export function createToolWindows(options) {
         if (field.bottom > body.bottom - MARGIN) win.body.scrollTop += field.bottom - body.bottom + MARGIN;
         else if (field.top < body.top + MARGIN) win.body.scrollTop -= body.top + MARGIN - field.top;
       }
-      win.edges.hidden = r.h <= win.head.getBoundingClientRect().height + 2;
-      const compacted = compactHeights.has(id);
-      const fold = naturalHeight(win) >= r.h - 48;
-      const action = compacted ? "Expand" : fold ? "Fold" : "Compact";
-      win.buttons.compact.innerHTML = svg(compacted ? ICONS.expand : ICONS.fold);
-      win.buttons.compact.setAttribute("aria-expanded", String(!compacted));
-      win.buttons.compact.title = compacted ? "Restore the full panel height" : fold
-        ? "Fold controls into the header to reveal the crystal" : "Fit this panel to its content; keep the crystal stationary";
-      win.buttons.compact.setAttribute("aria-label", `${action} ${win.tool.title} panel`);
       rects.set(id, r);
       if (wasHidden) win.body.scrollTop = win.scroll;
     }
@@ -675,20 +644,28 @@ export function createToolWindows(options) {
     apply();
     onChange();
   }
-  const resize = new ResizeObserver(() => {
-    if (!drag) apply();
-  });
+  let layoutFrame = 0;
+  function scheduleLayout() {
+    if (drag || layoutFrame) return;
+    layoutFrame = requestAnimationFrame(() => {
+      layoutFrame = 0;
+      if (!drag) apply();
+    });
+  }
+  const resize = new ResizeObserver(scheduleLayout);
+  // A wrapped measurement label changes the space available to a phone sheet.
+  resize.observe(document.querySelector(".measure-details"));
   resize.observe(viewport);
   // The body is a capped scroll container. Its contents can grow or shrink
   // while its own height stays fixed (adding a rule or opening a disclosure).
   for (const { body } of windows.values()) {
     for (const content of body.children) resize.observe(content);
   }
-  window.visualViewport?.addEventListener("resize", () => { if (!drag) apply(); });
-  window.visualViewport?.addEventListener("scroll", () => { if (!drag) apply(); });
+  window.visualViewport?.addEventListener("resize", scheduleLayout);
+  window.visualViewport?.addEventListener("scroll", scheduleLayout);
   // Restore ordinary placement when editing ends, including native Done.
   for (const type of ["focusin", "focusout"])
-    viewport.addEventListener(type, () => requestAnimationFrame(() => { if (!drag) apply(); }));
+    viewport.addEventListener(type, scheduleLayout);
   apply();
 
   return {

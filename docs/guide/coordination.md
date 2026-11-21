@@ -1,6 +1,6 @@
 # Bonds and coordination polyhedra
 
-Open **Bonds & polyhedra**, the top button on the right-hand tool rail. On a phone, tap **Tools** at the lower right, then **Bonds & polyhedra**. The window contains a row for each central-element / neighbor-element pair. **＋ Pair** stays in the title bar.
+Open **Bonds & polyhedra**, the top button on the right-hand tool rail. On a phone, tap **Tools** at the lower right, then **Bonds & polyhedra**. The window contains a row for each central-element / neighbor-element pair. Choose **+ Pair** in the next empty grid cell to add a pair. Its controls come into view immediately.
 
 <ViewerFigure name="pairs" alt="Bonds & polyhedra window showing cutoff fields, Bonds and Polyhedra switches and opacity sliders." />
 
