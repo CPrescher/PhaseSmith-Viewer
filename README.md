@@ -2,7 +2,7 @@
 
 Explore crystal structures in your browser: atomic distances and angles, coordination polyhedra, lattice planes and directions, symmetry elements, pair-distance distributions, ideal X-ray powder patterns, and single-crystal diffraction on an interactive Ewald sphere and detector. CIF parsing and symmetry expansion run locally with the PhaseSmith WebAssembly engine; Three.js renders the structure using WebGL.
 
-**[Open the viewer](https://cprescher.github.io/PhaseSmith-Viewer/)** · **[Documentation](https://cprescher.github.io/PhaseSmith-Viewer/docs/)** · **[Worked examples](https://cprescher.github.io/PhaseSmith-Viewer/docs/tutorials.html)**
+**[Open the viewer](https://cprescher.github.io/PhaseSmith-Viewer/)** · **[Documentation](https://cprescher.github.io/PhaseSmith-Viewer/docs/)** · **[Worked examples](https://cprescher.github.io/PhaseSmith-Viewer/docs/tutorials.html)** · **[Changelog](CHANGELOG.md)**
 
 ## User guide
 
@@ -73,6 +73,8 @@ npm run build:engine
 Open **Actions → Release → Run workflow** and select `main`. Leave **Publish a GitHub Release** unchecked for a rehearsal. The run builds the downloads, tests them and records their SHA-256 checksums. On each Windows architecture, it installs the viewer, opens an associated CIF, saves a project with the native Windows dialog and reopens the PSV in a fresh profile. Check **Publish** to also create the version tag on the tested commit and publish the downloads with generated release notes. Pushing a matching tag such as `v1.0.0` also triggers publication.
 
 Each release includes a universal macOS DMG, offline Windows installers for x64 and ARM64, a ZIP containing the web viewer and guide, and `SHA256SUMS`. The web ZIP can be served from the root of a local HTTP server. GitHub Pages continues to deploy from successful builds of `main`.
+
+Record user-visible changes under **Unreleased** in the [changelog](CHANGELOG.md) as they land. When preparing a release, move those entries under the version heading and start a fresh **Unreleased** section.
 
 For the next version, update `package.json`, `package-lock.json`, `src-tauri/Cargo.toml` and `src-tauri/Cargo.lock` together. The workflow checks that their versions agree before starting the builds.
 
