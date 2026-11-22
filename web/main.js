@@ -329,6 +329,7 @@ function initialize() {
     distance = null,
     angle = null,
     measureMode = "info";
+  const selectionRims = [];
   scene.add(selectionGroup);
   const liveAntialias = createLiveAntialias(renderer);
   const livePixelRatio = (width, height) => Math.min(window.devicePixelRatio || 1, 2,
@@ -357,6 +358,7 @@ function initialize() {
       finally { updatingFromMain = false; }
     }
     syncViewCamera();
+    for (const rim of selectionRims) rim.quaternion.copy(viewCamera.quaternion);
     syncStudio();
     faceSorter.sync([...faceMeshes.values()], viewCamera);
     if (exportView?.crop) {
@@ -524,8 +526,8 @@ function initialize() {
   // Overlay colors (selection, measurement, pick marker, cell edges) per
   // theme; element and pair colors are scientific choices and never change.
   const SCENE_PALETTES = {
-    dark: { select: 0x79ffdc, arc: 0xffe08a, pick: 0xffc46b, cell: 0x7fa6c5 },
-    light: { select: 0x0a8f7b, arc: 0xc06d00, pick: 0xd08300, cell: 0x587690 },
+    dark: { selectionRim: 0xffca68, select: 0x79ffdc, arc: 0xffe08a, pick: 0xffc46b, cell: 0x7fa6c5 },
+    light: { selectionRim: 0xad6c06, select: 0x0a8f7b, arc: 0xc06d00, pick: 0xd08300, cell: 0x587690 },
   };
   const scenePalette = () =>
     SCENE_PALETTES[document.documentElement.dataset.theme === "light" ? "light" : "dark"];
@@ -2171,20 +2173,21 @@ function initialize() {
   function updateSelection() {
     dispose(selectionGroup);
     selectionGroup.clear();
-    // Selection is a crisp back-face shell: from any direction it reads as
-    // an even halo around the atom's silhouette and never covers its face.
-    for (const a of selection) {
-      const halo = new THREE.Mesh(
-        new THREE.SphereGeometry(a.radius * 1.13, 64, 48),
-        new THREE.MeshBasicMaterial({
-          color: scenePalette().select,
-          side: THREE.BackSide,
-          transparent: true,
-          opacity: 0.92,
-        }),
-      );
-      halo.position.copy(a.position);
-      selectionGroup.add(halo);
+    selectionRims.length = 0;
+    // Eight arcs form a camera-facing ring just outside the atom silhouette.
+    // Gaps are real geometry so they also stay open in the depth prepass.
+    const step = Math.PI / 4;
+    const gap = 0.21;
+    for (const atom of selection) {
+      const arc = new THREE.RingGeometry(1.06, 1.145, 12, 1, gap / 2, step - gap);
+      const material = new THREE.MeshBasicMaterial({ color: scenePalette().selectionRim, toneMapped: false });
+      const rim = new THREE.InstancedMesh(arc, material, 8);
+      const rotation = new THREE.Matrix4();
+      for (let i = 0; i < rim.count; i++) rim.setMatrixAt(i, rotation.makeRotationZ(i * step));
+      rim.scale.setScalar(atom.radius);
+      rim.position.copy(atom.position);
+      selectionRims.push(rim);
+      selectionGroup.add(rim);
     }
     distance = null;
     angle = null;

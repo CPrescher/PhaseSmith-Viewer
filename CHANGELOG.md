@@ -4,6 +4,7 @@
 
 ### Changed
 
+- A dashed gold ring highlights each selected atom in both themes.
 - Distance dashes, angle legs, and angle arcs are now 2.5 pixels wide on screen and keep that width as you zoom.
 
 ### Fixed
