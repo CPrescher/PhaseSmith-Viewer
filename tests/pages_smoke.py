@@ -71,6 +71,22 @@ async def check_mixed_pointer_keypads(page):
         assert not await keypad.is_visible()
 
 
+async def check_tablet_detector_figures(page):
+    await choose_tool(page, "#mode-detector", touch=True)
+    panel = page.locator("#detector-window")
+    # The inspector is resizable independently of the tablet viewport.
+    await panel.evaluate("el => { el.style.width = '760px'; el.style.height = '460px'; }")
+    plots = [panel.locator(selector) for selector in ["#detector-ewald", "#detector-image"]]
+    left, right = [await plot.bounding_box() for plot in plots]
+    assert left and right and left["x"] + left["width"] <= right["x"]
+    assert abs(left["y"] - right["y"]) < 1 and abs(left["height"] - right["height"]) < 1
+    assert left["height"] >= 0.65 * left["width"], (left, right)
+    await panel.evaluate("el => { el.style.width = '560px'; }")
+    await panel.locator('[data-detector-view="image"]').tap()
+    assert await plots[1].is_visible() and not await plots[0].is_visible()
+    await panel.locator("#detector-close").tap()
+
+
 async def main(tablet_webkit=False):
     async with async_playwright() as p:
         if tablet_webkit:
@@ -83,6 +99,7 @@ async def main(tablet_webkit=False):
             await page.wait_for_function("window.viewerDiagnostics?.().atoms.length > 0")
             await check_tablet_library(page)
             await check_mixed_pointer_keypads(page)
+            await check_tablet_detector_figures(page)
             await browser.close()
             print("WebKit tablet: compact menus, Library focus and aragonite faces passed")
             return
@@ -157,6 +174,7 @@ async def main(tablet_webkit=False):
                 await page.set_viewport_size({"width": 1024, "height": 700})
                 await check_tablet_library(page)
                 await check_mixed_pointer_keypads(page)
+                await check_tablet_detector_figures(page)
             assert not errors, errors
             print(
                 f"{example or 'NaCl'}: production assets, PhaseSmith WASM and viewer passed",

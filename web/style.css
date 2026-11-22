@@ -2994,9 +2994,15 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 #detector-window button:not(.window-button) { background: var(--raised); font-size: 13px; cursor: pointer; }
 #detector-window button:disabled { opacity: .5; }
 .detector-views, .detector-angles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
-.detector-views { flex: 1 0 215px; min-height: 215px; grid-template-rows: auto minmax(0, 1fr) auto; row-gap: 0; }
+/* In the two-plot layout, reserve drawing space independently of wrapped
+   controls and captions. Both figures share the same three grid rows. */
+.detector-views {
+  flex: 1 0 auto;
+  grid-template-rows: auto minmax(min(33cqw, 38dvh), 1fr) auto;
+  row-gap: 0;
+}
 .detector-views figure { display: grid; grid-template-rows: subgrid; grid-row: span 3; margin: 0; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--field); }
-.detector-views figcaption { padding: 8px 10px 0; font-size: 13px; font-weight: 600; }
+.detector-views figcaption { align-self: center; padding: 8px 10px 0; font-size: 13px; font-weight: 600; }
 .detector-views small { font-weight: 400; color: var(--muted); margin-left: 4px; }
 .detector-views figure > svg { display: block; align-self: stretch; width: 100%; height: 100%; min-width: 0; min-height: 0; contain: size; }
 .detector-views svg text { font: 11px system-ui, sans-serif; fill: var(--muted); }
