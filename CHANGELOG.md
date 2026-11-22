@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [v1.0.2](https://github.com/CPrescher/PhaseSmith-Viewer/releases/tag/v1.0.2) · 2026-11-22
+
 - In the two-column diffraction detector, the Ewald sphere and detector spots share a drawing row that scales with the panel width.
 - Touch numeric keypads use a three-column digit grid with a one-cell Backspace and a three-row Enter key. The keypad follows its field when a panel moves and stays open during repeated Backspace taps.
 
