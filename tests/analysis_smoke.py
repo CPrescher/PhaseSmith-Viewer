@@ -132,7 +132,24 @@ async def check(browser, width, height, theme):
             {"name": "observed.xy", "mimeType": "text/plain", "buffer": b"43.2 130\n43.3 218\n43.4 -2\n"})
         await page.wait_for_selector(".analysis-observed-line", state="attached")
         await page.locator("#analysis-table tbody tr").first.click()
+        # Loading a structure and plotting its powder pattern leave the
+        # separate reflection scene uninitialized until the explorer opens.
+        assert await page.locator("#reflection-stage canvas").count() == 0
         await page.locator("#analysis-explain").click()
+        await page.locator('[data-panel="rays"]').click()
+        wave = page.locator("#reflection-waves polyline").first
+        await page.locator("#reflection-animate").click()
+        curve = await wave.element_handle()
+        initial = await curve.get_attribute("transform")
+        await page.wait_for_function(
+            '([curve, initial]) => curve.isConnected && curve.getAttribute("transform") !== initial',
+            arg=[curve, initial],
+        )
+        await page.locator("#reflection-animate").click()
+        transform = await wave.get_attribute("transform")
+        await page.wait_for_timeout(120)
+        assert await wave.get_attribute("transform") == transform
+        await page.locator('[data-panel="sum"]').click()
         await page.locator("#reflection-step-back").click()
         step = await page.input_value("#reflection-step")
         hkl = await page.input_value("#reflection-hkl")
@@ -154,6 +171,10 @@ async def check(browser, width, height, theme):
         assert "observed.xy" in await fresh.inner_text("#analysis-file-status")
         await fresh.close()
         await page.locator("#reflection-close").click()
+        # A late input event after dismissal must not calculate another hkl.
+        intensity = await page.locator("#reflection-intensity").text_content()
+        await page.locator("#reflection-hkl").evaluate("el => { el.value = '0 0 0'; el.form.requestSubmit(); }")
+        assert await page.locator("#reflection-intensity").text_content() == intensity
     await choose_tool(page, "#mode-analysis")
     await ready(page)
     # Range and element filter are rebuilt for a freshly loaded structure.

@@ -69,7 +69,16 @@ export function parseMillerIndices(text) {
 /** "1 -1 0", "1,-1,0", "[1-10]", "(110)" → three numbers; compact form only
  *  for three single digits. */
 export function parseTriple(text, { integer = false, label = "indices" } = {}) {
-  const t = String(text).replace(/−/g, "-").replace(/[\[\](),]/g, " ").trim();
+  const raw = String(text).replace(/−/g, "-").replace(/٫/g, ".").replace(/[\[\]()]/g, " ").trim();
+  // With three space-delimited components, a comma inside a number is decimal.
+  // Otherwise keep accepting comma-delimited triples such as [1,-1,0].
+  const components = raw.split(/\s+/);
+  if (!integer && raw.includes(",") && components.length === 3 &&
+      components.every(value => /^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:e[+-]?\d+)?$/i.test(value))) {
+    const values = components.map(value => Number(value.replace(",", ".")));
+    if (values.every(Number.isFinite)) return values;
+  }
+  const t = raw.replace(/,/g, " ").trim();
   const fields = /^[+-]?\d[+-]?\d[+-]?\d$/.test(t) ? t.match(/[+-]?\d/g) : t.split(/\s+/);
   const values = fields.map(Number);
   if (values.length !== 3 || values.some((v) => !Number.isFinite(v)))

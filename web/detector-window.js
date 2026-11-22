@@ -31,6 +31,11 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   enableTripletSelection($("hkl"));
   const indexKeys = numericKeys($("hkl"), "(hkl)", true, { onDone: () => $("form").requestSubmit() });
   $("form").append(indexKeys);
+  for (const id of ["axis", "matrix"]) {
+    const field = $(id);
+    field.closest("label").after(numericKeys(field, id === "axis" ? "Scan axis" : "Matrix", true,
+      { inputMode: "decimal", nativeEnter: true }));
+  }
   const win = $("window"),
     opener = document.getElementById("mode-detector");
   const show = floatingDialog(win, opener, $("head"), close);

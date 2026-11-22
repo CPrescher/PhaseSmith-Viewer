@@ -5,10 +5,10 @@ from playwright.async_api import async_playwright
 from smoke import URL, choose_tool, diagnostics, settle
 
 
-async def check(browser, width, height, touch=True):
+async def check(browser, width, height, touch=True, locale="en-US"):
     page = await browser.new_page(
         viewport={"width": width, "height": height},
-        has_touch=touch, is_mobile=touch,
+        has_touch=touch, is_mobile=touch, locale=locale,
     )
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
@@ -19,22 +19,22 @@ async def check(browser, width, height, touch=True):
         await (locator.tap() if touch else locator.click())
 
     async def enter(field, keys):
-        assert await field.get_attribute("inputmode") == "decimal"
+        assert await field.get_attribute("inputmode") == ("none" if touch else "text")
         assert await field.get_attribute("autocorrect") == "off"
-        await field.fill("12")
+        await field.fill("0")
         if touch:
             await field.press("End")
-            await keys.locator('[data-key="space"]').tap()
-            await keys.locator('[data-key="minus"]').tap()
-            await field.press("3")
-            await keys.locator('[data-key="space"]').tap()
-            await field.press("4")
-            assert await field.input_value() == "12 -3 4"
+            separator = "," if locale == "de-DE" else "."
+            assert await keys.get_by_text(separator, exact=True).count() == 1
+            assert await keys.get_by_text("." if separator == "," else ",", exact=True).count() == 0
+            for key in ["decimal", "5", "space", "minus", "1", "space", "0"]:
+                await keys.locator(f'[data-key="{key}"]').tap()
+            assert await field.input_value() == f"0{separator}5 -1 0"
             assert await field.evaluate("el => el === document.activeElement")
             await keys.locator('[data-key="done"]').tap()
         else:
             assert not await keys.is_visible()
-            await field.fill("12 -3 4")
+            await field.fill("0,5 -1 0")
             await field.press("Enter")
         assert not await keys.is_visible()
 
@@ -45,7 +45,7 @@ async def check(browser, width, height, touch=True):
     await settle(page)
     assert not await page.locator("#direction-error").inner_text()
     assert await page.locator('.view-directions details').evaluate("el => el.classList.contains('active')")
-    assert "12" in (await diagnostics(page))["viewReadout"]["text"]
+    assert (await diagnostics(page))["viewReadout"]["text"] == "[1 −2 0]"
     # Enter remains a submit action, including fractional directions.
     await field.fill(".5 -1 0")
     await field.press("Enter")
@@ -60,7 +60,7 @@ async def check(browser, width, height, touch=True):
     row = page.locator("[data-arrow-id]").first
     field = row.locator('[data-field="uvw"]')
     await enter(field, row.locator('.numeric-keys[data-for="uvw"]'))
-    assert (await diagnostics(page))["lattice"]["arrows"][0]["uvw"] == [12, -3, 4]
+    assert (await diagnostics(page))["lattice"]["arrows"][0]["uvw"] == [.5, -1, 0]
     await field.fill(".5 -1 0")
     await field.press("Enter")
     assert (await diagnostics(page))["lattice"]["arrows"][0]["uvw"] == [.5, -1, 0]
@@ -89,6 +89,22 @@ async def check(browser, width, height, touch=True):
             await field.press("Enter")
         assert await field.input_value() == "2 0 0"
         await activate(page.locator(f"#{tool}-close"))
+    if touch:
+        await choose_tool(page, "#mode-extent", touch)
+        bound = page.locator("#range-a-min")
+        await bound.tap()
+        await bound.press("ControlOrMeta+a")
+        pad = page.locator('[data-for="range-a-min"]')
+        field_box, pad_box = await bound.bounding_box(), await pad.bounding_box()
+        assert field_box and pad_box
+        assert (pad_box["y"] + pad_box["height"] <= field_box["y"] or
+                field_box["y"] + field_box["height"] <= pad_box["y"] or
+                pad_box["x"] + pad_box["width"] <= field_box["x"] or
+                field_box["x"] + field_box["width"] <= pad_box["x"])
+        for key in ["minus", "0", "decimal", "2", "5", "done"]:
+            await pad.locator(f'[data-key="{key}"]').tap()
+        assert float(await bound.input_value()) == -.25
+        assert not await pad.is_visible()
     assert not errors, errors
     assert await page.evaluate("document.scrollingElement.scrollWidth <= innerWidth")
     await page.close()
@@ -101,6 +117,7 @@ async def main():
         browser = await p.chromium.launch(**options)
         for width, height, touch in [(1440, 900, False), (1024, 768, True), (390, 844, True)]:
             await check(browser, width, height, touch)
+        await check(browser, 320, 568, locale="de-DE")
         await browser.close()
 
 

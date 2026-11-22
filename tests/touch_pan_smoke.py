@@ -24,6 +24,13 @@ async def check(browser, width, height, dpi):
         await page.wait_for_function("viewerDiagnostics().block === 'skew_direction' && viewerDiagnostics().history.ready")
     session = await context.new_cdp_session(page)
     largest_error = 0
+    canvas = page.locator("#viewport > canvas")
+    if dpi > 1.5:
+        await canvas.evaluate("""canvas => {
+          window.previewRatios = new Set();
+          new MutationObserver(() => previewRatios.add(canvas.width / canvas.clientWidth))
+            .observe(canvas, {attributes: true, attributeFilter: ["width"]});
+        }""")
 
     async def send(kind, points):
         await session.send("Input.dispatchTouchEvent", {"type": kind, "touchPoints": points})
@@ -166,6 +173,12 @@ async def check(browser, width, height, dpi):
     assert (await diagnostics(page))["camera"] != before["camera"]
     await assert_rotation(before)
     await send("touchEnd", [])
+    if dpi > 1.5:
+        await page.wait_for_function("""() => {
+          const canvas = document.querySelector('#viewport > canvas');
+          return canvas.width === Math.floor(canvas.clientWidth * 2)
+            && [...previewRatios].some(ratio => Math.abs(ratio - 1.5) < 0.01);
+        }""")
     assert not errors, errors
     print(f"{width}×{height}, DPI {dpi}: max pan/pinch/twist slip {largest_error:.4f} CSS px", flush=True)
     await context.close()

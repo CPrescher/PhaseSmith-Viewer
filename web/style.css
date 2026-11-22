@@ -3711,3 +3711,44 @@ body:has(#app) #detector-window.showing-crystal[data-linked-resized] {
   .panel-scroll-track { forced-color-adjust: none; background: Canvas; outline: 1px solid GrayText; }
   .panel-scroll-track > span { background: ButtonText; }
 }
+
+/* Keep edits local to the active window while a docked keyboard is visible. */
+:is(dialog[id], .tool-window, .turn-panel, #direction-form).keyboard-fit {
+  min-height: 0 !important;
+  max-height: var(--keyboard-height) !important;
+  translate: 0 var(--keyboard-shift, 0px);
+}
+:is(.turn-panel, #direction-form).keyboard-fit { overflow-y: auto; }
+
+@media (any-pointer: coarse) {
+  :is(#app, dialog[id]) :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], textarea) {
+    font-size: 16px !important;
+  }
+  .numeric-keys.touch-keypad:not([hidden]), #direction-form > .numeric-keys.touch-keypad:not([hidden]) {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 3px;
+    width: min(270px, calc(100vw - 12px));
+    max-width: 100%;
+    padding: 5px;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--text);
+    box-shadow: 0 5px 18px var(--shadow);
+  }
+  .touch-keypad[popover], #direction-form > .touch-keypad[popover] {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    overflow-y: auto;
+  }
+  .touch-keypad button[data-key] { min-width: 0; min-height: 44px; padding-inline: 2px; }
+  .touch-keypad [data-key="done"] { margin-left: 0; }
+  .index-keypad [data-key="space"] { grid-row: 1; grid-column: 4 / span 2; }
+  .index-keypad [data-key="minus"] { grid-row: 2; grid-column: 4; }
+  .index-keypad [data-key="backspace"] { grid-row: 2; grid-column: 5; }
+  .direction-keypad [data-key="0"] { grid-row: 4; grid-column: 1 / span 3; }
+  .direction-keypad [data-key="decimal"] { grid-row: 3; grid-column: 4 / span 2; }
+  .direction-keypad [data-key="done"] { grid-row: 4; grid-column: 4 / span 2; }
+}

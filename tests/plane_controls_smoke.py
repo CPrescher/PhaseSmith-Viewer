@@ -52,21 +52,27 @@ async def check(browser, width, height, theme):
     await activate(page.locator("#plane-add"))
     row = page.locator("[data-plane-id]").first
     hkl, offset = row.locator("[data-field=hkl]"), row.locator("[data-field=m]")
-    assert await hkl.get_attribute("inputmode") == "numeric"
-    assert await offset.get_attribute("inputmode") == "decimal"
+    assert await hkl.get_attribute("inputmode") == ("none" if touch else "text")
+    assert await offset.get_attribute("inputmode") == ("none" if touch else "decimal")
     if touch:
-        # The native number pad may omit signs/spaces. Accessory buttons edit
-        # at the caret without dismissing it; Done commits through history.
+        # Enter a signed, multi-digit triplet using only the inline pad.
         hkl_keys = row.locator('.numeric-keys[data-for="hkl"]')
         offset_keys = row.locator('.numeric-keys[data-for="m"]')
-        await hkl.fill("12")
-        await hkl.press("End")
-        await hkl_keys.locator('[data-key="space"]').tap()
+        await hkl.tap()
+        space = hkl_keys.get_by_role("button", name="Insert space")
+        first = await hkl_keys.locator('[data-key="1"]').bounding_box()
+        separator = await space.bounding_box()
+        assert abs(separator["y"] - first["y"]) < 1 and separator["width"] > first["width"] * 1.9
+        await hkl.evaluate("el => el.select()")
+        for digit in "125":
+            await hkl_keys.locator(f'[data-key="{digit}"]').tap()
+        await hkl_keys.locator('[data-key="backspace"]').tap()
+        await space.tap()
         assert await hkl.evaluate("el => el === document.activeElement")
         await hkl_keys.locator('[data-key="minus"]').tap()
-        await hkl.press("3")
-        await hkl_keys.locator('[data-key="space"]').tap()
-        await hkl.press("4")
+        await hkl_keys.locator('[data-key="3"]').tap()
+        await space.tap()
+        await hkl_keys.locator('[data-key="4"]').tap()
         assert await hkl.input_value() == "12 -3 4"
         await hkl_keys.locator('[data-key="done"]').tap()
         assert (await state())["planes"][0]["hkl"] == [12, -3, 4]

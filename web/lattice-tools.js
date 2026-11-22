@@ -1214,7 +1214,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         bottom.append(captioned(origin, "origin x y z"), readout);
         row.append(
           top,
-          numericKeys(uvw, "[uvw]", true, { inputMode: "decimal" }),
+          numericKeys(uvw, "[uvw]", true, { fractionalIndices: true }),
           numericKeys(length, "Length"),
           bottom,
           numericKeys(origin, "Origin", true, { inputMode: "decimal" }),

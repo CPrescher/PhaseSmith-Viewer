@@ -690,7 +690,7 @@
                   </div>
                   <h3 class="table-title">Site coordination</h3>
                   <div id="shell-controls" hidden>
-                    <label>All-ligand cutoff (Å) <input id="shell-cutoff" type="number" min="0.01" max="30" step="any" placeholder="Automatic"></label>
+                    <label>All-ligand cutoff (Å) <input id="shell-cutoff" type="number" inputmode="decimal" min="0.01" max="30" step="any" placeholder="Automatic"></label>
                     <label title="Draw the neighbor hull around the visible copy of this site closest to the center of the plotted structure."><input type="checkbox" id="shell-outline" checked> Show coordination shell</label>
                     <div class="table-scroll"><table class="data-table"><thead><tr><th>Ligand</th><th>Element</th><th>Distance (Å)</th><th>Count</th></tr></thead><tbody id="shell-ligands"></tbody></table></div>
                   </div>
@@ -901,16 +901,16 @@
           <input id="analysis-mode" type="hidden" value="distances" />
           <details id="analysis-settings" class="tool-options" open><summary>Plot settings · range and appearance</summary>
           <div id="analysis-distance-fields" class="analysis-fields">
-            <label>From (Å)<input id="analysis-rMin" type="number" min="0" max="30" step="any" value="0" required /></label>
-            <label>To (Å)<input id="analysis-rMax" type="number" min="0.1" max="30" step="any" value="6" required /></label>
-            <label>Group within (Å)<input id="analysis-tolerance" type="number" min="0.00001" max="0.1" step="any" value="0.001" required /></label>
+            <label>From (Å)<input id="analysis-rMin" type="number" inputmode="decimal" min="0" max="30" step="any" value="0" required /></label>
+            <label>To (Å)<input id="analysis-rMax" type="number" inputmode="decimal" min="0.1" max="30" step="any" value="6" required /></label>
+            <label>Group within (Å)<input id="analysis-tolerance" type="number" inputmode="decimal" min="0.00001" max="0.1" step="any" value="0.001" required /></label>
             <label class="analysis-pair-field">Atom pairs<select id="analysis-pair"><option value="all">All atom pairs</option></select></label>
           </div>
           <div id="analysis-powder-fields" class="analysis-fields" hidden>
-            <label>Wavelength (Å)<input id="analysis-wavelength" type="number" min="0.1" max="3" step="any" value="1.5406" required /></label>
-            <label>From 2θ (°)<input id="analysis-twoThetaMin" type="number" min="0.1" max="170" step="any" value="5" required /></label>
-            <label>To 2θ (°)<input id="analysis-twoThetaMax" type="number" min="0.1" max="170" step="any" value="90" required /></label>
-            <label class="analysis-pair-field">Peak FWHM (° 2θ; 0 = sticks)<input id="analysis-fwhm" type="number" min="0" max="2" step="any" value="0.15" required /></label>
+            <label>Wavelength (Å)<input id="analysis-wavelength" type="number" inputmode="decimal" min="0.1" max="3" step="any" value="1.5406" required /></label>
+            <label>From 2θ (°)<input id="analysis-twoThetaMin" type="number" inputmode="decimal" min="0.1" max="170" step="any" value="5" required /></label>
+            <label>To 2θ (°)<input id="analysis-twoThetaMax" type="number" inputmode="decimal" min="0.1" max="170" step="any" value="90" required /></label>
+            <label class="analysis-pair-field">Peak FWHM (° 2θ; 0 = sticks)<input id="analysis-fwhm" type="number" inputmode="decimal" min="0" max="2" step="any" value="0.15" required /></label>
             <p class="hint" style="grid-column: 1 / -1; margin: 0">Selecting a reflection in Detector synchronizes the wavelength and extends this plot’s range to include it.</p>
           </div>
           </details>
@@ -997,20 +997,20 @@
       <div class="analysis-body">
         <p class="hint">Geometry updates immediately. Use Apply orientation after editing a mounting matrix.</p>
         <div id="detector-geometry-fields">
-          <label>Wavelength (Å)<input id="detector-wavelength" type="number" min="0.001" step="any" value="1.5406" required></label>
-          <label>Distance (mm)<input id="detector-distance" type="number" min="0.001" step="any" value="100" required></label>
+          <label>Wavelength (Å)<input id="detector-wavelength" type="number" inputmode="decimal" min="0.001" step="any" value="1.5406" required></label>
+          <label>Distance (mm)<input id="detector-distance" type="number" inputmode="decimal" min="0.001" step="any" value="100" required></label>
           <label>Detector shape<select id="detector-outline"><option value="circle">Circular</option><option value="rectangle">Rectangular</option><option value="calibrated" hidden disabled>Calibrated panel</option></select></label>
-          <label id="detector-circle-field">Diameter (mm)<input id="detector-diameter" type="number" min="0.001" step="any" value="200" required></label>
-          <label id="detector-width-field" hidden>Width (mm)<input id="detector-width" type="number" min="0.001" step="any" value="200" required></label>
-          <label id="detector-height-field" hidden>Height (mm)<input id="detector-height" type="number" min="0.001" step="any" value="200" required></label>
+          <label id="detector-circle-field">Diameter (mm)<input id="detector-diameter" type="number" inputmode="decimal" min="0.001" step="any" value="200" required></label>
+          <label id="detector-width-field" hidden>Width (mm)<input id="detector-width" type="number" inputmode="decimal" min="0.001" step="any" value="200" required></label>
+          <label id="detector-height-field" hidden>Height (mm)<input id="detector-height" type="number" inputmode="decimal" min="0.001" step="any" value="200" required></label>
           <label id="detector-panel-field" hidden>Panel size (mm)<output id="detector-panel-size"></output></label>
         </div>
         <p id="detector-geometry-error" role="status"></p>
         <details id="detector-wedge"><summary>Rotation-wedge coverage</summary>
           <div class="detector-actions">
-            <label>From ω (°) <input id="detector-from" type="number" min="-180" max="180" step="any" value="-11"></label>
-            <label>To ω (°) <input id="detector-to" type="number" min="-180" max="180" step="any" value="11"></label>
-            <label>DAC half-opening (°) <input id="detector-cone" type="number" min="0" max="90" step="any" placeholder="No DAC"></label>
+            <label>From ω (°) <input id="detector-from" type="number" inputmode="decimal" min="-180" max="180" step="any" value="-11"></label>
+            <label>To ω (°) <input id="detector-to" type="number" inputmode="decimal" min="-180" max="180" step="any" value="11"></label>
+            <label>DAC half-opening (°) <input id="detector-cone" type="number" inputmode="decimal" min="0" max="90" step="any" placeholder="No DAC"></label>
           </div>
           <p class="hint">Symmetric cones about the incident beam at ω = 0°, rotating with the spindle.</p>
           <p id="detector-coverage" role="status"></p>
@@ -1019,8 +1019,8 @@
         <details id="detector-calibration"><summary>Detector calibration (.poni)</summary>
           <div class="detector-actions"><label>Load PONI <input type="file" id="detector-poni" accept=".poni"></label>
             <button type="button" id="detector-clear-poni" hidden>Use manual geometry</button></div>
-          <form id="detector-shape" hidden><label>Image rows <input type="number" id="detector-rows" min="1" required></label>
-            <label>Columns <input type="number" id="detector-cols" min="1" required></label>
+          <form id="detector-shape" hidden><label>Image rows <input type="number" inputmode="numeric" id="detector-rows" min="1" required></label>
+            <label>Columns <input type="number" inputmode="numeric" id="detector-cols" min="1" required></label>
             <button>Apply image shape</button></form>
           <p id="detector-poni-status" role="status"></p>
         </details>
@@ -1032,7 +1032,7 @@
 0 1 0
 0 0 1</textarea></label>
             <div><label>Scan axis in viewer lab (x y z)<input id="detector-axis" value="0 0 1" required></label>
-            <label>Set ω (°)<input id="detector-set-angle" type="number" step="any" value="0" required></label></div>
+            <label>Set ω (°)<input id="detector-set-angle" type="number" inputmode="decimal" step="any" value="0" required></label></div>
             <label>PhaseSmith JSON<input type="file" id="detector-orientation-file" accept=".json,application/json"></label>
             <label id="detector-candidate-field" hidden>Candidate<select id="detector-candidate"></select></label>
             <div class="detector-actions"><button type="submit">Apply orientation</button><button type="button" id="detector-clear-mount">Reset mounting</button></div>

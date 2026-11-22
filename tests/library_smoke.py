@@ -38,6 +38,21 @@ async def main():
             if phone:
                 await expect(page.locator('#library-close')).to_be_focused()
                 await page.locator('#library-search').tap()
+                # A docked keyboard shrinks and may pan only the visual viewport.
+                await page.evaluate("""() => {
+                    Object.defineProperty(visualViewport, 'height', {value: 310, configurable: true});
+                    Object.defineProperty(visualViewport, 'offsetTop', {value: 45, configurable: true});
+                    visualViewport.dispatchEvent(new Event('resize'));
+                }""")
+                await page.wait_for_selector('#structure-library.keyboard-fit')
+                bounds = await page.locator('#library-search').bounding_box()
+                assert bounds['y'] >= 45 and bounds['y'] + bounds['height'] <= 355
+                await page.evaluate("""() => {
+                    delete visualViewport.height;
+                    delete visualViewport.offsetTop;
+                    visualViewport.dispatchEvent(new Event('resize'));
+                }""")
+                await page.wait_for_selector('#structure-library.keyboard-fit', state='detached')
             await expect(page.locator('#library-search')).to_be_focused()
             await expect(page.locator('.library-select')).to_have_count(52)
             await page.locator('#library-search').fill('zinc blende')

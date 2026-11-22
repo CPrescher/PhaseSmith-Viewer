@@ -29,6 +29,7 @@ import { siteShell } from "./site-shell.js";
 import { estimatePairCutoff } from "./pair-defaults.js";
 import { angleAt, hullVolume, parseTriple } from "./crystal-math.js";
 import { createLatticeTools } from "./lattice-tools.js";
+import { installKeyboardViewport } from "./keyboard-viewport.js";
 import { enableTripletSelection, numericKeys } from "./numeric-input.js";
 import { createAxisCompass } from "./axis-compass.js";
 import { createThemeSwitch } from "./theme.js";
@@ -57,6 +58,15 @@ import {
 } from "./appearance.js";
 const $ = (id) => document.getElementById(id),
   viewport = $("viewport");
+installKeyboardViewport();
+for (const field of document.querySelectorAll('input[type="number"], #turn-angle')) {
+  const anchor = field.closest(".range-grid, label");
+  const caption = field.getAttribute("aria-label") || field.labels?.[0]?.textContent.trim() || field.id;
+  anchor.after(numericKeys(field, caption, false, {
+    inputMode: field.inputMode, nativeEnter: true,
+    signed: field.type === "number" && (field.min === "" || Number(field.min) < 0),
+  }));
+}
 $("viewer-version").textContent = `PhaseSmith Viewer ${viewerVersion}`;
 document.documentElement.toggleAttribute("data-desktop-app", desktop);
 createFullscreenSwitch({ nativeWindow: desktop ? getCurrentWindow() : null, button: $("fullscreen-toggle"), status: $("fullscreen-status") });
@@ -187,6 +197,17 @@ function initialize() {
     sceneBox = new THREE.Box3(),
     sceneSphere = new THREE.Sphere(),
     sceneDelta = new THREE.Vector3();
+  // A Retina canvas multiplies the cost of every transparency pass. Restore
+  // full detail once the fingers and any subsequent camera inertia settle.
+  let touchPreviewTimer = 0;
+  function extendTouchPreview() {
+    if (window.devicePixelRatio <= 1.5) return;
+    clearTimeout(touchPreviewTimer);
+    touchPreviewTimer = setTimeout(() => {
+      touchPreviewTimer = 0;
+      invalidate();
+    }, 180);
+  }
   function createControls(target = new THREE.Vector3()) {
     const next = new ViewControls(camera, renderer.domElement);
     next.rotateSpeed = 2.2;
@@ -200,7 +221,10 @@ function initialize() {
     // The constructor looks at its initial origin target. Restore the real
     // target immediately so stopping motion after a pan cannot tilt the view.
     next.update();
-    next.addEventListener("change", invalidate);
+    next.addEventListener("change", () => {
+      if (touchPreviewTimer) extendTouchPreview();
+      invalidate();
+    });
     // Camera autosave once motion (including damping) has settled.
     next.addEventListener("change", () => scheduleSave(1200));
     next.addEventListener("start", invalidate);
@@ -341,7 +365,7 @@ function initialize() {
       // translucent edges without forcing extra supersampling on low-DPI screens.
       // Bound live pixels: each transparency layer otherwise multiplies the
       // full-screen Retina workload. Export frames use their own resolution.
-      const scale = livePixelRatio(viewport.clientWidth, viewport.clientHeight);
+      const scale = Math.min(livePixelRatio(viewport.clientWidth, viewport.clientHeight), touchPreviewTimer ? 1.5 : Infinity);
       if (renderer.getPixelRatio() !== scale) renderer.setPixelRatio(scale);
     }
     // Trackball emits change while damping moves the camera. That event
@@ -1484,7 +1508,9 @@ function initialize() {
         // moves and the counts stay visible while the cutoff changes.
         const slot = make("div", { className: "pair-slot" });
         slot.append(sub, tuner);
-        card.append(main, cutoffMessage, slot, counts);
+        card.append(main, cutoffMessage, slot, counts, numericKeys(inputs.cutoff, "Distance cutoff", false, {
+          signed: false, nativeEnter: true, onDone: () => tuner.close(),
+        }));
         return card;
       }),
     );
@@ -2059,7 +2085,7 @@ function initialize() {
   enableTripletSelection($("view-direction"));
   $("direction-form").insertBefore(
     numericKeys($("view-direction"), "[uvw]", true, {
-      inputMode: "decimal",
+      fractionalIndices: true,
       onDone: () => $("direction-form").requestSubmit(),
     }),
     $("direction-error"),
@@ -2536,7 +2562,10 @@ function initialize() {
     }
   });
   renderer.domElement.addEventListener("pointermove", (e) => {
-    if (active.size) invalidate();
+    if (active.has(e.pointerId)) {
+      if (e.pointerType === "touch") extendTouchPreview();
+      invalidate();
+    }
     if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6)
       down = null;
   });

@@ -28,3 +28,15 @@ test("fractional direction and origin parsing remains available", () => {
   assert.deepEqual(parseTriple("0.5 -1 0"), [0.5, -1, 0]);
   assert.deepEqual(parseTriple("[1,-1,0]"), [1, -1, 0]);
 });
+
+test("directions accept decimal commas in space-separated components", () => {
+  for (const [text, expected] of [
+    ["0,5 -1 0", [0.5, -1, 0]],
+    ["0٫5 -1 0", [0.5, -1, 0]],
+    ["[−0,25 0.5 1,75]", [-0.25, 0.5, 1.75]],
+    ["1, 2, 3", [1, 2, 3]],
+    ["0.5,-1,0", [0.5, -1, 0]],
+  ]) assert.deepEqual(parseTriple(text), expected, text);
+  assert.throws(() => parseTriple("0,5,3 1 0"));
+  assert.throws(() => parseMillerIndices("0,5 -1 0"));
+});

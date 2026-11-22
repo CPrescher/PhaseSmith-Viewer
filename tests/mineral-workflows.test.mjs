@@ -7,6 +7,9 @@ import { powderPattern } from "../web/structure-analysis.js";
 import { reflection } from "../web/reflection-model.js";
 import { detectorModel } from "../web/detector-model.js";
 import { siteShell } from "../web/site-shell.js";
+import { estimatePairCutoff } from "../web/pair-defaults.js";
+import { buildCoordinationEnvironments } from "../web/coordination.js";
+import { defaultRanges, translatedSites } from "../web/plot-range.js";
 import { powderFamilies, readPowderTrace } from "../web/powder-comparison.js";
 
 const wasm = new WebAssembly.Instance(diffractionModule).exports;
@@ -21,6 +24,24 @@ function readCif(text) {
 }
 const load = file => readCif(fs.readFileSync(new URL("../public/" + file, import.meta.url), "utf8"));
 const close = (actual, expected, tolerance) => assert.ok(Math.abs(actual-expected) < tolerance, actual + " vs " + expected);
+
+test("anhydrite Ca–O bonds include all four ligand pairs at every displayed Ca", () => {
+  const structure = load("structures/anhydrite.cif");
+  const centres = translatedSites(structure.atoms, defaultRanges(), true);
+  const environments = cutoff => buildCoordinationEnvironments({
+    ...structure, centres, centerElement: "Ca", neighborElement: "O", cutoff,
+  });
+  const shells = environments(estimatePairCutoff(structure, "Ca", "O"));
+  assert.equal(shells.length, 6); // Includes Ca images on the cell boundary.
+  for (const {neighbors} of shells) {
+    assert.equal(neighbors.length, 8);
+    for (const [i, distance] of [2.3420, 2.4607, 2.5088, 2.5640].entries()) {
+      close(neighbors[2*i].distance, distance, 0.0001);
+      close(neighbors[2*i+1].distance, distance, 0.0001);
+    }
+  }
+  for (const {neighbors} of environments(2.55)) assert.equal(neighbors.length, 6);
+});
 
 test("site shells keep mixed ligands, planar groups and distinct distortions", () => {
   const inspect = (file, label, cutoff) => {

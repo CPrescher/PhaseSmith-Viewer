@@ -34,7 +34,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
         <button id="reflection-next" type="button" aria-label="Next harmonic">→</button>
       </div>
       <details class="reflection-options tool-options"><summary>Wavelength / detector</summary><div class="reflection-option-fields">
-      <label>λ (Å)<input id="reflection-wavelength" type="number" value="1.5406" min="0.001" step="any" required aria-label="X-ray wavelength" /></label>
+      <label>λ (Å)<input id="reflection-wavelength" type="number" inputmode="decimal" value="1.5406" min="0.001" step="any" required aria-label="X-ray wavelength" /></label>
       <button id="reflection-detector" type="button">Show on detector</button>
       <button id="reflection-project" type="button">Save exercise</button>
       </div></details>
@@ -125,6 +125,9 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     };
   }
 
+  const wavelengthField = $("reflection-wavelength");
+  wavelengthField.closest("label").after(numericKeys(wavelengthField, "Wavelength", false,
+    { signed: false, nativeEnter: true }));
   let structure = null, renderedStructure = null, result = null, selected = 0, reference = 0, count = 0;
   let clickedPosition = null, savedExercise = null;
   const rayMode = () => !$("reflection-rays-panel").hidden;
@@ -132,8 +135,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
   const selectedPosition = () => clickedPosition ?? result.atoms[selected].frac;
   const selectedDepth = () => selectedPosition().reduce((sum, v, i) => sum + v * result.hkl[i], 0);
   let renderer, scene, camera, viewCamera, controls, model, planeGroup, spheres, copies = [];
-  let resettingView = false;
-  let center = new THREE.Vector3(), radius = 1, fitDistance = 10, frame = 0, active = false;
+  let center = new THREE.Vector3(), radius = 1, fitDistance = 10, frame = 0;
   let selectionGroup, layerGroup, sphereRadius, planeTruncated = false;
   let layerAnchors = [];
   const layerColors = ["#55d6ba", "#ff8c77", "#83b9ff"];
@@ -142,6 +144,8 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
   const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
   let pointerStart = null;
   let animateWaves = false, waveTime = 0, lastWaveFrame = 0;
+  let waveFrame = 0;
+  const waveRows = [];
 
   function svg(parent, type, attrs, value) {
     const element = document.createElementNS(ns, type);
@@ -191,7 +195,12 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     controls = new ViewControls(camera, renderer.domElement);
     controls.staticMoving = true;
     controls.noPan = true;
-    controls.addEventListener("change", render);
+    // Static trackball controls only need to consume fresh gesture samples.
+    controls.addEventListener("start", requestCrystalFrame);
+    controls.addEventListener("end", requestCrystalFrame);
+    renderer.domElement.addEventListener("pointermove", event => {
+      if (event.buttons) requestCrystalFrame();
+    });
     renderer.domElement.addEventListener("pointerdown", event => { pointerStart = [event.clientX, event.clientY]; });
     renderer.domElement.addEventListener("pointerup", event => {
       if (!pointerStart || Math.hypot(event.clientX - pointerStart[0], event.clientY - pointerStart[1]) > 5) return;
@@ -268,10 +277,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
   function setView(view) {
     if (!result) return;
     for (const button of dialog.querySelectorAll("[data-view]")) button.setAttribute("aria-pressed", String(button.dataset.view === view));
-    // Trackball reset briefly restores its construction-time camera at the
-    // origin. Do not project layer labels through that singular interim view.
-    resettingView = true;
-    try { controls.reset(); } finally { resettingView = false; }
+    controls.reset();
     const normal = new THREE.Vector3(...result.normal);
     const helper = Math.abs(normal.z) < 0.9 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
     const edge = helper.cross(normal).normalize();
@@ -296,7 +302,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     controls.minDistance = fitDistance * 0.25;
     controls.maxDistance = fitDistance * 5;
     controls.update();
-    render();
+    requestCrystalFrame();
   }
 
   function paintCrystal() {
@@ -328,7 +334,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     $("reflection-plane-note").textContent = showLayers
       ? "Lettered layers match the ray diagram. Colored sheets mark atomic layers; dim atoms provide context."
       : `Blue planes mark integer m. ${planeTruncated ? "First 64 planes shown. " : ""}Highlighted positions belong to the same site and have the same phase.`;
-    render();
+    requestCrystalFrame();
   }
 
   function buildLayerHighlights(show, layers) {
@@ -374,8 +380,13 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     }
   }
 
+  function requestCrystalFrame() {
+    if (dialog.open && !frame) frame = requestAnimationFrame(render);
+  }
   function render() {
-    if (resettingView || !active || !result || !renderer || !controls) return;
+    frame = 0;
+    if (!dialog.open || !result || !controls || $("reflection-content").hidden) return;
+    controls.update();
     const half = camera.position.distanceTo(controls.target) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     viewCamera.left = -half * camera.aspect;
     viewCamera.right = half * camera.aspect;
@@ -515,7 +526,9 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
   }
 
   function drawRays() {
+    if (!rayMode()) return;
     const rays = $("reflection-rays"), waves = $("reflection-waves");
+    waveRows.length = 0;
     rays.replaceChildren();
     waves.replaceChildren();
     const delta = selectedDepth() - result.atoms[reference].m;
@@ -552,22 +565,41 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     text(rays, centerX - 12, 14, "Incoming ↘", "end");
     text(rays, width - 5, 14, "↗ Outgoing", "end");
     const left = 113, right = width - 66, period = (right - left) / 1.5, instant = left + period / 2;
+    const clip = svg(waves, "clipPath", { id: "reflection-wave-clip" });
+    svg(clip, "rect", { x: left, y: 0, width: Math.max(0, right - left), height: 116 });
     line(waves, instant, 18, instant, 110, "var(--muted)", 1, "3 3");
     text(waves, Math.min(width - 50, Math.max(55, instant)), 12, "Same instant");
     for (const [index, layer] of layers.entries()) {
       const baseline = 32 + index * 32;
       text(waves, 0, baseline + 4, layerName(layer), "start");
       line(waves, left, baseline, right, baseline, "var(--line)");
-      const height = x => baseline - 10 * Math.cos(2 * Math.PI * ((x - instant) / period - layer.cycles - waveTime));
-      const points = [];
-      for (let x = left; x <= right; x++) points.push(`${x},${height(x)}`);
-      svg(waves, "polyline", { points: points.join(" "), fill: "none", stroke: layerColor(layer), "stroke-width": 2.3 });
-      svg(waves, "circle", { cx: instant, cy: height(instant), r: 3.5, fill: layerColor(layer) });
+      if (period > 0) {
+        // Slide a precomputed curve under a clip. Only the horizontal shift
+        // and the marker height change as the phase advances.
+        const clipped = svg(waves, "g", { "clip-path": "url(#reflection-wave-clip)" });
+        const points = [];
+        for (let i = -64; i <= 96; i++) {
+          const x = i / 64;
+          points.push(`${left + x * period},${baseline - 10 * Math.cos(2 * Math.PI * (x - 0.5 - layer.cycles))}`);
+        }
+        const curve = svg(clipped, "polyline", { points: points.join(" "), fill: "none", stroke: layerColor(layer), "stroke-width": 2.3 });
+        const marker = svg(waves, "circle", { cx: instant, r: 3.5, fill: layerColor(layer) });
+        waveRows.push({ curve, marker, period, baseline, cycles: layer.cycles });
+      }
       text(waves, right + 5, baseline + 4, `${Number(layer.cycles.toPrecision(3))}λ`, "start");
     }
     $("reflection-translation").textContent = `${layers.map(layer => layer.id).join("–")} match the crystal layers, translated together by [${shift.join(" ")}] unit cells for visibility. t = [${translation.join(" ")}] connects the reference copies. Extra paths 2z⊥ sin θ are measured from the uppermost layer. Wave heights are normalized; in-plane offsets are suppressed.`;
     rays.setAttribute("aria-label", layers.map(layer => `${layerName(layer)} (${layer.names.join(" and ")}): ${format(layer.cycles)} wavelengths extra path`).join(". "));
     waves.setAttribute("aria-label", "Normalized waves at the detector. " + rays.getAttribute("aria-label"));
+    updateWavePositions();
+    scheduleWaves();
+  }
+
+  function updateWavePositions() {
+    for (const { curve, marker, period, baseline, cycles } of waveRows) {
+      curve.setAttribute("transform", `translate(${(waveTime % 1) * period} 0)`);
+      marker.setAttribute("cy", baseline - 10 * Math.cos(2 * Math.PI * (cycles + waveTime)));
+    }
   }
 
   function selectGroup(index) {
@@ -643,6 +675,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
   }
 
   function calculate() {
+    if (!dialog.open) return;
     try {
       const hkl = parseMillerIndices($("reflection-hkl").value);
       const next = reflection(structure, hkl, Number($("reflection-wavelength").value));
@@ -695,7 +728,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
   }
 
   function resize() {
-    if (!active || !renderer || !result || $("reflection-content").hidden) return;
+    if (!dialog.open || !renderer || !result || $("reflection-content").hidden) return;
     if (!stage.clientWidth || !stage.clientHeight) { drawSum(); drawRays(); return; }
     renderer.setSize(stage.clientWidth, stage.clientHeight);
     camera.aspect = stage.clientWidth / stage.clientHeight;
@@ -703,18 +736,25 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     controls.handleResize();
     drawSum();
     drawRays();
-    render();
+    requestCrystalFrame();
   }
-  function tick(now = 0) {
-    if (!active) return;
-    controls.update();
-    if (animateWaves && !$("reflection-rays-panel").hidden && now - lastWaveFrame > 32) {
+  function wavesPlaying() {
+    return dialog.open && animateWaves && !document.hidden && !$("reflection-content").hidden && rayMode() && waveRows.length > 0;
+  }
+  function scheduleWaves() {
+    if (wavesPlaying() && !waveFrame) waveFrame = requestAnimationFrame(tickWaves);
+  }
+  function tickWaves(now) {
+    waveFrame = 0;
+    if (!wavesPlaying()) return;
+    if (now - lastWaveFrame > 32) {
       waveTime = now / 2200;
       lastWaveFrame = now;
-      drawRays();
+      updateWavePositions();
     }
-    frame = requestAnimationFrame(tick);
+    scheduleWaves();
   }
+  document.addEventListener("visibilitychange", scheduleWaves);
   function open(hkl, wavelength) {
     const saved = hkl ? null : savedExercise ?? snapshot();
     savedExercise = null;
@@ -726,7 +766,6 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
     $("reflection-hkl").value = hkl.join(" ");
     if (!dialog.open) showReflection();
     opener?.setAttribute("aria-expanded", "true");
-    active = true;
     try {
       if (!renderer) initializeScene();
       controls.enabled = true;
@@ -747,8 +786,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
           controls.target.fromArray(saved.target); controls.update();
         }
       }
-      cancelAnimationFrame(frame);
-      tick();
+      requestCrystalFrame();
     } catch (error) {
       $("reflection-error").textContent = `Could not open the crystal view. ${error.message}`;
       $("reflection-error").hidden = false;
@@ -771,9 +809,11 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
   $("reflection-close").addEventListener("click", closeReflection);
   dialog.addEventListener("close", () => {
     if (dialog.open) return;
-    active = false;
     opener?.setAttribute("aria-expanded", "false");
     cancelAnimationFrame(frame);
+    frame = 0;
+    cancelAnimationFrame(waveFrame);
+    waveFrame = 0;
     if (controls) controls.enabled = false;
   });
   $("reflection-form").addEventListener("submit", event => { event.preventDefault(); calculate(); });
@@ -796,6 +836,7 @@ export function createReflectionExplorer({ getStructure, atomRadius, onDetector 
   $("reflection-reference").addEventListener("change", event => { reference = Number(event.target.value); paintCrystal(); drawRays(); });
   $("reflection-animate").addEventListener("click", event => {
     animateWaves = !animateWaves;
+    scheduleWaves();
     event.currentTarget.setAttribute("aria-pressed", String(animateWaves));
     event.currentTarget.textContent = animateWaves ? "Pause waves" : "Animate waves";
   });
