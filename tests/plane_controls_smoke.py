@@ -77,6 +77,7 @@ async def check(browser, width, height, theme):
         await hkl_keys.locator('[data-key="done"]').tap()
         assert (await state())["planes"][0]["hkl"] == [12, -3, 4]
         assert not await hkl_keys.is_visible()
+        await offset.tap()
         await offset.fill("0.25")
         await offset_keys.locator('[data-key="sign"]').tap()
         assert await offset.input_value() == "-0.25"

@@ -21,6 +21,10 @@ async def check(browser, width, height, touch=True, locale="en-US"):
     async def enter(field, keys):
         assert await field.get_attribute("inputmode") == ("none" if touch else "text")
         assert await field.get_attribute("autocorrect") == "off"
+        if touch:
+            await field.focus()
+            assert not await keys.is_visible()
+            await field.tap()
         await field.fill("0")
         if touch:
             await field.press("End")
@@ -67,6 +71,8 @@ async def check(browser, width, height, touch=True, locale="en-US"):
     assert await row.get_by_role("button", name="Remove arrow [0.5 -1 0]").count() == 1
     for field_name, text in [("origin", "0.5 0 0"), ("length", "2")]:
         field = row.locator(f'[data-field="{field_name}"]')
+        if touch:
+            await field.tap()
         await field.fill(text)
         if touch:
             await row.locator(f'[data-for="{field_name}"] [data-key="done"]').tap()
@@ -82,6 +88,8 @@ async def check(browser, width, height, touch=True, locale="en-US"):
             await field.blur()
             await field.click()
             assert await field.evaluate("e => e.selectionEnd - e.selectionStart === e.value.length")
+        if touch:
+            await field.tap()
         await field.fill("200")
         if touch:
             await page.locator(f'[data-for="{tool}-hkl"] [data-key="done"]').tap()

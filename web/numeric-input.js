@@ -182,9 +182,23 @@ export function numericKeys(input, caption, withSpace = false, {
     // Removing a focused editor can close its popover without a blur event.
     if (event.newState === "closed" && !keys.matches(":popover-open")) hide();
   });
-  input.addEventListener("focus", show);
+  // Dialog autofocus, Tab and a mouse on a hybrid device can all focus a
+  // field. Reserve the floating keypad for an intentional touch or pen tap.
+  let touchPress = false;
+  input.addEventListener("pointerdown", event => {
+    touchPress = event.pointerType === "touch" || event.pointerType === "pen";
+  });
+  input.addEventListener("pointercancel", () => { touchPress = false; });
   input.addEventListener("click", () => {
-    if (document.activeElement === input) show();
+    if (touchPress && document.activeElement === input) show();
+    touchPress = false;
+  });
+  input.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !keys.hidden) {
+      event.preventDefault();
+      event.stopPropagation();
+      hide();
+    }
   });
   input.addEventListener("change", () => { edited = false; });
   input.addEventListener("blur", event => {
