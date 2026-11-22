@@ -161,8 +161,12 @@ export function buildCoordinationEnvironments({
 function planarHull(points, vectors, center, xAxis, normal, epsilon) {
   if (!center) return null;
   const origin = vectors[0];
-  const offset = new Vector3(...center).sub(origin);
-  if (Math.abs(offset.dot(normal)) > epsilon) return null;
+  const site = new Vector3(...center);
+  const offset = site.clone().sub(origin);
+  // Allow a shallow displacement from the ligand plane (about 2.1% of a
+  // C–O bond in aragonite). Keep the polygon containment test below precise.
+  const shortestBond = vectors.reduce((d, v) => Math.min(d, v.distanceTo(site)), Infinity);
+  if (Math.abs(offset.dot(normal)) > Math.max(epsilon, 0.03 * shortestBond)) return null;
   const yAxis = normal.clone().cross(xAxis);
   const projected = vectors.map((v, index) => {
     const d = v.clone().sub(origin);

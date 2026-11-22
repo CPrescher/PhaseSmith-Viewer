@@ -34,6 +34,9 @@ async def check(browser,w,h,theme):
         box=await flyout.bounding_box()
         assert box and box['x']>=0 and box['x']+box['width']<=before['x'], (w,h,group,box,before)
         assert box['y']>=0 and box['y']+box['height']<=h
+        buttons = flyout.locator('button')
+        assert box['height'] <= 8 + 54 * await buttons.count(), (w, h, group, box)
+        assert await hit(buttons.first) and await hit(buttons.last)
         assert await rail.bounding_box()==before
         await page.keyboard.press('ArrowDown')
         assert await flyout.locator('button').nth(1).evaluate('b=>b===document.activeElement')

@@ -78,6 +78,9 @@ jobs:
         run: |
           python -m pip install -r tests/requirements-browser.txt
           python -m playwright install --with-deps chromium
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            python -m playwright install --with-deps webkit
+          fi
       - name: Check production loading and examples (extended suite on request)
         timeout-minutes: ${{ inputs.full_browser_matrix && 45 || 3 }}
         shell: bash
@@ -91,6 +94,9 @@ jobs:
           trap 'kill "$viewer_server_pid"; rm -rf "$viewer_site_root"' EXIT
           curl --retry 10 --retry-connrefused --retry-delay 1 -fsS "http://127.0.0.1:4181$VITE_BASE_PATH" > /dev/null
           VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/docs_smoke.py
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" xvfb-run -a python tests/pages_smoke.py --tablet-webkit
+          fi
           if [ "${{ inputs.full_browser_matrix }}" = true ]; then
             VIEWER_URL="http://127.0.0.1:4181${VITE_BASE_PATH%/}" python tests/run_browser_checks.py --timeout 1200
           else

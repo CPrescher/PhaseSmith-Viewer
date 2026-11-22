@@ -31,10 +31,12 @@ test("site shells keep mixed ligands, planar groups and distinct distortions", (
   assert.equal(mixed.count,7);
   assert.equal(mixed.groups[0].atom.element,"F");
   assert.ok(mixed.volume > 0 && mixed.edges.length > 0);
-  const carbonate = inspect("structures/calcite.cif","C",1.5);
-  assert.equal(carbonate.count,3);
-  assert.equal(carbonate.edges.length,3);
-  assert.equal(carbonate.volume,null);
+  for (const mineral of ["calcite", "aragonite"]) {
+    const carbonate = inspect(`structures/${mineral}.cif`, "C", 1.5);
+    assert.equal(carbonate.count, 3);
+    assert.equal(carbonate.edges.length, 3);
+    assert.equal(carbonate.volume, null);
+  }
   close(inspect("examples/forsterite.cif","Mg1",2.3).distortion,0.011175,1e-5);
   close(inspect("examples/forsterite.cif","Mg2",2.3).distortion,0.03289,1e-5);
 });
