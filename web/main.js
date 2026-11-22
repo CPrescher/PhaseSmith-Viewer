@@ -4,6 +4,9 @@ import { version as viewerVersion } from "../package.json";
 import * as THREE from "three";
 import { ViewControls } from "./view-controls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { Line2 } from "three/addons/lines/Line2.js";
+import { LineGeometry } from "three/addons/lines/LineGeometry.js";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import "./style.css";
 import {
   defaultRanges,
@@ -2156,6 +2159,15 @@ function initialize() {
     fitPose = { distance: fitDistance, target: target.clone() };
     invalidate();
   }
+  function addMeasurementLine(points, style, renderOrder = 5) {
+    const line = new Line2(
+      new LineGeometry().setFromPoints(points),
+      new LineMaterial({ linewidth: 2.5, depthTest: false, ...style }),
+    );
+    if (style.dashed) line.computeLineDistances();
+    line.renderOrder = renderOrder;
+    selectionGroup.add(line);
+  }
   function updateSelection() {
     dispose(selectionGroup);
     selectionGroup.clear();
@@ -2179,14 +2191,7 @@ function initialize() {
     if (measureMode === "angle" && selection.length >= 2) {
       // A–B–C: two solid legs from the vertex B and an arc at B.
       const [a, b, c] = selection;
-      const legs = new THREE.LineSegments(
-        new THREE.BufferGeometry().setFromPoints(
-          [a, b, ...(c ? [b, c] : [])].map((atom) => atom.position),
-        ),
-        new THREE.LineBasicMaterial({ color: scenePalette().select, depthTest: false }),
-      );
-      legs.renderOrder = 5;
-      selectionGroup.add(legs);
+      addMeasurementLine(selection.map((atom) => atom.position), { color: scenePalette().select });
       if (c) {
         angle = angleAt(a.position.toArray(), b.position.toArray(), c.position.toArray());
         if (angle !== null) {
@@ -2209,31 +2214,18 @@ function initialize() {
             arc.push(
               u.clone().applyAxisAngle(axis, (radians * i) / steps).multiplyScalar(radius).add(b.position),
             );
-          const curve = new THREE.Line(
-            new THREE.BufferGeometry().setFromPoints(arc),
-            new THREE.LineBasicMaterial({ color: scenePalette().arc, depthTest: false }),
-          );
-          curve.renderOrder = 6;
-          selectionGroup.add(curve);
+          addMeasurementLine(arc, { color: scenePalette().arc }, 6);
         }
       }
     }
     if (measureMode === "distance" && selection.length === 2) {
       distance = selection[0].position.distanceTo(selection[1].position);
-      const line = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(
-          selection.map((a) => a.position),
-        ),
-        new THREE.LineDashedMaterial({
-          color: scenePalette().select,
-          depthTest: false,
-          dashSize: Math.max(distance / 24, 0.04),
-          gapSize: Math.max(distance / 48, 0.02),
-        }),
-      );
-      line.computeLineDistances();
-      line.renderOrder = 5;
-      selectionGroup.add(line);
+      addMeasurementLine(selection.map((atom) => atom.position), {
+        color: scenePalette().select,
+        dashed: true,
+        dashSize: Math.max(distance / 24, 0.04),
+        gapSize: Math.max(distance / 48, 0.02),
+      });
     }
     const picking = Boolean(styleEditor?.picking);
     // Style picking keeps the card compact (accent frame + hint on larger
