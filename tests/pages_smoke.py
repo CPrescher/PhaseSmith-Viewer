@@ -40,6 +40,24 @@ async def check_tablet_library(page):
     assert all(shell["faceCount"] == 1 and shell["edgeCount"] == 3 for shell in rule["environments"])
 
 
+async def check_mixed_pointer_keypads(page):
+    for tool, add, field_name in [
+        ("#mode-lattice", "#plane-add", "hkl"),
+        ("#mode-directions", "#arrow-add", "uvw"),
+    ]:
+        await choose_tool(page, tool, touch=True)
+        await page.locator(add).tap()
+        field = page.locator(f'[data-field="{field_name}"]').last
+        keypad = page.locator(f'.numeric-keys[data-for="{field_name}"]').last
+        await field.click()
+        assert await field.evaluate("el => el === document.activeElement")
+        assert not await keypad.is_visible()
+        await field.tap()
+        assert await keypad.is_visible()
+        await field.click()
+        assert not await keypad.is_visible()
+
+
 async def main(tablet_webkit=False):
     async with async_playwright() as p:
         if tablet_webkit:
@@ -51,6 +69,7 @@ async def main(tablet_webkit=False):
             await page.goto(URL + "/")
             await page.wait_for_function("window.viewerDiagnostics?.().atoms.length > 0")
             await check_tablet_library(page)
+            await check_mixed_pointer_keypads(page)
             await browser.close()
             print("WebKit tablet: compact menus, Library focus and aragonite faces passed")
             return
@@ -124,6 +143,7 @@ async def main(tablet_webkit=False):
                 )
                 await page.set_viewport_size({"width": 1024, "height": 700})
                 await check_tablet_library(page)
+                await check_mixed_pointer_keypads(page)
             assert not errors, errors
             print(
                 f"{example or 'NaCl'}: production assets, PhaseSmith WASM and viewer passed",

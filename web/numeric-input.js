@@ -187,6 +187,7 @@ export function numericKeys(input, caption, withSpace = false, {
   let touchPress = false;
   input.addEventListener("pointerdown", event => {
     touchPress = event.pointerType === "touch" || event.pointerType === "pen";
+    if (!touchPress && !keys.hidden) hide();
   });
   input.addEventListener("pointercancel", () => { touchPress = false; });
   input.addEventListener("click", () => {
