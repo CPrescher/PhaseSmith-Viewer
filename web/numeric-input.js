@@ -85,9 +85,18 @@ export function numericKeys(input, caption, withSpace = false, {
   if (!touch) return keys;
 
   keys.classList.add("touch-keypad");
-  if (indexKeypad) keys.classList.add("index-keypad");
-  if (fractionalIndices) keys.classList.add("direction-keypad");
   if (floating) keys.popover = "manual";
+  // Keep the input focused even if a fast tap lands in a gap between keys.
+  keys.addEventListener("pointerdown", event => event.preventDefault());
+  keys.addEventListener("touchend", event => {
+    const key = event.target.closest('[data-key="backspace"]');
+    if (!key || !event.cancelable) return;
+    // Consume this tap before Safari can synthesize a click at its location.
+    event.preventDefault();
+    if (event.touches.length || event.changedTouches.length !== 1) return;
+    const touch = event.changedTouches[0];
+    if (key.contains(document.elementFromPoint(touch.clientX, touch.clientY))) key.click();
+  }, { passive: false });
 
   function position() {
     if (!input.getClientRects().length) return hide();
@@ -136,7 +145,6 @@ export function numericKeys(input, caption, withSpace = false, {
     const button = make("button", { type: "button", className: "secondary", textContent: text });
     button.setAttribute("aria-label", label);
     button.dataset.key = name;
-    button.addEventListener("pointerdown", event => event.preventDefault());
     button.addEventListener("click", action);
     keys.append(button);
   }
@@ -152,10 +160,10 @@ export function numericKeys(input, caption, withSpace = false, {
       if (withSpace || number) add("−", "minus", "Insert minus sign", () => replace("-"));
       else add("±", "sign", "Toggle sign", toggleSign);
     }
-    if (withSpace) add("Space", "space", "Insert space", () => replace(" "));
+    if (withSpace) add("␣", "space", "Insert space", () => replace(" "));
     if (input.tagName === "TEXTAREA") add("↵", "newline", "New row", () => replace("\n"));
     add("⌫", "backspace", "Backspace", () => replace("", true));
-    add("Done", "done", `Finish editing ${caption}`, finish);
+    add("⏎", "done", `Finish editing ${caption}`, finish);
   }
   function show() {
     if (!keys.hidden || nativeFallback) return;
@@ -166,13 +174,21 @@ export function numericKeys(input, caption, withSpace = false, {
     listeners = new AbortController();
     position();
     const options = { signal: listeners.signal };
-    document.addEventListener("click", event => {
+    const panel = input.closest("dialog, .tool-window, #direction-form, .turn-panel");
+    if (panel) {
+      const movement = new MutationObserver(position);
+      movement.observe(panel, { attributes: true, attributeFilter: ["style", "class", "hidden", "open"] });
+      listeners.signal.addEventListener("abort", () => movement.disconnect(), { once: true });
+    }
+    document.addEventListener("pointerdown", event => {
+      // Drag handles prevent default to keep the active editor focused.
+      if (event.defaultPrevented && panel?.contains(event.target)) return;
       if (event.target !== input && !keys.contains(event.target) &&
           !Array.from(input.labels ?? []).some(label => label.contains(event.target))) {
         input.blur();
         hide();
       }
-    }, { ...options, capture: true });
+    }, options);
     document.addEventListener("scroll", position, { ...options, capture: true });
     window.addEventListener("resize", position, options);
     window.visualViewport?.addEventListener("resize", position, options);

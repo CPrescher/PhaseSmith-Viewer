@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Touch numeric keypads use a three-column digit grid with a one-cell Backspace and a three-row Enter key. The keypad follows its field when a panel moves and stays open during repeated Backspace taps.
+
 ## [v1.0.1](https://github.com/CPrescher/PhaseSmith-Viewer/releases/tag/v1.0.1) · 2026-11-22
 
 ### Changed

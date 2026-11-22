@@ -54,6 +54,19 @@ async def check_mixed_pointer_keypads(page):
         assert not await keypad.is_visible()
         await field.tap()
         assert await keypad.is_visible()
+        delete = keypad.locator('[data-key="backspace"]')
+        enter = keypad.locator('[data-key="done"]')
+        delete_box, enter_box = await delete.bounding_box(), await enter.bounding_box()
+        assert await enter.inner_text() == "⏎"
+        assert await keypad.locator('[data-key="space"]').inner_text() == "␣"
+        assert enter_box["x"] == delete_box["x"] and enter_box["width"] == delete_box["width"]
+        assert enter_box["height"] == 3 * delete_box["height"] + 6
+        await field.fill("123")
+        await field.press("End")
+        for expected in ["12", "1", "", ""]:
+            await page.touchscreen.tap(delete_box["x"] + delete_box["width"] / 2,
+                                       delete_box["y"] + delete_box["height"] / 2)
+            assert await field.input_value() == expected and await keypad.is_visible()
         await field.click()
         assert not await keypad.is_visible()
 
