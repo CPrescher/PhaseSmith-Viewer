@@ -61,8 +61,26 @@ async def check(browser, width, height, theme):
         await hkl.tap()
         space = hkl_keys.get_by_role("button", name="Insert space")
         first = await hkl_keys.locator('[data-key="1"]').bounding_box()
+        assert first["height"] == 44
+        assert (await hkl_keys.bounding_box())["height"] <= 197
         separator = await space.bounding_box()
-        assert abs(separator["y"] - first["y"]) < 1 and separator["width"] > first["width"] * 1.9
+        zero = await hkl_keys.locator('[data-key="0"]').bounding_box()
+        assert await space.inner_text() == "␣"
+        assert separator["y"] == zero["y"] and abs(separator["x"] - zero["x"] - zero["width"] - 3) < 1
+        await hkl.fill("123")
+        await hkl.press("End")
+        delete = await hkl_keys.locator('[data-key="backspace"]').bounding_box()
+        enter = hkl_keys.locator('[data-key="done"]')
+        assert await enter.inner_text() == "⏎"
+        enter_box = await enter.bounding_box()
+        assert delete["width"] == enter_box["width"] == first["width"]
+        assert delete["x"] == enter_box["x"] and delete["height"] == first["height"]
+        assert enter_box["y"] == delete["y"] + delete["height"] + 3
+        assert enter_box["height"] == 3 * first["height"] + 6
+        for remaining in ["12", "1", "", ""]:
+            await page.touchscreen.tap(delete["x"] + delete["width"] / 2, delete["y"] + delete["height"] / 2)
+            assert await hkl.input_value() == remaining
+            assert await hkl_keys.is_visible() and await hkl.evaluate("el => el === document.activeElement")
         await hkl.evaluate("el => el.select()")
         for digit in "125":
             await hkl_keys.locator(f'[data-key="{digit}"]').tap()

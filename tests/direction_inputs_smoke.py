@@ -27,6 +27,8 @@ async def check(browser, width, height, touch=True, locale="en-US"):
             await field.tap()
         await field.fill("0")
         if touch:
+            assert (await keys.locator('[data-key="1"]').bounding_box())["height"] == 44
+            assert (await keys.bounding_box())["height"] <= 244
             await field.press("End")
             separator = "," if locale == "de-DE" else "."
             assert await keys.get_by_text(separator, exact=True).count() == 1
@@ -105,6 +107,15 @@ async def check(browser, width, height, touch=True, locale="en-US"):
         pad = page.locator('[data-for="range-a-min"]')
         field_box, pad_box = await bound.bounding_box(), await pad.bounding_box()
         assert field_box and pad_box
+        assert pad_box["height"] <= 197
+        digit_boxes = [await pad.locator(f'[data-key="{n}"]').bounding_box() for n in range(10)]
+        for n in range(1, 10):
+            assert digit_boxes[n]["x"] == digit_boxes[1 + (n - 1) % 3]["x"]
+            assert digit_boxes[n]["y"] == digit_boxes[1 + 3 * ((n - 1) // 3)]["y"]
+        assert digit_boxes[1]["x"] < digit_boxes[2]["x"] < digit_boxes[3]["x"]
+        assert digit_boxes[1]["y"] < digit_boxes[4]["y"] < digit_boxes[7]["y"] < digit_boxes[0]["y"]
+        assert digit_boxes[0]["x"] == digit_boxes[2]["x"]
+        assert (await pad.locator('[data-key="1"]').bounding_box())["height"] == 44
         assert (pad_box["y"] + pad_box["height"] <= field_box["y"] or
                 field_box["y"] + field_box["height"] <= pad_box["y"] or
                 pad_box["x"] + pad_box["width"] <= field_box["x"] or
