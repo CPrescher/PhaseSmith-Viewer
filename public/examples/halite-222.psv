@@ -1,0 +1,79 @@
+{
+  "format": "phasesmith-viewer-project",
+  "version": 1,
+  "savedAt": "2026-11-26T13:18:28.857Z",
+  "document": {
+    "text": "# Ideal rock salt with a rounded cubic cell parameter.\ndata_halite\n_chemical_name_mineral 'Halite'\n_chemical_formula_sum 'Na Cl'\n_symmetry_space_group_name_H-M 'F m -3 m'\n_space_group_IT_number 225\n_cell_length_a 5.64\n_cell_length_b 5.64\n_cell_length_c 5.64\n_cell_angle_alpha 90\n_cell_angle_beta 90\n_cell_angle_gamma 90\nloop_\n_atom_site_label\n_atom_site_type_symbol\n_atom_site_fract_x\n_atom_site_fract_y\n_atom_site_fract_z\nCl1 Cl 0 0 0\nNa1 Na 0.5 0.5 0.5\n",
+    "filename": "ideal-halite.cif"
+  },
+  "state": {
+    "block": "halite",
+    "ranges": [
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "boundary": true,
+    "cell": true,
+    "rules": [],
+    "appearance": {},
+    "atoms": {
+      "show": true,
+      "size": 0.3
+    },
+    "lattice": {
+      "planes": [
+        {
+          "id": 1,
+          "hkl": [
+            2,
+            2,
+            2
+          ],
+          "m": 0,
+          "autoOffset": false,
+          "size": 100,
+          "opacity": 0.34,
+          "family": true,
+          "visible": true,
+          "color": "#f5bd54"
+        }
+      ],
+      "labels": {
+        "enabled": true,
+        "includeOffsets": false,
+        "position": "outside"
+      }
+    },
+    "camera": {
+      "position": [
+        14.8,
+        1.44,
+        -8.96
+      ],
+      "up": [
+        0.1,
+        1,
+        0.33
+      ],
+      "target": [
+        0,
+        0,
+        0
+      ]
+    },
+    "measure": {
+      "mode": "info"
+    }
+  },
+  "theme": "dark"
+}
