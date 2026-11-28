@@ -479,13 +479,20 @@ export function createReflectionExplorer({
   }
 
   function arrow(parent, start, end, color, width = 2) {
-    const shaft = line(parent, ...start, ...end, color, width);
     const dx = end[0] - start[0], dy = end[1] - start[1], length = Math.hypot(dx, dy);
     if (length > 4) {
-      const c = dx / length, s = dy / length, head = Math.min(7, length * 0.4);
-      svg(parent, "polygon", { points: `${end} ${end[0] - head * c - head * s / 2},${end[1] - head * s + head * c / 2} ${end[0] - head * c + head * s / 2},${end[1] - head * s - head * c / 2}`, fill: color });
+      const c = dx / length, s = dy / length;
+      const head = Math.min(4.2 + width * 1.6, length * 0.45);
+      const wing = head * 0.52;
+      const trim = Math.min(head * 0.65, length * 0.3);
+      const shaft = line(parent, start[0], start[1], end[0] - trim * c, end[1] - trim * s, color, width);
+      svg(parent, "polygon", {
+        points: `${end[0]},${end[1]} ${end[0] - head * c - wing * s},${end[1] - head * s + wing * c} ${end[0] - head * c + wing * s},${end[1] - head * s - wing * c}`,
+        fill: color,
+      });
+      return shaft;
     }
-    return shaft;
+    return line(parent, ...start, ...end, color, width);
   }
 
   function drawSum() {
@@ -750,11 +757,16 @@ export function createReflectionExplorer({
     const rows = document.createDocumentFragment();
     for (const entry of rays ? result.atoms : result.groups) {
       const row = document.createElement("tr");
+      const activate = () => (rays ? selectAtom(entry.index) : selectGroup(entry.index));
       const button = document.createElement("button");
       button.type = "button";
       button.className = "text-button";
       button.textContent = rays ? atomName(entry) : entry.label || entry.element;
-      button.addEventListener("click", () => rays ? selectAtom(entry.index) : selectGroup(entry.index));
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        activate();
+      });
+      row.addEventListener("click", activate);
       row.insertCell().append(button);
       for (const value of [rays ? format(entry.m) : entry.members.length, degrees(entry.cycles),
         format(rays ? entry.amplitude : Math.hypot(entry.real, entry.imaginary))]) {

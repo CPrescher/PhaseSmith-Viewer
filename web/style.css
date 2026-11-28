@@ -4943,6 +4943,32 @@ details.tool-options[open] > summary::before {
     min-height: 44px;
   }
 }
+details.reflection-options.tool-options {
+  border-top: 0;
+  margin: 0;
+}
+details.reflection-options.tool-options .reflection-option-fields {
+  padding: 4px 0 0;
+}
+@media (min-width: 901px) and (min-height: 501px) {
+  details.reflection-options.tool-options {
+    display: contents;
+  }
+  details.reflection-options.tool-options > summary {
+    display: none;
+  }
+  details.reflection-options.tool-options .reflection-option-fields {
+    display: contents;
+  }
+}
+.reflection-atom-table tbody tr {
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .reflection-atom-table tbody tr:hover:not(.selected) td {
+    background: var(--accent-soft);
+  }
+}
 
 /* ---- 4. Custom <select> and calm WCAG-safe input wells inside panes -------- */
 :is(.tool-window, .analysis-window, .xrd-workspace, #detector-options, #structure-library)
