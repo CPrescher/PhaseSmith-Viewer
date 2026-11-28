@@ -4969,6 +4969,69 @@ details.reflection-options.tool-options .reflection-option-fields {
     background: var(--accent-soft);
   }
 }
+.reflection-ray-verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 8px 0 4px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.reflection-ray-verdict[data-tone="constructive"] {
+  border-color: color-mix(in srgb, #55d6ba 45%, var(--line));
+}
+.reflection-ray-verdict[data-tone="destructive"] {
+  border-color: color-mix(in srgb, #ff8c77 45%, var(--line));
+}
+.ray-role-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 550;
+  color: var(--text);
+}
+.ray-role-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.ray-role-arrow {
+  color: var(--muted);
+}
+.ray-verdict-text {
+  margin-left: auto;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--numeric-features);
+  color: var(--text);
+}
+#reflection-explorer .reflection-ref-btn {
+  min-height: 22px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 99px;
+  border: 1px solid var(--control-border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+#reflection-explorer .reflection-ref-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+#reflection-explorer .reflection-ref-btn.is-active {
+  background: color-mix(in srgb, #55d6ba 22%, transparent);
+  border-color: color-mix(in srgb, #55d6ba 55%, transparent);
+  color: var(--text);
+}
 
 /* ---- 4. Custom <select> and calm WCAG-safe input wells inside panes -------- */
 :is(.tool-window, .analysis-window, .xrd-workspace, #detector-options, #structure-library)
