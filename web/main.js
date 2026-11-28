@@ -189,8 +189,32 @@ function initialize() {
   const scene = new THREE.Scene(),
     camera = new THREE.PerspectiveCamera(38, 1, 0.01, 10000);
   // A perspective control camera supplies intuitive distance-based zoom;
-  // the synchronized parallel camera renders and picks the crystal.
-  const viewCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10000);
+  // by default the synchronized orthographic camera renders and picks the
+  // crystal, with an optional Perspective projection toggle.
+  const orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10000);
+  const perspCamera = new THREE.PerspectiveCamera(38, 1, 0.01, 10000);
+  let projectionMode = "ortho";
+  let viewCamera = orthoCamera;
+  function setProjection(mode, { save = true } = {}) {
+    const next = mode === "perspective" ? "perspective" : "ortho";
+    if (projectionMode === next && viewCamera === (next === "perspective" ? perspCamera : orthoCamera)) return;
+    projectionMode = next;
+    viewCamera = next === "perspective" ? perspCamera : orthoCamera;
+    const btn = $("projection-toggle");
+    if (btn) {
+      btn.textContent = next === "perspective" ? "Persp" : "Ortho";
+      btn.setAttribute("aria-pressed", String(next === "perspective"));
+    }
+    syncViewCamera();
+    invalidate();
+    if (save) scheduleSave();
+  }
+  if ($("projection-toggle")) {
+    $("projection-toggle").onclick = () => {
+      historyLabel = "Toggle projection";
+      setProjection(projectionMode === "ortho" ? "perspective" : "ortho");
+    };
+  }
   // Tool windows overlay the view. Opening, switching, moving or closing
   // a tool never changes the camera or the projected atom positions.
   const stage = { x: 0, y: 0, clear: null };
@@ -198,17 +222,10 @@ function initialize() {
     const halfHeight =
       camera.position.distanceTo(controls.target) *
       Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-    viewCamera.left = -halfHeight * camera.aspect;
-    viewCamera.right = halfHeight * camera.aspect;
-    viewCamera.top = halfHeight;
-    viewCamera.bottom = -halfHeight;
-    // Depth is decoupled from the logical (zoom) distance: when zoomed into
-    // a long structure the logical camera can sit inside it, which would
-    // clip near atoms and let rays start behind them. Move only the
-    // rendered camera back along its own view axis until the scene's
-    // bounding sphere (cached bounds, O(1)) is in front of the near plane,
-    // and extend far past its back. Screen x/y are unchanged (orthographic),
-    // so pan/zoom anchoring, labels and picking stay pixel-exact.
+    orthoCamera.left = -halfHeight * camera.aspect;
+    orthoCamera.right = halfHeight * camera.aspect;
+    orthoCamera.top = halfHeight;
+    orthoCamera.bottom = -halfHeight;
     viewAxis.set(0, 0, 1).applyQuaternion(camera.quaternion); // toward viewer
     const near = camera.near;
     let shift = 0,
@@ -222,13 +239,31 @@ function initialize() {
       shift = Math.max(0, along + sceneSphere.radius + near + margin);
       far = Math.max(far, shift - along + sceneSphere.radius + margin);
     }
-    viewCamera.near = near;
-    viewCamera.far = far;
-    viewCamera.position.copy(camera.position).addScaledVector(viewAxis, shift);
-    viewCamera.quaternion.copy(camera.quaternion);
-    viewCamera.up.copy(camera.up);
-    viewCamera.updateProjectionMatrix();
-    viewCamera.updateMatrixWorld();
+    orthoCamera.near = near;
+    orthoCamera.far = far;
+    orthoCamera.position.copy(camera.position).addScaledVector(viewAxis, shift);
+    orthoCamera.quaternion.copy(camera.quaternion);
+    orthoCamera.up.copy(camera.up);
+    orthoCamera.updateProjectionMatrix();
+    orthoCamera.updateMatrixWorld();
+
+    // Synchronize perspective render camera for optional perspective mode.
+    perspCamera.fov = camera.fov;
+    perspCamera.aspect = camera.aspect;
+    perspCamera.position.copy(camera.position);
+    perspCamera.quaternion.copy(camera.quaternion);
+    perspCamera.up.copy(camera.up);
+    if (!sceneBox.isEmpty()) {
+      const dist = camera.position.distanceTo(sceneSphere.center);
+      perspCamera.near = Math.max(0.05, Math.min(near * 10, dist - sceneSphere.radius * 1.15));
+      perspCamera.far = Math.max(camera.far, dist + sceneSphere.radius * 2 + 10);
+    } else {
+      perspCamera.near = near;
+      perspCamera.far = far;
+    }
+    perspCamera.updateProjectionMatrix();
+    perspCamera.updateMatrixWorld();
+    viewCamera = projectionMode === "perspective" ? perspCamera : orthoCamera;
     // Optional depth cueing: linear fog along the view axis, from just in
     // front of the scene centre to past its back, toward the canvas color
     // (white for White exports; none for transparent images).
@@ -452,12 +487,16 @@ function initialize() {
         // beyond the live viewport at other orientations; it still fits in
         // the export without changing the user's camera or zoom.
         const { crop, css } = exportView;
-        const px = (viewCamera.right - viewCamera.left) / css.width;
-        const py = (viewCamera.top - viewCamera.bottom) / css.height;
-        viewCamera.left += crop.x * px;
-        viewCamera.right = viewCamera.left + crop.width * px;
-        viewCamera.top -= crop.y * py;
-        viewCamera.bottom = viewCamera.top - crop.height * py;
+        if (viewCamera.isPerspectiveCamera) {
+          viewCamera.setViewOffset(css.width, css.height, crop.x, crop.y, crop.width, crop.height);
+        } else {
+          const px = (viewCamera.right - viewCamera.left) / css.width;
+          const py = (viewCamera.top - viewCamera.bottom) / css.height;
+          viewCamera.left += crop.x * px;
+          viewCamera.right = viewCamera.left + crop.width * px;
+          viewCamera.top -= crop.y * py;
+          viewCamera.bottom = viewCamera.top - crop.height * py;
+        }
         viewCamera.updateProjectionMatrix();
         const lineScale = exportView.pixelScale || 1;
         if (lineScale !== 1) {
@@ -473,6 +512,7 @@ function initialize() {
         } finally {
           // Labels retain their live CSS coordinates; the exporter translates
           // them into the cropped frame after drawing the rendered geometry.
+          if (viewCamera.isPerspectiveCamera) viewCamera.clearViewOffset();
           syncViewCamera();
         }
       } else {
@@ -1139,6 +1179,27 @@ function initialize() {
     getStructure: () => structure,
     onHighlightDistance: highlightDistance,
     onApplyCutoff: applyDistanceCutoff,
+    getRuleCutoff: (pair) => {
+      if (!pair) return null;
+      const norm = normalizePair(pair);
+      const found = rules.find((r) => normalizePair(normalizedPairName(r.center, r.neighbor)) === norm);
+      return found ? Number(found.cutoff) : null;
+    },
+    onDragCutoff: (pair, cutoff, commit) => {
+      if (!structure || !pair || !Number.isFinite(cutoff)) return;
+      const norm = normalizePair(pair);
+      const existing = rules.find((r) => normalizePair(normalizedPairName(r.center, r.neighbor)) === norm);
+      if (!existing) return;
+      existing.cutoff = Math.max(CUTOFF_MIN, Number(cutoff.toFixed(3)));
+      const card = document.querySelector(`.pair-rule[data-rule-id="${existing.id}"]`);
+      const field = card?.querySelector('input[data-field="cutoff"]');
+      if (field) field.value = existing.cutoff.toFixed(2);
+      rebuildRule(existing);
+      if (commit) {
+        historyLabel = "Adjust bond cutoff";
+        scheduleSave();
+      }
+    },
     onChange: () => scheduleSave(),
   });
   const powderPanel = createPowderPanel({
@@ -2352,6 +2413,12 @@ function initialize() {
         });
         const choose = () => selectSite(highlightedSite === s.label ? null : s.label);
         row.onclick = choose;
+        row.onpointerenter = (e) => {
+          if (e.pointerType === "mouse") highlightSite(s.label);
+        };
+        row.onpointerleave = (e) => {
+          if (e.pointerType === "mouse") highlightSite(highlightedSite);
+        };
         row.onkeydown = (e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
@@ -3605,7 +3672,32 @@ function initialize() {
       setError(`Could not open ${entry.name}: ${error.message}`);
     }
   }
-  createStructureLibrary({ onSelect: openLibraryEntry, isBusy: () => exporter.busy });
+  async function openCodId(codId) {
+    if (exporter.busy) return;
+    const url = `https://www.crystallography.net/cod/${codId}.cif`;
+    const filename = `COD-${codId}.cif`;
+    const intent = ++userIntent;
+    clearError();
+    $("loading").hidden = false;
+    $("open").disabled = true;
+    $("block").disabled = true;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw Error(`COD ${codId} could not be fetched (HTTP ${response.status}).`);
+      const text = await response.text();
+      if (intent !== userIntent) return;
+      startImport(text, filename);
+    } catch (error) {
+      if (intent !== userIntent) return;
+      $("loading").hidden = true;
+      $("open").disabled = false;
+      $("block").disabled = false;
+      updateHistoryButtons();
+      updateProjectButtons();
+      setError(`Could not fetch COD ${codId}: ${error.message}`);
+    }
+  }
+  createStructureLibrary({ onSelect: openLibraryEntry, onFetchCod: openCodId, isBusy: () => exporter.busy });
   $("open").onclick = () => $("file").click();
   async function openDocument(file, projectOnly = false) {
     const intent = ++userIntent;
@@ -4069,6 +4161,15 @@ function initialize() {
     preset.onclick = () => {
       $("export-dpi").value = preset.dataset.dpi;
       updateExportInfo();
+      scheduleSave();
+    };
+  for (const preset of document.querySelectorAll(".journal-preset"))
+    preset.onclick = () => {
+      const radio = document.querySelector(`input[name="export-scale"][value="${preset.dataset.scale}"]`);
+      if (radio) radio.checked = true;
+      $("export-dpi").value = preset.dataset.dpi;
+      updateExportInfo();
+      scheduleSave();
     };
   $("style-depth-cue").addEventListener("change", () => {
     depthCue = $("style-depth-cue").checked;
@@ -4337,6 +4438,7 @@ function initialize() {
       // Added later in version 1 (optional on restore).
       uvwText: $("view-direction").value,
       palette: styleEditor.palette,
+      projection: projectionMode,
       depthCue,
       twoToneBonds: $("style-two-tone-bonds").checked,
       contactAo: $("style-contact-ao") ? $("style-contact-ao").checked : true,
@@ -4530,6 +4632,7 @@ function initialize() {
       if (value != null && [...$(id).options].some((o) => o.value === String(value))) $(id).value = String(value);
     updateExportInfo();
     // Camera last: nothing after this refits the view.
+    setProjection(s.projection === "perspective" ? "perspective" : "ortho", { save: false });
     restoreCameraState(s);
     if (!historyApplying) {
       // Restore shared radiation BEFORE detector restore so a PONI calibration
@@ -4772,6 +4875,10 @@ function initialize() {
     } else if (!event.metaKey && !event.ctrlKey && !event.altKey && !event.repeat && !typing && !target?.closest?.("select") && !exporter.busy && !document.querySelector("dialog:modal") && event.key.toLowerCase() === "d") {
       event.preventDefault();
       xrdWorkspace.toggle();
+    } else if (!event.metaKey && !event.ctrlKey && !event.altKey && !event.repeat && !typing && !target?.closest?.("select") && !exporter.busy && !document.querySelector("dialog:modal") && event.key.toLowerCase() === "p") {
+      event.preventDefault();
+      historyLabel = "Toggle projection";
+      setProjection(projectionMode === "ortho" ? "perspective" : "ortho");
     } else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"].includes(event.key) && target.matches("input[type=range], input[data-field=cutoff], [role=slider]")) {
       if (!historyKeyHeld) flushHistory();
       historyKeyHeld = true;
@@ -5024,6 +5131,7 @@ function initialize() {
       { id: "view-c", label: "View along +c", group: "View", shortcut: "C", run: () => orient([0, 0, 1], "c") },
       { id: "fit", label: "Fit crystal to view", group: "View", shortcut: "F", run: () => reset(true) },
       { id: "reset", label: "Reset view & selection", group: "View", shortcut: "R", run: () => reset(false) },
+      { id: "projection", label: "Toggle orthographic / perspective projection", group: "View", shortcut: "P", run: () => setProjection(projectionMode === "ortho" ? "perspective" : "ortho") },
       { id: "theme", label: "Toggle light / dark theme", group: "View", run: () => $("theme-toggle").click() },
       { id: "measure-info", label: "Atom info mode", group: "Measure", shortcut: "1", run: () => setMeasureMode("info") },
       { id: "measure-distance", label: "Distance measurement mode", group: "Measure", shortcut: "2", run: () => setMeasureMode("distance") },

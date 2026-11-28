@@ -17,7 +17,7 @@ export function searchLibrary(query = '', collection = '') {
     ].join(' ')).includes(term)));
 }
 
-export function createStructureLibrary({ onSelect, isBusy }) {
+export function createStructureLibrary({ onSelect, onFetchCod, isBusy }) {
   const dialog = document.getElementById('structure-library');
   const opener = document.getElementById('library-open');
   const search = document.getElementById('library-search');
@@ -25,6 +25,17 @@ export function createStructureLibrary({ onSelect, isBusy }) {
   const collection = document.getElementById('library-collection');
   const results = document.getElementById('library-results');
   const count = document.getElementById('library-count');
+  const codBar = document.getElementById('library-cod-bar');
+  const codLabel = document.getElementById('library-cod-label');
+  const codBtn = document.getElementById('library-cod-fetch');
+  let activeCodId = null;
+  if (codBtn) {
+    codBtn.onclick = () => {
+      if (!activeCodId || isBusy() || !onFetchCod) return;
+      dialog.close();
+      onFetchCod(activeCodId);
+    };
+  }
   const el = (tag, className, text) => {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -32,6 +43,12 @@ export function createStructureLibrary({ onSelect, isBusy }) {
     return node;
   };
   function render() {
+    const codMatch = search.value.trim().match(/^(?:cod\s*#?\s*)?(\d{7})$/i);
+    activeCodId = codMatch && onFetchCod ? codMatch[1] : null;
+    if (codBar) {
+      codBar.hidden = !activeCodId;
+      if (activeCodId && codLabel) codLabel.textContent = `Open COD ${activeCodId} directly from crystallography.net`;
+    }
     const matches = searchLibrary(search.value, collection.value);
     count.textContent = `${matches.length} of ${entries.length} structures`;
     results.replaceChildren(...matches.map((entry) => {
