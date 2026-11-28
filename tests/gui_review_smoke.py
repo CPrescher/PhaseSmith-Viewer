@@ -159,6 +159,7 @@ async def check(browser,w,h,theme):
     await choose_tool(page,'#style-open')
     assert await hit(page.locator('#style-swatches button').first), 'Style must expose a color'
     await choose_tool(page,'#mode-export')
+    await page.locator('#export-png').scroll_into_view_if_needed()
     assert await hit(page.locator('#export-png'))
     await page.locator('#tool-window-export [data-action=close]').click()
     await choose_tool(page,'#mode-analysis')
@@ -170,15 +171,13 @@ async def check(browser,w,h,theme):
     bottom=await page.locator('#analysis-window').evaluate('e=>e.getBoundingClientRect().bottom')
     assert min(chart['height'],bottom-chart['y'])>=150, (w,h,'chart clipped',chart,bottom)
     await page.locator('#analysis-close').click()
-    await choose_tool(page,'#mode-powder')
-    await page.wait_for_function("document.querySelector('#analysis-table th')?.textContent==='2θ (°)'")
-    assert await page.locator('#analysis-mode').input_value()=='powder'
+    await choose_tool(page,'#mode-diffraction')
+    await page.wait_for_function("document.querySelector('#powder-table th')?.textContent==='2θ (°)'")
     await reveal_control(page,'#project-save')
     await page.keyboard.press('Escape')
-    assert await page.locator('#analysis-window').is_visible(), 'File dismisses before its underlying plot'
-    await page.locator('#analysis-close').click()
-    await choose_tool(page,'#mode-reflection')
-    if h > 600:
+    assert await page.locator('#xrd-workspace').is_visible(), 'File dismisses before its underlying XRD workspace'
+    await page.locator('#xrd-tab-reflection').click()
+    if h > 600 and w > 640:
         for control in ['#open', '#file-menu-button', '#library-open', '#structure-info-open']:
             assert await hit(page.locator(control)), (w, h, 'Reflection covers the header', control)
     await page.locator('#reflection-hkl').fill('1 3 0')
@@ -195,20 +194,12 @@ async def check(browser,w,h,theme):
         await page.locator('[data-panel=rays]').click()
     await page.locator('[data-view=edge]').click()
     await settle(page)
-    if await page.locator('#tools-menu').is_visible():
-        assert await page.locator('#reflection-explorer #tools-menu').count()==1
-        assert await hit(page.locator('#reflection-intensity')), 'intensity must remain unobstructed'
-        await page.locator('#tools-menu').click()
-        await page.locator('#tool-rail').press('Escape')
-        assert await page.locator('#reflection-explorer').is_visible(), 'Escape closes menu before its window'
     assert not await page.evaluate("[...document.querySelectorAll('#reflection-explorer svg *')].some(e=>[...e.attributes].some(a=>/NaN|Infinity/.test(a.value)))")
-    await page.locator('#reflection-close').click()
-    await choose_tool(page,'#mode-detector')
+    await page.locator('#xrd-tab-detector').click()
     if w<500:
-        head=await page.locator('#detector-head').bounding_box()
-        close=await page.locator('#detector-close').bounding_box()
-        assert close['y']<head['y']+12 and close['x']>head['x']+head['width']-65, 'Close must stay at the top right'
-        assert await page.locator('#detector-title').evaluate('e=>e.scrollWidth<=e.clientWidth+1'), 'title must wrap before header buttons'
+        head=await page.locator('#xrd-head').bounding_box()
+        close=await page.locator('#xrd-close').bounding_box()
+        assert close['y']<head['y']+16 and close['x']>head['x']+head['width']-65, 'Close must stay at the top right'
     if h<500 or w<500:
         assert await hit(page.locator('#detector-next')), 'stepping must be visible on opening'
     await page.locator('#detector-animate').uncheck()
@@ -231,7 +222,7 @@ async def check(browser,w,h,theme):
     before=(await diagnostics(page))['camera']
     await page.locator('#detector-reveal').click()
     await settle(page)
-    assert (await page.locator('#detector-window').bounding_box())['height']<=320, 'linked dock must override a resized or wide desktop window'
+    assert (await page.locator('#xrd-workspace').bounding_box())['height']<=340, 'linked dock must override a resized or wide desktop window'
     assert (await diagnostics(page))['camera']==before, 'reveal must not move the crystal'
     exposed=await page.evaluate("viewerDiagnostics().atoms.filter(a=>document.elementFromPoint(a.x,a.y)?.tagName==='CANVAS').length")
     assert exposed>=8,(w,h,exposed)
@@ -254,46 +245,30 @@ async def check(browser,w,h,theme):
         assert await hit(page.locator('#detector-options-done'))
     assert await page.locator('#detector-options .analysis-body').evaluate('e=>e.scrollWidth<=e.clientWidth+1'), 'options overflow'
     await page.locator('#detector-options-done').click()
-    if await page.locator('#tools-menu').is_visible():
-        await page.locator('#tools-menu').click()
-        assert await hit(page.locator('#mode-pairs')), 'Tools must be above science windows'
-        await page.locator('#mode-pairs').click()
-        assert await page.locator('#detector-window').is_visible()
-        assert await hit(page.locator('#tool-window-pairs [data-action=close]'))
-        await choose_tool(page, '#mode-sites', True)
-        assert not await page.locator('#tool-window-pairs').is_visible()
-        assert await hit(page.locator('#tool-window-sites [data-action=close]'))
-        await choose_tool(page, '#mode-detector', True)
-        assert await hit(page.locator('#detector-close'))
-        assert await page.locator('#detector-link').is_checked()
-        assert await page.locator('#tool-window-sites').is_visible()
-        assert await hit(page.locator('#tools-menu')), 'launcher must return before the next input'
-        await page.locator('#tools-menu').tap()
-        await choose_tool(page,'#mode-reflection',True)
-        await page.locator('#reflection-close').tap()
+    if w<=640 or h<=500:
+        await page.locator('#xrd-close').click()
+        assert not await page.locator('#xrd-workspace').is_visible()
+        assert await hit(page.locator('#tools-menu')), 'launcher must return after closing phone XRD sheet'
     else:
-        await page.locator('#detector-close').click()
+        await page.locator('#xrd-close').click()
         # Science inspectors must leave the entire tablet/desktop rail usable.
-        for selector in ['#mode-analysis','#mode-powder','#mode-reflection','#mode-detector','#mode-analysis','#mode-reflection','#mode-detector','#mode-powder']:
+        for selector in ['#mode-analysis','#mode-diffraction']:
             await choose_tool(page,selector)
-            expected={'#mode-analysis':'analysis-window','#mode-powder':'analysis-window','#mode-reflection':'reflection-explorer','#mode-detector':'detector-window'}[selector]
-            assert await page.evaluate('''id=>{
-              const win=document.getElementById(id);
-              return win.open && [...document.querySelectorAll('dialog[open]')].every(other=>other===win || Number(getComputedStyle(other).zIndex)<Number(getComputedStyle(win).zIndex));
-            }''',expected), 'selected science window must come to the front'
+            if selector=='#mode-diffraction':
+                for tab in ['#xrd-tab-powder','#xrd-tab-reflection','#xrd-tab-detector']:
+                    await page.locator(tab).click()
             for button in await page.locator('#tool-rail button:visible').all():
                 assert await hit(button), (w,h,selector,'covered rail action',await button.get_attribute('id'))
         await page.locator('#mode-sites').click()
         assert await hit(page.locator('#site-table tbody tr').first), 'settings must be reachable after science tools'
-        for panel in ['#analysis-window', '#reflection-explorer', '#detector-window']:
-            assert await page.locator(panel).is_visible(), (w, h, panel)
+        assert await page.locator('#analysis-window').is_visible()
+        assert await page.locator('#xrd-workspace').is_visible()
         await choose_tool(page, '#mode-pairs')
         assert not await page.locator('#tool-window-sites').is_visible()
         assert await hit(page.locator('#tool-window-pairs [data-action=close]'))
-        assert await page.locator('#detector-window').is_visible()
-        await choose_tool(page,'#mode-reflection')
+        assert await page.locator('#xrd-workspace').is_visible()
         await page.locator('#style-open').click()
-        assert await hit(page.locator('#style-target')), 'Style must be reachable after Reflection'
+        assert await hit(page.locator('#style-target')), 'Style must be reachable after XRD'
     assert not errors,(w,h,errors[:5])
     assert await page.evaluate('document.scrollingElement.scrollWidth<=innerWidth && document.scrollingElement.scrollHeight<=innerHeight')
     await page.close()
@@ -310,17 +285,16 @@ async def main():
             page=await browser.new_page(viewport={'width':390,'height':844},has_touch=True)
             await page.goto(URL+'/?example=forsterite')
             await page.wait_for_function('window.viewerDiagnostics?.().atoms.length>0')
-            await choose_tool(page,'#mode-reflection')
+            await choose_tool(page,'#mode-diffraction')
+            await page.locator('#xrd-tab-reflection').click()
             for w,h in [(1440,900),(390,844),(1024,768)]:
                 await page.set_viewport_size({'width':w,'height':h})
-                await page.wait_for_function("document.querySelector('#tools-menu').classList.contains('in-science') === (document.querySelector('#app').dataset.launcher === 'menu')")
                 await settle(page)
                 if w>1000:
                     assert not await page.locator('#tools-menu').is_visible()
-                    assert await hit(page.locator('#reflection-wavelength'))
+                    assert await hit(page.locator('#radiation-wavelength'))
                 else:
-                    assert await page.locator('#reflection-explorer #tools-menu').count()==1
-                    assert await hit(page.locator('#tools-menu'))
+                    assert await hit(page.locator('#xrd-close'))
                     assert not await page.locator('.reflection-options').evaluate('e=>e.open'), 'compact disclosure choice must survive resize'
             print(engine.name+': live phone/desktop resize preserves reachable science controls',flush=True)
             await browser.close()

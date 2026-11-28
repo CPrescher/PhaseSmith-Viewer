@@ -143,7 +143,7 @@ async def run(profile):
         await page.keyboard.press("Escape")
         await page.locator("#mode-export").click()
         await page.locator("#export-dpi").fill("600")
-        await page.locator("#export-transparent").check()
+        await page.locator("#export-background").select_option("transparent")
         await page.locator('input[name=export-scale][value="4"]').check()
         await page.locator("#export-seconds").select_option("4")
         await page.locator("#export-fps").select_option("24")

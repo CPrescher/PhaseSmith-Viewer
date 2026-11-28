@@ -25,12 +25,14 @@ Cu1 Cu 0 0 0
 """
 
 
-async def ready(page, column="Distance (Å)", rows=None):
+async def ready(page, column="Distance (Å)", rows=None, panel="analysis"):
+    table_sel = "#powder-table" if panel == "powder" else "#analysis-table"
+    busy_sel = "#xrd-panel-powder" if panel == "powder" else "#analysis-window"
     await page.wait_for_function(
-        "([column,rows]) => document.querySelector('#analysis-table th')?.textContent === column && "
-        "(rows === null || document.querySelectorAll('#analysis-table tbody tr').length === rows) && "
-        "!document.querySelector('#analysis-window').hasAttribute('aria-busy')",
-        arg=[column, rows],
+        "([tableSel,busySel,column,rows]) => document.querySelector(`${tableSel} th`)?.textContent === column && "
+        "(rows === null || document.querySelectorAll(`${tableSel} tbody tr`).length === rows) && "
+        "!document.querySelector(busySel)?.hasAttribute('aria-busy')",
+        arg=[table_sel, busy_sel, column, rows],
     )
 
 
@@ -98,44 +100,47 @@ async def check(browser, width, height, theme):
     assert not await page.locator("#analysis-results").is_visible(), "invalid settings must clear stale results"
     await page.locator("#analysis-rMin").fill("0")
     await ready(page, rows=3)
-    await choose_tool(page, "#mode-powder")
+    await page.locator("#analysis-close").click()
+    await choose_tool(page, "#mode-diffraction")
     await page.locator("#file").set_input_files(HERE.parent / "public/structures/copper-fcc.cif")
     await page.wait_for_function("window.viewerDiagnostics().block !== 'analysis_cube'")
-    await ready(page, column="2θ (°)", rows=3)
-    first = await page.locator("#analysis-table tbody tr").first.inner_text()
+    await ready(page, column="2θ (°)", rows=3, panel="powder")
+    first = await page.locator("#powder-table tbody tr").first.inner_text()
     assert "43.3" in first and "1 1 1" in first, first
-    assert await page.locator("#analysis-chart .analysis-profile").count() == 1
-    await page.locator("#analysis-fwhm").fill("0")
-    await ready(page, column="2θ (°)", rows=3)
-    assert await page.locator("#analysis-chart .analysis-profile").count() == 0
-    await page.locator("#analysis-fwhm").fill("0.005")
-    await page.wait_for_function("document.querySelector('#analysis-status').textContent.includes('at least')")
-    assert not await page.locator("#analysis-results").is_visible()
-    await page.locator("#analysis-fwhm").fill("0.15")
-    await ready(page, column="2θ (°)", rows=3)
-    # Escape closes only the floating plot; the underlying pair editor stays open.
+    assert await page.locator("#powder-chart .analysis-profile").count() == 1
+    if await page.locator("#powder-settings").get_attribute("open") is None:
+        await page.locator("#powder-settings > summary").click()
+    await page.locator("#powder-fwhm").fill("0")
+    await ready(page, column="2θ (°)", rows=3, panel="powder")
+    assert await page.locator("#powder-chart .analysis-profile").count() == 0
+    await page.locator("#powder-fwhm").fill("0.005")
+    await page.wait_for_function("document.querySelector('#powder-status').textContent.includes('at least')")
+    assert not await page.locator("#powder-results").is_visible()
+    await page.locator("#powder-fwhm").fill("0.15")
+    await ready(page, column="2θ (°)", rows=3, panel="powder")
+    # Escape closes only the floating XRD workspace; the underlying pair editor stays open.
     await page.keyboard.press("Escape")
-    assert not await page.locator("#analysis-window").is_visible()
+    assert not await page.locator("#xrd-workspace").is_visible()
     assert (await diagnostics(page))["windows"]["visible"] == ["pairs"]
-    await choose_tool(page, "#mode-powder")
-    await ready(page, column="2θ (°)", rows=3)
+    await choose_tool(page, "#mode-diffraction")
+    await ready(page, column="2θ (°)", rows=3, panel="powder")
     assert await page.locator("#analysis-rMax").input_value() == "7"
     # Autosave and reload preserve the plot preferences and independent visibility.
     await page.wait_for_timeout(1800)
     await page.reload()
     await page.wait_for_function("window.viewerDiagnostics?.().session.restoredAt > 0")
-    await ready(page, column="2θ (°)", rows=3)
+    await ready(page, column="2θ (°)", rows=3, panel="powder")
     assert await page.locator("#analysis-rMax").input_value() == "7"
     assert (await diagnostics(page))["windows"]["visible"] == ["pairs"]
     if width == 1200:
-        await page.locator("#analysis-file").set_input_files(
+        await page.locator("#powder-import").set_input_files(
             {"name": "observed.xy", "mimeType": "text/plain", "buffer": b"43.2 130\n43.3 218\n43.4 -2\n"})
-        await page.wait_for_selector(".analysis-observed-line", state="attached")
-        await page.locator("#analysis-table tbody tr").first.click()
+        await page.wait_for_selector("#powder-chart .analysis-observed-line", state="attached")
+        await page.locator("#powder-table tbody tr").first.click()
         # Loading a structure and plotting its powder pattern leave the
         # separate reflection scene uninitialized until the explorer opens.
         assert await page.locator("#reflection-stage canvas").count() == 0
-        await page.locator("#analysis-explain").click()
+        await page.locator("#powder-explain").click()
         await page.locator('[data-panel="rays"]').click()
         wave = page.locator("#reflection-waves polyline").first
         await page.locator("#reflection-animate").click()
@@ -163,18 +168,20 @@ async def check(browser, width, height, theme):
             "name": "lesson.psv", "mimeType": "application/json",
             "buffer": Path(await download.path()).read_bytes(),
         })
-        await fresh.wait_for_selector("#reflection-explorer[open]")
+        await fresh.wait_for_selector("#xrd-panel-reflection:not([hidden])")
         assert await fresh.input_value("#reflection-step") == step
         assert await fresh.input_value("#reflection-hkl") == hkl
-        await fresh.locator("#reflection-close").click()
-        await fresh.wait_for_selector(".analysis-observed-line", state="attached")
-        assert "observed.xy" in await fresh.inner_text("#analysis-file-status")
+        await fresh.locator("#xrd-tab-powder").click()
+        await fresh.wait_for_selector("#powder-chart .analysis-observed-line", state="attached")
+        assert "observed.xy" in await fresh.inner_text("#powder-file-status")
         await fresh.close()
-        await page.locator("#reflection-close").click()
+        await page.locator("#xrd-close").click()
         # A late input event after dismissal must not calculate another hkl.
         intensity = await page.locator("#reflection-intensity").text_content()
         await page.locator("#reflection-hkl").evaluate("el => { el.value = '0 0 0'; el.form.requestSubmit(); }")
         assert await page.locator("#reflection-intensity").text_content() == intensity
+    else:
+        await page.locator("#xrd-close").click()
     await choose_tool(page, "#mode-analysis")
     await ready(page)
     # Range and element filter are rebuilt for a freshly loaded structure.

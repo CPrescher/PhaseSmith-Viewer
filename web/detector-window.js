@@ -5,7 +5,7 @@ import { circularDetector, rectangularDetector, readPoni, calibratedDetector } f
 import { formatMillerIndices, parseMillerIndices, matMul } from "./crystal-math.js";
 import { detectorModel } from "./detector-model.js";
 import { drawEwald, drawDetector } from "./detector-views.js";
-import { saveDetectorPNG } from "./detector-export.js";
+import { saveDetectorPNG, saveDetectorSVG } from "./detector-export.js";
 import {
   dot3,
   identity,
@@ -26,7 +26,16 @@ const signedAngle = (degrees) => (degrees > 180 ? degrees - 360 : degrees);
 const wrappedAngle = (degrees) => ((degrees % 360) + 360) % 360;
 const dragSnapPixels = 5;
 
-export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainView, getMainRotation }) {
+export function createDetectorWindow({
+  host = document.getElementById("xrd-panel-detector"),
+  radiation = null,
+  getStructure,
+  onExplain = () => {},
+  onPeak = () => {},
+  onActive = () => {},
+  onMainView = () => {},
+  getMainRotation = () => identity,
+}) {
   const $ = (id) => document.getElementById("detector-" + id);
   enableTripletSelection($("hkl"));
   const indexKeys = numericKeys($("hkl"), "(hkl)", true, { onDone: () => $("form").requestSubmit() });
@@ -36,9 +45,24 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
     field.closest("label").after(numericKeys(field, id === "axis" ? "Scan axis" : "Matrix", true,
       { inputMode: "decimal", nativeEnter: true }));
   }
-  const win = $("window"),
-    opener = document.getElementById("mode-detector");
-  const show = floatingDialog(win, opener, $("head"), close);
+  const win = $("window") || host;
+  const embedded = Boolean(host && win?.tagName !== "DIALOG");
+  const opener = embedded ? null : document.getElementById("mode-detector");
+  const show = embedded ? () => {} : floatingDialog(win, opener, $("head"), close);
+  let active = false,
+    dirty = false,
+    lockingPoni = false;
+  const isActive = () => (embedded ? active : Boolean(win?.open));
+  const currentWavelength = () =>
+    radiation ? radiation.wavelength : Number($("wavelength")?.value ?? 1.5406);
+  function syncRadiationNote() {
+    const note = $("radiation-note");
+    if (!note) return;
+    const wl = Number(currentWavelength().toFixed(6));
+    note.textContent = radiation?.locked
+      ? `Wavelength λ = ${wl} Å (locked by PONI calibration)`
+      : `Wavelength λ = ${wl} Å (set in the XRD radiation bar)`;
+  }
   let panel = null,
     pendingCalibration = null,
     calibrationVersion = 0,
@@ -81,10 +105,12 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
         tracked,
         sphereCamera.view,
         Number($("point-size").value) / 100,
+        select,
       );
   }
   function redrawDetector() {
-    if (model) drawDetector($("image"), model.detector, spots, chosen, $("ring").checked, select);
+    if (model) drawDetector($("image"), model.detector, spots, chosen, $("ring").checked, select,
+      { distance: model.distance, wavelength: model.wavelength });
   }
   for (const button of win.querySelectorAll("[data-detector-view]")) {
     button.onclick = () => {
@@ -96,21 +122,26 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
     };
   }
   function revealCrystal(on) {
+    if (!$("reveal")) return;
+    const outer = win.closest("#xrd-workspace") ?? win;
     const controlsTop = document.querySelector("#view-readout")?.getBoundingClientRect().top || document.querySelector(".view-bottom")?.getBoundingClientRect().top || innerHeight - 80;
-    win.style.setProperty("--linked-bottom", `${innerHeight - controlsTop + 12}px`);
+    const bottomOffset = `${innerHeight - controlsTop + 12}px`;
+    win.style.setProperty("--linked-bottom", bottomOffset);
+    outer.style.setProperty("--linked-bottom", bottomOffset);
     delete win.dataset.linkedResized;
     win.classList.toggle("showing-crystal", on);
+    if (outer !== win) outer.classList.toggle("showing-crystal", on);
     $("reveal").textContent = on ? "Show detector" : "Show crystal";
     $("reveal").setAttribute("aria-pressed", String(on));
-    win.querySelector(".detector-body").scrollTop = 0;
+    win.querySelector(".detector-body")?.scrollTo(0, 0);
   }
-  $("reveal").onclick = () => revealCrystal(!win.classList.contains("showing-crystal"));
+  if ($("reveal")) $("reveal").onclick = () => revealCrystal(!win.classList.contains("showing-crystal"));
   $("link").addEventListener("change", () => {
-    $("reveal").hidden = !$("link").checked;
+    if ($("reveal")) $("reveal").hidden = !$("link").checked;
     if (!$("link").checked) revealCrystal(false);
   });
   const plotSize = new ResizeObserver(() => {
-    if (win.open) {
+    if (isActive()) {
       redrawSphere();
       redrawDetector();
     }
@@ -118,9 +149,9 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   plotSize.observe($("ewald"));
   plotSize.observe($("image"));
   function syncMain() {
-    $("reveal").hidden = !$("link").checked;
+    if ($("reveal")) $("reveal").hidden = !$("link").checked;
     if (!$("link").checked && win.classList.contains("showing-crystal")) revealCrystal(false);
-    if (!win.open || !model || !$("link").checked) return onMainView(null);
+    if (!isActive() || !model || !$("link").checked) return onMainView(null);
     const axes = cameraAxes(sphereCamera.view);
     // Express the Ewald camera in crystal coordinates using the same rotated
     // Cartesian basis that projects the unit cell in the sphere.
@@ -131,14 +162,20 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       hkl: tracked?.hkl ?? null,
     });
   }
-  function close() {
+  function deactivate() {
+    active = false;
     stopStep();
-    if ($("options").open) $("options").close();
+    if ($("options")?.open) $("options").close();
     closedRotation = model && $("link").checked ? getMainRotation() : null;
-    win.close();
     onMainView(null, true);
-    opener.setAttribute("aria-expanded", "false");
-    focusLauncher(opener);
+  }
+  function close() {
+    deactivate();
+    if (!embedded) {
+      win.close();
+      opener?.setAttribute("aria-expanded", "false");
+      if (opener) focusLauncher(opener);
+    }
   }
   function select(spot) {
     chosen = spot;
@@ -161,6 +198,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
         Number((p.relativeIntensity * 100).toPrecision(3)) +
         "%)";
       onPeak({ twoTheta: p.twoTheta, wavelength: model.wavelength });
+      onActive(p.hkl, "detector", { twoTheta: p.twoTheta, d: 1 / p.length });
     } else {
       $("detail").textContent = "";
       onPeak(null);
@@ -216,7 +254,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
     adoptModel(
       detectorModel(
         getStructure(),
-        Number($("wavelength").value),
+        currentWavelength(),
         Number($("distance").value),
         hkl,
         mount,
@@ -247,7 +285,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       "+ω axis · " +
       ((Math.acos(Math.max(-1, Math.min(1, model.axis[0]))) * 180) / Math.PI).toFixed(1) +
       "° to beam";
-    $("save").disabled = false;
+    $("save").disabled = $("save-svg").disabled = false;
     $("save-error").textContent = "";
     tracked = model.requested;
     $("omega").disabled = $("azimuth").disabled = false;
@@ -297,10 +335,12 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   for (const id of ["from","to","cone"]) $(id).oninput = updateWedge;
   $("wedge").ontoggle = updateWedge;
   $("coverage-csv").onclick = async () => {
-    const rows = ["h,k,l,omega_deg,two_theta_deg,d_A,F_squared"];
-    for (const {point,omega} of scanWedge())
-      rows.push([...point.hkl,omega,point.twoTheta,1/point.length,point.intensity].join(","));
     try {
+      // scanWedge() returns { events, continuous }; only discrete crossings are rows.
+      const { events } = scanWedge();
+      const rows = ["h,k,l,omega_deg,two_theta_deg,d_A,F_squared"];
+      for (const { point, omega } of events)
+        rows.push([...point.hkl, omega, point.twoTheta, 1 / point.length, point.intensity].join(","));
       await saveBlob(new Blob([rows.join("\n")], { type: "text/csv" }), "phasesmith-rotation-wedge.csv");
     } catch (error) { $("coverage").textContent = error.message; }
   };
@@ -402,9 +442,10 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       spots = [];
       chosen = null;
       $("status").textContent = error.message;
-      if ($("options").open) $("geometry-error").textContent = error.message;
-      for (const id of ["prev", "next", "explain", "omega", "azimuth", "spots", "save"])
-        $(id).disabled = true;
+      if ($("options")?.open) $("geometry-error").textContent = error.message;
+      // Guard every lookup: this recovery path must never throw itself.
+      for (const id of ["prev", "next", "explain", "omega", "azimuth", "spots", "save", "save-svg"])
+        if ($(id)) $(id).disabled = true;
       for (const id of [
         "size",
         "axis-caption",
@@ -417,13 +458,15 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
         "omega-value",
         "azimuth-value",
       ])
-        $(id).replaceChildren();
+        $(id)?.replaceChildren();
       onPeak(null);
     }
   }
-  function open(hkl, wavelength) {
-    const startingView = !win.open || !model;
-    show();
+  function activate(handoff = null) {
+    const startingView = !isActive() || !model;
+    active = true;
+    syncRadiationNote();
+    if (!embedded && !win.open) show();
     safely(() => {
       const resume = startingView && model && closedRotation && $("link").checked;
       const previous = closedRotation;
@@ -434,27 +477,61 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
         if (current.some((row, i) => row.some((v, j) => Math.abs(v - previous[i][j]) > 1e-10)))
           api.rotateSpecimen(current, 0);
       }
-      if (hkl) {
-        $("hkl").value = hkl.join(" ");
-        if (!panel) $("wavelength").value = wavelength;
+      if (handoff?.hkl && handoff.align === true) {
+        $("hkl").value = handoff.hkl.join(" ");
+        if (!panel && !radiation && $("wavelength") && handoff.wavelength !== undefined) {
+          $("wavelength").value = String(handoff.wavelength);
+        }
+        dirty = false;
         align(true);
       } else if (!model) {
+        dirty = false;
         configure(null);
         next();
-      } else syncMain();
+      } else if (dirty) {
+        dirty = false;
+        configure(model?.requested?.hkl ?? null, model?.tilt ?? 0);
+        render(chosen?.point);
+      } else {
+        redrawSphere();
+        redrawDetector();
+        syncMain();
+      }
     });
   }
-  opener.onclick = () => win.open ? (isFrontDialog(win) ? close() : show()) : open();
-  $("close").onclick = close;
+  function open(hkl, wavelength) {
+    if (wavelength !== undefined && radiation && !radiation.locked) {
+      try { radiation.set({ wavelength }); } catch { /* keep current */ }
+    }
+    activate(hkl ? { hkl, wavelength, align: true } : null);
+  }
+  radiation?.subscribe(() => {
+    syncRadiationNote();
+    if (lockingPoni) return;
+    if (isActive() && model) {
+      safely(() => {
+        configure(model?.requested?.hkl ?? null, model?.tilt ?? 0);
+        tracked = null;
+        message = "";
+        render(chosen?.point);
+      });
+    } else if (model) {
+      dirty = true;
+    }
+  });
+  syncRadiationNote();
+  if (opener) opener.onclick = () => win.open ? (isFrontDialog(win) ? close() : show()) : open();
+  if ($("close")) $("close").onclick = close;
   let optionsParentLayout = null;
   const showOptions = floatingDialog($("options"), $("open-options"), $("options").querySelector("header"), () => $("options").close());
   $("open-options").onclick = () => {
     if ($("options").open) return $("options").close();
+    const outer = win.closest("#xrd-workspace") ?? win;
     const placeAutomatically = $("options").dataset.userMoved !== "true";
     showOptions();
     if (placeAutomatically && innerWidth >= 1000) {
       // Keep most of the live detector visible while its geometry is edited.
-      const rect = win.getBoundingClientRect(), right = rect.right + 12;
+      const rect = outer.getBoundingClientRect(), right = rect.right + 12;
       const limit = document.getElementById("tool-rail").getBoundingClientRect().left - 8;
       const rightSpace = limit - right, leftSpace = rect.left - 20;
       const space = Math.max(rightSpace, leftSpace);
@@ -469,12 +546,13 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       // the diagram tabs and both headers, remain usable side by side.
       const limit = document.getElementById("tool-rail").getBoundingClientRect().left - 12;
       const width = Math.min(360, limit - 324);
-      optionsParentLayout = { left: win.style.left, width: win.style.width, temporaryWidth: width, viewport: innerWidth };
-      win.style.left = "12px";
-      win.style.width = width + "px";
+      optionsParentLayout = { outer, left: outer.style.left, width: outer.style.width, minWidth: outer.style.minWidth, temporaryWidth: width, viewport: innerWidth };
+      outer.style.left = "12px";
+      outer.style.minWidth = width + "px";
+      outer.style.width = width + "px";
       $("options").style.width = "300px";
       $("options").style.left = (width + 24) + "px";
-      $("options").style.top = win.getBoundingClientRect().top + "px";
+      $("options").style.top = outer.getBoundingClientRect().top + "px";
     } else if (placeAutomatically) {
       $("options").style.left = "8px";
       $("options").style.top = "8px";
@@ -484,20 +562,23 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
   $("options").onclose = () => {
     if (optionsParentLayout) {
       const prior = optionsParentLayout;
+      const target = prior.outer ?? win;
       // Respect a subsequent manual drag/resize, or a screen-size change.
-      if (innerWidth === prior.viewport && win.style.left === "12px" && win.style.width === prior.temporaryWidth + "px") {
-        win.style.left = prior.left;
-        win.style.width = prior.width;
+      if (innerWidth === prior.viewport && target.style.left === "12px" && target.style.width === prior.temporaryWidth + "px") {
+        target.style.left = prior.left;
+        target.style.width = prior.width;
+        target.style.minWidth = prior.minWidth ?? "";
       }
       optionsParentLayout = null;
     }
-    if (win.open) $("open-options").focus({ preventScroll: true });
+    if (isActive()) $("open-options").focus({ preventScroll: true });
   };
   $("form").onsubmit = (event) => {
     event.preventDefault();
     safely(align);
   };
-  for (const id of ["wavelength", "distance", "diameter", "outline", "width", "height"])
+  for (const id of ["wavelength", "distance", "diameter", "outline", "width", "height"]) {
+    if (!$(id)) continue;
     $(id).onchange = () =>
       safely(() => {
         showDimensions();
@@ -507,6 +588,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
         message = "";
         render();
       });
+  }
   $("prev").onclick = () => safely(() => next(-1, true), false);
   $("next").onclick = () => safely(() => next(1, true), false);
   const slider = $("omega");
@@ -630,7 +712,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       // Prepare the scan before committing edited geometry.
       const prepared = detectorModel(
         getStructure(),
-        Number($("wavelength").value),
+        currentWavelength(),
         Number($("distance").value),
         model?.requested?.hkl,
         0,
@@ -664,7 +746,7 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
     const { data, name } = pendingCalibration;
     const shape = [$("rows"), $("cols")].map((el) => Number(el.value));
     const detector = calibratedDetector(data, shape);
-    const wavelength = data.wavelength ?? Number($("wavelength").value);
+    const wavelength = data.wavelength ?? currentWavelength();
     const prepared = detectorModel(
       getStructure(),
       wavelength,
@@ -679,14 +761,23 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       previousGeometry = {
         outline: $("outline").value,
         distance: $("distance").value,
-        wavelength: $("wavelength").value,
+        wavelength: String(currentWavelength()),
       };
     panel = detector;
     activeCalibration = {text: pendingCalibration.text, name, shape};
     $("outline").value = "calibrated";
     $("outline").disabled = true;
     $("distance").value = data.distance;
-    $("wavelength").value = wavelength;
+    if ($("wavelength")) $("wavelength").value = wavelength;
+    if (radiation) {
+      lockingPoni = true;
+      try {
+        radiation.lock({ kind: "poni", name }, data.wavelength ?? undefined);
+      } finally {
+        lockingPoni = false;
+      }
+      syncRadiationNote();
+    }
     $("distance").disabled = $("diameter").disabled = true;
     $("clear-poni").hidden = false;
     adoptModel(prepared);
@@ -698,9 +789,8 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       detector.caption +
       ". Set the crystal mounting and scan axis under Orientation. Coordinates refer to the calibrated image. Custom pixel masks are omitted.";
   }
-  $("poni").onchange = async (e) => {
-    const version = ++calibrationVersion,
-      file = e.target.files[0];
+  async function loadPoniFile(file) {
+    const version = ++calibrationVersion;
     pendingCalibration = null;
     $("shape").hidden = true;
     if (!file) return;
@@ -717,7 +807,8 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
     } catch (error) {
       if (version === calibrationVersion) $("poni-status").textContent = error.message;
     }
-  };
+  }
+  $("poni").onchange = (e) => loadPoniFile(e.target.files[0]);
   $("shape").onsubmit = (e) => {
     e.preventDefault();
     try {
@@ -738,7 +829,19 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       $("outline").value = previousGeometry.outline;
       showDimensions();
       $("distance").value = previousGeometry.distance;
-      $("wavelength").value = previousGeometry.wavelength;
+      if ($("wavelength")) $("wavelength").value = previousGeometry.wavelength;
+      if (radiation) {
+        lockingPoni = true;
+        try {
+          radiation.unlock();
+          if (Number.isFinite(Number(previousGeometry.wavelength)) && Number(previousGeometry.wavelength) > 0) {
+            radiation.set({ wavelength: Number(previousGeometry.wavelength) });
+          }
+        } finally {
+          lockingPoni = false;
+        }
+        syncRadiationNote();
+      }
       configure(model?.requested?.hkl ?? null);
       message = "";
       render();
@@ -767,15 +870,33 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       $("save-error").textContent = "Could not save the diffraction image. Please try again.";
     }
   };
+  $("save-svg").onclick = async () => {
+    if (!model) return;
+    $("save-error").textContent = "";
+    try {
+      await saveDetectorSVG({
+        sphere: $("ewald"),
+        detector: $("image"),
+        detectorSize: model.detector.caption,
+        sample: document.getElementById("name").textContent,
+        settings: `λ = ${model.wavelength} Å · Distance ${model.distance} mm · ω = ${$("omega-value").textContent} · Beam rotation ${$("azimuth-value").textContent}`,
+      });
+    } catch {
+      $("save-error").textContent = "Could not save the diffraction SVG. Please try again.";
+    }
+  };
   $("spots").onchange = () => select(spots[$("spots").selectedIndex]);
   $("explain").onclick = () => {
     if (chosen) onExplain(chosen.point.hkl, model.wavelength);
   };
   const api = {
+    activate,
+    deactivate,
     open,
+    loadPoniFile,
     exportState() {
       if (!model) return null;
-      return {open:win.open, mounting, spindle, customMount, tilt:model.tilt, rock, azimuth,
+      return {open:isActive(), mounting, spindle, customMount, tilt:model.tilt, rock, azimuth,
         hkl:model.requested?.hkl, selected:chosen?.point.hkl, tracked:tracked?.hkl, query:$("hkl").value,
         calibration:activeCalibration, manual: panel ? previousGeometry : null,
         outline:$("outline").value, wavelength:model.wavelength, distance:model.distance,
@@ -785,19 +906,23 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
         wedge:$("wedge").open, from:$("from").value, to:$("to").value, cone:$("cone").value};
     },
     restoreState(state) {
-      if (win.open) close();
+      if (isActive()) close();
       stopStep();
       resetMountForm();
       closedRotation = null;
       model = activeCalibration = pendingCalibration = panel = null;
       calibrationVersion++;
+      if (radiation) {
+        lockingPoni = true;
+        try { radiation.unlock(); } finally { lockingPoni = false; }
+      }
       $("shape").hidden = $("clear-poni").hidden = true;
       $("poni").value = $("poni-status").textContent = "";
       $("outline").disabled = $("distance").disabled = $("diameter").disabled = false;
       $("outline").value = "circle";
       $("link").checked = false;
       for (const id of ["wavelength", "distance", "width", "height", "diameter", "from", "to", "cone"])
-        $(id).value = state?.[id] ?? $(id).defaultValue;
+        if ($(id)) $(id).value = state?.[id] ?? $(id).defaultValue;
       $("wedge").open = state?.wedge === true;
       if (!state) {
         $("point-size").value = $("point-size").defaultValue;
@@ -805,9 +930,10 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
         $("ring").checked = $("ring").defaultChecked;
         $("animate").checked = $("animate").defaultChecked;
         showDimensions();
+        syncRadiationNote();
         return;
       }
-      if (state.open) show();
+      if (!embedded && state.open) show();
       safely(() => {
         // Saved mounting is already in the internal Cartesian frame.
         mountingMatrix(state.mounting, "U", identity, identity);
@@ -838,17 +964,17 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
         sphereCamera.restore(state.camera);
         message = "";
         updateCrossings();
-        const active = model.spots(rock,azimuth);
-        const selected = active.find(s => s.point.hkl.join() === state.selected?.join());
-        tracked = active.find(s => s.point.hkl.join() === state.tracked?.join())?.point ?? model.requested;
-        render(selected?.point);
+        const activeSpots = model.spots(rock,azimuth);
+        const selectedSpot = activeSpots.find(s => s.point.hkl.join() === state.selected?.join());
+        tracked = activeSpots.find(s => s.point.hkl.join() === state.tracked?.join())?.point ?? model.requested;
+        render(selectedSpot?.point);
       });
     },
     beginSpecimenDrag() {
       snapRemainder = null;
     },
     rotateSpecimen(cameraFromCrystal, degreesPerPixel) {
-      if (!model || !win.open || !$("link").checked) return;
+      if (!model || !isActive() || !$("link").checked) return;
       stopStep();
       const { right, up, eye } = cameraAxes(sphereCamera.view);
       let end = matMul(transpose([right, up, eye]), cameraFromCrystal);
@@ -882,10 +1008,11 @@ export function createDetectorWindow({ getStructure, onExplain, onPeak, onMainVi
       if (closedRotation) $("link").checked = false;
       closedRotation = null;
       model = null;
+      dirty = false;
       resetMountForm();
       rock = azimuth = 0;
       $("hkl").value = "2 0 0";
-      if (win.open) open();
+      if (isActive()) activate();
     },
   };
   return api;

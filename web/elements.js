@@ -127,5 +127,101 @@ export const ELEMENT_DEFAULTS = Object.freeze({
   Og: ["#d22d37", 1.57],
 });
 
-export const elementColor = (element) => ELEMENT_DEFAULTS[element]?.[0] ?? "#a5afc3";
+export const ELEMENT_PALETTES = Object.freeze({
+  mineral: Object.freeze({ id: "mineral", label: "Mineral (default)" }),
+  cpk: Object.freeze({ id: "cpk", label: "CPK / Jmol" }),
+  colorblind: Object.freeze({ id: "colorblind", label: "Colorblind-safe" }),
+});
+
+export const PALETTE_NAMES = Object.freeze(Object.keys(ELEMENT_PALETTES));
+
+// Classic CPK / Jmol colors for common elements (others fall back to ELEMENT_DEFAULTS).
+const CPK_OVERRIDES = Object.freeze({
+  H: "#f2f2f2",
+  C: "#6e6e6e",
+  N: "#3050f8",
+  O: "#ef2323",
+  F: "#90e050",
+  Na: "#ab5cf2",
+  Mg: "#8aff00",
+  Al: "#bfa6a6",
+  Si: "#f0c8a0",
+  P: "#ff8000",
+  S: "#e8d820",
+  Cl: "#1ff01f",
+  K: "#8f40d4",
+  Ca: "#3dff00",
+  Ti: "#bfc2c7",
+  Cr: "#8a99c7",
+  Mn: "#9c7ac7",
+  Fe: "#e06633",
+  Co: "#f090a0",
+  Ni: "#50d050",
+  Cu: "#c88033",
+  Zn: "#7d80b0",
+  Br: "#a62929",
+  Ag: "#c0c0c0",
+  I: "#940094",
+  Ba: "#00c900",
+  Au: "#ffd123",
+  Pb: "#575961",
+});
+
+// Okabe-Ito / Paul Tol inspired palette for deuteranopia & protanopia legibility:
+// separates Mg vs O (blue vs vermilion) and Li / Na / Al / K clearly.
+const COLORBLIND_OVERRIDES = Object.freeze({
+  H: "#e2e8f0",
+  Li: "#009e73",
+  Be: "#66c2a5",
+  B: "#ee99aa",
+  C: "#4d5a68",
+  N: "#332288",
+  O: "#d55e00",
+  F: "#88ccee",
+  Na: "#cc79a7",
+  Mg: "#0072b2",
+  Al: "#e69f00",
+  Si: "#56b4e9",
+  P: "#ee7733",
+  S: "#ddcc77",
+  Cl: "#44aa99",
+  K: "#7b4f9d",
+  Ca: "#f0e442",
+  Ti: "#8c96a6",
+  Cr: "#117733",
+  Mn: "#aa4499",
+  Fe: "#a65628",
+  Co: "#4477aa",
+  Ni: "#228833",
+  Cu: "#bb5566",
+  Zn: "#6699cc",
+  Br: "#882255",
+  Sr: "#ccbb44",
+  Zr: "#33bbee",
+  Ag: "#b8c2cc",
+  I: "#661100",
+  Ba: "#999933",
+  Au: "#e5c438",
+  Pb: "#646b82",
+});
+
+const PALETTE_OVERRIDES = Object.freeze({
+  mineral: null,
+  cpk: CPK_OVERRIDES,
+  colorblind: COLORBLIND_OVERRIDES,
+});
+
+let activePalette = "mineral";
+
+export function getElementPalette() {
+  return activePalette;
+}
+
+export function setElementPalette(name) {
+  if (Object.hasOwn(PALETTE_OVERRIDES, name)) activePalette = name;
+  return activePalette;
+}
+
+export const elementColor = (element, palette = activePalette) =>
+  PALETTE_OVERRIDES[palette]?.[element] ?? ELEMENT_DEFAULTS[element]?.[0] ?? "#a5afc3";
 export const covalentRadius = (element) => ELEMENT_DEFAULTS[element]?.[1] ?? 1.2;

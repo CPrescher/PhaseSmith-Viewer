@@ -4,7 +4,30 @@
    landscape tablets, one sheet on phones and portrait tablets), placed by
    tool-windows.js. The document never scrolls; tool windows scroll
    locally. */
+/* Inter Variable, self-hosted (public/fonts, rsms.me/inter, SIL OFL), so
+   the viewer looks the same offline and in the desktop app. A local copy is
+   preferred; font-display: swap never blocks layout. */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src:
+    local("Inter Variable"),
+    local("InterVariable"),
+    url("/fonts/InterVariable.woff2") format("woff2");
+}
 :root {
+  /* Typography */
+  --font-sans:
+    "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  /* Numeric readouts: tabular figures; Inter's alternate 1 (cv01) and
+     open digits (cv05) keep 1, l and I apart in site labels and indices. */
+  --numeric-features: "tnum", "cv05", "cv01";
   --bg: #0b1622;
   --panel: #101e2e;
   --raised: #16273a;
@@ -13,12 +36,19 @@
   --line-strong: #34506c;
   --text: #dfe8f1;
   --muted: #8aa0b5;
-  --faint: #5e7690;
-  --accent: #39c6b0;
-  --accent-ink: #062521;
-  --accent-soft: #39c6b026;
+  /* Boundary of interactive controls (fields, chips, buttons): at least
+     3:1 against --field, --panel and --raised (WCAG 1.4.11). */
+  --control-border: #62809e;
+  --card-shadow: none;
+  --scrim: #04090fa6;
+  --shadow-lg: 0 18px 60px var(--shadow);
+  /* Small secondary text: at least 4.5:1 on --panel, --raised and --raised-2. */
+  --faint: #849cb2;
+  --accent: #58a6ff;
+  --accent-ink: #07192d;
+  --accent-soft: #58a6ff26;
   --danger: #ff9f8c;
-  --accent-hover: #4fd8c2;
+  --accent-hover: #79b8ff;
   /* Canvas and on-canvas overlays */
   --canvas-1: #24384d;
   --canvas-2: #15263a;
@@ -29,7 +59,7 @@
   --hover: #ffffff12;
   --popover-bg: #0f1d2df5;
   --shadow: #0006;
-  --measure: #a5ffe7;
+  --measure: #93c5fd;
   --summary-shadow: 0 1px 2px #0008;
   --label-bg: #0b1622b0;
   --label-text: #f2f6fa;
@@ -48,19 +78,36 @@
   --select-soft: #ffc46b26;
   --select-line: #ffc46b;
   --field: #0c1826;
+  /* Precision Studio floating pane & control tokens (dark — solid matte) */
+  --pane-bg: #101c2a;
+  --pane-bg-solid: #101c2a;
+  --pane-edge: rgba(255, 255, 255, 0.085);
+  --pane-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --pane-shadow: 0 18px 46px rgba(0, 0, 0, 0.50), 0 2px 8px rgba(0, 0, 0, 0.28);
+  --group-bg: rgba(255, 255, 255, 0.036);
+  --group-hover: rgba(255, 255, 255, 0.058);
+  --group-border: rgba(255, 255, 255, 0.065);
+  --group-shadow: none;
+  --well-bg: #0a141f;
+  --well-track: #0a141f;
+  --well-edge: rgba(148, 180, 212, 0.28);
+  --ctl-bg: rgba(255, 255, 255, 0.065);
+  --ctl-hover: rgba(255, 255, 255, 0.11);
+  --seg-active: #1b2f45;
+  --seg-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 0 0 0.5px rgba(255, 255, 255, 0.10);
+  --hairline: rgba(255, 255, 255, 0.075);
+  --hairline-strong: rgba(255, 255, 255, 0.13);
+  --scroll-track: rgba(255, 255, 255, 0.06);
+  --scroll-thumb: rgba(255, 255, 255, 0.34);
+  --scroll-thumb-hover: rgba(255, 255, 255, 0.52);
+  --focus-ring: 0 0 0 2px rgba(88, 166, 255, 0.45);
   --touch: 44px;
   --radius: 8px;
   --radius-field: 6px;
   /* Height reserved under the measurement buttons for their details card;
      floating tool palettes start below it. */
   --card-max: 168px;
-  font-family:
-    Inter,
-    ui-sans-serif,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--font-sans);
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -71,19 +118,22 @@
 :root[data-theme="light"] {
   --bg: #eef2f5;
   --panel: #ffffff;
-  --raised: #f4f7f9;
-  --raised-2: #e6edf2;
+  --raised: #eef3f7;
+  --raised-2: #e2eaf1;
   --field: #ffffff;
-  --line: #dbe3ea;
+  --line: #cfdbe6;
   --line-strong: #aebccb;
+  --card-shadow: 0 1px 2px #0f2a4517, 0 0 0 0.5px #0f2a450d;
+  --scrim: #0f2a4547;
   --text: #15263a;
   --muted: #4b5e70;
-  --faint: #5f7184;
-  --accent: #0b7f70;
+  --control-border: #718398;
+  --faint: #56687a;
+  --accent: #1d68c4;
   --accent-ink: #ffffff;
-  --accent-soft: #0b7f701f;
+  --accent-soft: #1d68c41c;
   --danger: #b3261e;
-  --accent-hover: #096b5e;
+  --accent-hover: #1756a6;
   --canvas-1: #ffffff;
   --canvas-2: #eef2f6;
   --canvas-3: #e1e8ee;
@@ -93,7 +143,7 @@
   --hover: #0f2a4512;
   --popover-bg: #fffffff7;
   --shadow: #0f2a4533;
-  --measure: #07705f;
+  --measure: #1554a6;
   --summary-shadow: none;
   --label-bg: #ffffffd9;
   --label-text: #15263a;
@@ -110,6 +160,29 @@
   --error-text: #82200f;
   --select-soft: #f0a5002e;
   --select-line: #c27c00;
+  /* Precision Studio floating pane & control tokens (light — solid matte cool-alabaster + elevated white cards) */
+  --pane-bg: #f4f7fa;
+  --pane-bg-solid: #f4f7fa;
+  --pane-edge: rgba(15, 42, 69, 0.11);
+  --pane-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  --pane-shadow: 0 16px 40px rgba(15, 42, 69, 0.14), 0 2px 6px rgba(15, 42, 69, 0.06);
+  --group-bg: #ffffff;
+  --group-hover: #fafcff;
+  --group-border: rgba(15, 42, 69, 0.09);
+  --group-shadow: 0 1px 2px rgba(15, 42, 69, 0.045);
+  --well-bg: #ffffff;
+  --well-track: #e8eef4;
+  --well-edge: #8395a7;
+  --ctl-bg: rgba(15, 42, 69, 0.055);
+  --ctl-hover: rgba(15, 42, 69, 0.10);
+  --seg-active: #ffffff;
+  --seg-shadow: 0 1px 2px rgba(15, 42, 69, 0.12), 0 0 0 0.5px rgba(15, 42, 69, 0.08);
+  --hairline: rgba(15, 42, 69, 0.085);
+  --hairline-strong: rgba(15, 42, 69, 0.15);
+  --scroll-track: rgba(15, 42, 69, 0.07);
+  --scroll-thumb: rgba(15, 42, 69, 0.34);
+  --scroll-thumb-hover: rgba(15, 42, 69, 0.52);
+  --focus-ring: 0 0 0 2px rgba(29, 104, 196, 0.40);
   color-scheme: light;
 }
 * {
@@ -231,7 +304,7 @@ html[data-desktop-app] .structure { padding-left: 0; border-left: 0; }
 .library-filters label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
 #library-search, #library-collection {
   width: 100%; min-width: 0; min-height: 44px; padding: 8px 12px;
-  border: 1px solid var(--line-strong); border-radius: 6px; background: var(--field);
+  border: 1px solid var(--control-border); border-radius: 6px; background: var(--field);
 }
 #library-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .library-card { border: 1px solid var(--line); background: var(--raised); border-radius: 8px; padding: 12px; min-width: 0; }
@@ -290,7 +363,7 @@ h1 {
 }
 .stat strong {
   font-weight: 550;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
 }
 /* Every text field and select: one height, frame, fill and type size. */
 select,
@@ -299,7 +372,7 @@ select,
 #view-direction,
 .pair-main input[data-field="cutoff"] {
   min-height: var(--touch);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius-field);
   background: var(--field);
   color: var(--text);
@@ -344,7 +417,7 @@ select {
   flex: none;
   width: var(--touch);
   height: var(--touch);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius);
   background: var(--raised);
   color: var(--text);
@@ -376,7 +449,7 @@ select {
 }
 .secondary {
   background: var(--raised);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius);
   min-height: var(--touch);
   padding: 0 12px;
@@ -415,7 +488,7 @@ canvas {
   gap: 6px 8px;
   min-height: var(--touch);
 }
-h2,
+:where(h2),
 .table-title,
 .turn-title {
   font-size: 11px;
@@ -425,8 +498,18 @@ h2,
   color: var(--muted);
   white-space: nowrap;
 }
-h2 {
+:where(h2) {
   margin: 0 auto 0 0;
+}
+.library-head h2,
+.analysis-head h2,
+.reflection-head h2,
+#detector-window h2 {
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 650;
+  white-space: normal;
 }
 .hint {
   font-size: 11px;
@@ -498,7 +581,7 @@ h2 {
   gap: 7px;
   min-height: var(--touch);
   padding: 0 12px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius);
   background: var(--raised);
   color: var(--muted);
@@ -612,7 +695,7 @@ h2 {
 .pair-main input[data-field="cutoff"] {
   width: 100%;
   padding: 11px 7px 0;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
   text-align: right;
   cursor: pointer;
 }
@@ -729,7 +812,7 @@ h2 {
   flex: none;
   width: var(--touch);
   height: var(--touch);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius);
   background: var(--raised-2);
   font-size: 20px;
@@ -813,7 +896,7 @@ h2 {
   text-align: right;
   font-size: 12px;
   color: var(--text);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
 }
 .polyhedra-opacity input {
   flex: 1 1 auto;
@@ -833,7 +916,7 @@ h2 {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
 }
 .pair-counts.error {
   color: var(--danger);
@@ -878,7 +961,7 @@ h2 {
 .range-stepper {
   display: grid;
   grid-template-columns: clamp(26px, 26%, 44px) minmax(0, 1fr) clamp(26px, 26%, 44px);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius-field);
   background: var(--field);
 }
@@ -892,7 +975,7 @@ h2 {
 }
 .range-stepper input {
   width: 100%;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
 }
 .range-stepper button {
   background: transparent;
@@ -1029,7 +1112,7 @@ h2 {
   color: var(--overlay-text);
   font-size: 13px;
   cursor: pointer;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
 }
 .view-directions summary::-webkit-details-marker {
   display: none;
@@ -1138,7 +1221,7 @@ h2 {
   letter-spacing: -0.6px;
   color: var(--measure);
   font-weight: 500;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
   white-space: nowrap;
 }
 .distance span {
@@ -1184,6 +1267,7 @@ h2 {
   scrollbar-width: none;
   border-left: 1px solid var(--overlay-line);
   padding-left: 4px;
+  scroll-padding-inline: 16px;
 }
 .elements[data-overflow~="end"] {
   mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
@@ -1253,7 +1337,7 @@ button.element[aria-pressed="false"] .dot {
   padding: 4px 6px;
   font-size: 11px;
   color: var(--muted);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
   text-shadow: var(--summary-shadow);
 }
 /* Short landscape windows keep the view toolbar on one row. The count
@@ -1437,7 +1521,7 @@ button.element[aria-pressed="false"] .dot {
 }
 .tool-field {
   padding: 0 6px;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
   min-width: 0;
 }
 .tool-field.hkl,
@@ -1509,7 +1593,7 @@ button.element[aria-pressed="false"] .dot {
   font-size: 11px;
   line-height: 16px;
   white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
   will-change: transform;
 }
 .tool-field.origin {
@@ -1529,7 +1613,7 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
   width: 30px;
   height: 30px;
   padding: 5px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-border);
   border-radius: 6px;
   background: var(--panel);
 }
@@ -1615,7 +1699,7 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
   line-height: 16px;
   text-align: right;
   color: var(--muted);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -1708,7 +1792,7 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
 }
 .data-table th {
   position: sticky;
@@ -1744,7 +1828,8 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
 
 /* Independent plot window: above the viewer palettes; the crystal and the
    active tool stay in place. Native dialog focus, explicit close and Escape. */
-.analysis-window {
+.analysis-window,
+.xrd-workspace {
   --analysis-pair-0: #e6a33a;
   --analysis-pair-1: #32b58b;
   --analysis-pair-2: #ae8df0;
@@ -1757,6 +1842,8 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
   --analysis-pair-9: #a4a7f3;
   --analysis-pair-10: #71b5a0;
   --analysis-pair-11: #e38857;
+}
+.analysis-window {
   position: fixed;
   inset: auto;
   z-index: 1000;
@@ -1777,7 +1864,8 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
   box-shadow: 0 18px 70px var(--shadow);
 }
 .analysis-window[open] { display: flex; flex-direction: column; }
-:root[data-theme="light"] .analysis-window {
+:root[data-theme="light"] .analysis-window,
+:root[data-theme="light"] .xrd-workspace {
   --analysis-pair-0: #ab6500;
   --analysis-pair-1: #007e5c;
   --analysis-pair-2: #7d4cbb;
@@ -1815,7 +1903,7 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
 .analysis-fields input {
   min-height: var(--touch);
   padding: 0 10px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius-field);
   background: var(--field);
   color: var(--text);
@@ -1838,12 +1926,32 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
 .analysis-table-scroll .analysis-pair-tag:last-child { margin-right: 0; }
 .analysis-pair-swatch { display: inline-block; flex: none; width: 12px; height: 3px; border-radius: 2px; background: var(--pair-color); }
 .analysis-profile { fill: none; stroke: var(--accent); stroke-width: 1.8; }
+/* Interactive plot: axes, 1-2-5 ticks, zoom brush, hover crosshair and
+   (hkl) labels. Pointer interactions are handled in analysis-window.js. */
+.analysis-chart { touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: crosshair; }
+.analysis-axis, .analysis-tick { stroke: var(--line-strong); stroke-width: 1; }
+.analysis-tick.minor { stroke: var(--line); }
+.analysis-brush { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1; pointer-events: none; }
+.analysis-crosshair { pointer-events: none; }
+.analysis-crosshair-line { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.85; }
+.analysis-crosshair-dot { fill: var(--accent); stroke: var(--panel); stroke-width: 1.2; }
+.analysis-crosshair-box { fill: var(--popover-bg); stroke: var(--line-strong); stroke-width: 0.8; }
+.analysis-chart .analysis-crosshair-text { fill: var(--text); font-size: 10px; font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features); }
+.analysis-chart .analysis-hkl-label { fill: var(--text); font-size: 10px; font-weight: 550; paint-order: stroke; stroke: var(--panel); stroke-width: 2.5px; stroke-linejoin: round; pointer-events: none; }
+.analysis-plot-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 4px 0 8px; }
+.analysis-plot-controls:not(:has(> :not([hidden]))) { display: none; }
+.analysis-plot-options { display: contents; }
+.analysis-plot-options[hidden] { display: none; }
+.analysis-plot-controls select { min-height: var(--touch); font-size: 13px; }
+#analysis-zoom-reset { margin-left: auto; min-height: var(--touch); padding: 4px 12px; }
+.analysis-body .analysis-plot-hint { margin: 2px 0 6px; font-size: 11px; }
+@media (hover: none) { .analysis-body .analysis-plot-hint { display: none; } }
 .analysis-detail { min-height: 18px; font-size: 12px; color: var(--muted); line-height: 1.5; margin: 6px 0; }
-.analysis-table-scroll { max-height: 180px; }
+.analysis-table-scroll { max-height: 180px; scrollbar-gutter: stable; }
 .analysis-table-scroll td:nth-child(2) { white-space: normal; }
 .analysis-table-scroll td:last-child, .analysis-table-scroll th:last-child { text-align: right; }
 .analysis-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.analysis-actions button { min-height: 36px; padding: 6px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-field); background: var(--raised); }
+.analysis-actions button { min-height: 36px; padding: 6px 12px; border: 1px solid var(--control-border); border-radius: var(--radius-field); background: var(--raised); }
 @media (max-width: 540px) {
   .analysis-window { resize: none; }
   .analysis-body, .detector-body { padding: 12px; }
@@ -1990,7 +2098,7 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
 .toggle-button {
   min-height: var(--touch);
   padding: 0 12px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius);
   background: var(--raised);
   color: var(--muted);
@@ -2080,7 +2188,7 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
   width: var(--touch);
   height: var(--touch);
   padding: 5px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius);
   background: var(--panel);
   cursor: pointer;
@@ -2216,12 +2324,12 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
 .turn-preset {
   min-width: 0;
   min-height: var(--touch);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-border);
   border-radius: 6px;
   background: var(--raised);
   color: var(--text);
   font-size: 13px;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
   -webkit-tap-highlight-color: transparent;
 }
 .turn-custom {
@@ -2245,7 +2353,7 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
   font-size: 12px;
   line-height: 18px;
   white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
 }
 .view-readout b {
   font-weight: 600;
@@ -2262,7 +2370,7 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
   height: 100%;
   min-height: var(--touch);
   padding-top: 11px;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
 }
 .turn-custom .micro {
   position: absolute;
@@ -2299,7 +2407,7 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
   min-width: var(--touch);
   min-height: var(--touch);
   padding: 0;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-border);
   background: var(--raised);
   color: var(--text);
   font-size: 18px;
@@ -2322,7 +2430,7 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
   font-size: 12px;
   font-weight: 600;
   color: var(--accent);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
 }
 .turn-roll {
   display: grid;
@@ -2396,7 +2504,7 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
   width: var(--touch);
   height: var(--touch);
   padding: 0;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-border);
   border-radius: 50%;
   background: var(--raised);
   color: var(--text);
@@ -2520,7 +2628,7 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
 #app[data-profile="float"] .tool-layer,
 #app.keyboard-editing .tool-layer { z-index: 16; }
 /* Keep the selected settings above overlapping inspectors and below the launcher. */
-body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in-front { z-index: 2000; }
+body:has(.analysis-window[open], #reflection-explorer[open], #xrd-workspace:not([hidden])) #app .tool-layer.in-front { z-index: 2000; }
 .tool-window {
   position: absolute;
   display: flex;
@@ -2632,7 +2740,8 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 }
 /* Thin edge strips and larger corners provide cursors on desktop and
    dedicated touch targets without drawing over the panel contents. */
-.tool-window, dialog { --panel-edge-width: 6px; }
+.tool-window, dialog, .xrd-workspace { --panel-edge-width: 7px; }
+.xrd-workspace > .panel-resize-edges { z-index: 25; }
 .panel-resize-edges {
   --corner: 16px;
   position: absolute;
@@ -2776,7 +2885,7 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
     color: var(--text);
     font-size: 12.5px;
     line-height: 1.45;
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features);
     pointer-events: auto;
   }
 }
@@ -2895,7 +3004,7 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 .reflection-intensity { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line-strong); padding-top: 12px; margin-top: 12px; }
 .reflection-intensity strong { font-size: 14px; }
 .reflection-intensity p { font-size: 11px; color: var(--muted); margin: 4px 0 0; }
-.reflection-intensity output { font-size: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--accent); }
+.reflection-intensity output { font-size: 20px; font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features); white-space: nowrap; color: var(--accent); }
 #reflection-explorer::backdrop { background: #0009; }
 .reflection-head, .reflection-toolbar, .reflection-view-controls, .reflection-harmonics, .reflection-tabs, .reflection-step-buttons { display: flex; align-items: center; gap: 8px; }
 .reflection-head { justify-content: space-between; align-items: flex-start; }
@@ -2904,7 +3013,7 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 .reflection-head p { margin: 5px 0 0; }
 .reflection-toolbar { margin: 16px 0 12px; flex-wrap: wrap; gap: 12px; }
 .reflection-toolbar label, .reflection-atom-label { display: flex; gap: 6px; align-items: center; font-size: 12px; }
-#reflection-explorer input:not([type="range"]), #reflection-explorer select { min-height: 36px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--field); color: var(--text); padding: 6px 8px; font: inherit; }
+#reflection-explorer input:not([type="range"]), #reflection-explorer select { min-height: 36px; border: 1px solid var(--control-border); border-radius: 6px; background: var(--field); color: var(--text); padding: 6px 8px; font: inherit; }
 #reflection-explorer button { min-height: 36px; }
 #reflection-hkl { width: 92px; }
 #reflection-wavelength { width: 93px; }
@@ -2944,7 +3053,7 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 .reflection-steps input { width: 100%; }
 .reflection-step-buttons { flex-wrap: wrap; margin: 8px 0; }
 .reflection-step-buttons button { flex: 1 1 auto; }
-#reflection-total { font-size: 14px; font-variant-numeric: tabular-nums; line-height: 1.5; }
+#reflection-total { font-size: 14px; font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features); line-height: 1.5; }
 .reflection-atom-table { grid-row: 3; contain: size; min-height: 112px; overflow: auto; resize: vertical; border: 1px solid var(--line); border-radius: 6px; }
 .reflection-atom-table thead { position: sticky; top: 0; background: var(--panel); z-index: 1; }
 .reflection-atom-label[hidden] { display: none; }
@@ -2963,15 +3072,15 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 @media (max-width: 760px) {
   #reflection-explorer { padding: 14px; }
 }
-@container (max-width: 720px) {
+@container (max-width: 600px) {
   .reflection-atom-table { min-height: 112px; height: 185px; }
-  .reflection-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
-  #reflection-stage { height: 300px; }
+  .reflection-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  #reflection-stage { height: 260px; }
   .reflection-atom-table th, .reflection-atom-table td { padding: 5px 4px; }
   .reflection-intensity { align-items: flex-start; flex-direction: column; }
   .reflection-intensity output { font-size: 17px; }
 }
-#reflection-explorer button:not(.text-button) { border: 1px solid var(--line-strong); border-radius: 6px; background: var(--raised); color: var(--text); padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+#reflection-explorer button:not(.text-button) { border: 1px solid var(--control-border); border-radius: 6px; background: var(--raised); color: var(--text); padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; }
 #reflection-explorer button:not(.text-button):hover { background: var(--raised-2); }
 #reflection-explorer button[aria-pressed="true"], #reflection-explorer button[aria-pressed="true"]:hover { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 #reflection-explorer button:disabled { opacity: 0.45; cursor: default; }
@@ -2986,7 +3095,7 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 #detector-form label, .detector-angles label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
 #detector-form label { align-self: center; }
 #detector-form input, #detector-spots, #detector-window button:not(.window-button) {
-  border: 1px solid var(--line-strong); border-radius: var(--radius-field); background: var(--field);
+  border: 1px solid var(--control-border); border-radius: var(--radius-field); background: var(--field);
   color: var(--text); padding: 6px 9px; font: inherit; min-height: 36px; }
 #detector-form [hidden] { display: none; }
 #detector-panel-size { display: flex; align-items: center; min-height: 36px; color: var(--text); }
@@ -3028,7 +3137,7 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 #detector-save { margin-left: auto; }
 .detector-hit { cursor: pointer; }
 .detector-angles label { grid-template-columns: 1fr auto; }
-.detector-angles output { color: var(--text); font-variant-numeric: tabular-nums; }
+.detector-angles output { color: var(--text); font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features); }
 .detector-angles input { grid-column: 1 / -1; width: 100%; margin: 0; }
 .detector-actions { align-items: center; }
 .detector-actions label { display: flex; align-items: center; gap: 5px; font-size: 13px; }
@@ -3070,8 +3179,8 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 #detector-mount-form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px 12px; margin-top: 8px; align-items: start; }
 #detector-mount-form label { display: grid; gap: 3px; color: var(--muted); min-width: 0; }
 #detector-mount-form [hidden] { display: none; }
-#detector-mount-form input, #detector-mount-form textarea, #detector-mount-form select { width: 100%; box-sizing: border-box; min-width: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-field); padding: 4px; background: var(--field); color: var(--text); }
-#detector-matrix { font-family: monospace; resize: vertical; }
+#detector-mount-form input, #detector-mount-form textarea, #detector-mount-form select { width: 100%; box-sizing: border-box; min-width: 0; border: 1px solid var(--control-border); border-radius: var(--radius-field); padding: 4px; background: var(--field); color: var(--text); }
+#detector-matrix { font-family: var(--font-mono); resize: vertical; }
 #detector-mount-status:empty { display: none; }
 
 .detector-views .panel-gap { fill: var(--line-strong); }
@@ -3091,7 +3200,7 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 #detector-options details { border-top: 1px solid var(--line); padding: 10px 0; }
 #detector-options summary { font-weight: 600; font-size: 14px; color: var(--text); }
 #detector-options button:not(.window-button), #detector-geometry-fields :is(select, input) {
-  border: 1px solid var(--line-strong); border-radius: var(--radius-field); padding: 6px 8px; background: var(--field); color: var(--text); font: inherit; min-height: 36px;
+  border: 1px solid var(--control-border); border-radius: var(--radius-field); padding: 6px 8px; background: var(--field); color: var(--text); font: inherit; min-height: 36px;
 }
 #detector-geometry-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
 #detector-geometry-fields label { display: grid; gap: 3px; color: var(--muted); font-size: 12px; }
@@ -3107,7 +3216,7 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 
 .reciprocal-size { display: flex; align-items: center; gap: 6px; padding: 3px 8px; font-size: 11px; }
 .reciprocal-size input { width: 7em; min-width: 0; flex: 0 1 7em; }
-.reciprocal-size output { font-variant-numeric: tabular-nums; }
+.reciprocal-size output { font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features); }
 #detector-ewald .lattice-node { fill: url(#ewald-lattice-ball); opacity: 1; }
 #detector-ewald .crossing { fill: url(#ewald-hit-ball); }
 #detector-ewald .tracked-node { fill: url(#ewald-tracked-ball); }
@@ -3152,7 +3261,7 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 #structure-info h3 { font-size: 14px; border-bottom: 1px solid var(--line); padding-bottom: 6px; margin: 16px 0 8px; }
 #structure-info dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 18px; font-size: 13px; margin: 0; }
 #structure-info dt { color: var(--muted); }
-#structure-info dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+#structure-info dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; font-feature-settings: var(--numeric-features); }
 #structure-info a { color: var(--accent); }
 #info-warnings { font-size: 12px; line-height: 1.5; }
 @media (max-width: 760px) {
@@ -3185,7 +3294,7 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 .reflection-options { position: relative; margin: 0; padding: 0; border: 0; }
 .reflection-option-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; }
 .reflection-options:not([open]) .reflection-option-fields { display: none; }
-.reflection-options > summary { padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: 6px; color: var(--text); }
+.reflection-options > summary { padding: 4px 10px; border: 1px solid var(--control-border); border-radius: 6px; color: var(--text); }
 .reflection-options[open] { flex-basis: 100%; }
 .reflection-options[open] > summary { width: fit-content; }
 .reflection-options:not([open]) #reflection-wavelength { visibility: hidden; }
@@ -3319,7 +3428,7 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 #app[data-profile="side"] .tool-window-body { padding-top: 2px; }
 /* Advanced detector inputs use the same field grammar as manual geometry. */
 #detector-options input:not([type="file"]):not([type="checkbox"]), #detector-options select, #detector-options textarea {
-  min-width: 0; max-width: 100%; border: 1px solid var(--line-strong); border-radius: var(--radius-field);
+  min-width: 0; max-width: 100%; border: 1px solid var(--control-border); border-radius: var(--radius-field);
   padding: 6px 8px; background: var(--field); color: var(--text); font: inherit; font-size: 14px;
 }
 #detector-wedge .detector-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
@@ -3400,15 +3509,48 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 .detector-actions { order: 5; }
 #detector-status, #detector-detail, #detector-scope { order: 6; }
 #detector-window.showing-crystal .detector-body > .detector-controls { display: contents; }
-#detector-window.showing-crystal .detector-controls > :not(.detector-angles):not(.detector-navigation) { display: none; }
+#detector-window.showing-crystal .detector-controls > :not(.detector-top-bar):not(.detector-angles):not(.detector-navigation) { display: none; }
+#detector-window.showing-crystal .detector-top-bar #detector-form { display: none; }
 #detector-window.showing-crystal .detector-visuals { display: none; }
+#xrd-workspace.showing-crystal {
+  top: auto !important;
+  bottom: var(--linked-bottom, 64px) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: min(320px, calc(100dvh - 48px)) !important;
+}
+#xrd-workspace.showing-crystal .xrd-head {
+  display: none;
+}
+#xrd-workspace.showing-crystal .detector-body {
+  padding: 4px 10px 6px;
+  gap: 4px;
+}
+@media (max-width: 420px) and (max-height: 700px) {
+  #xrd-workspace.showing-crystal {
+    bottom: 52px !important;
+    max-height: 245px !important;
+  }
+}
+@media (max-height: 500px) {
+  #xrd-workspace.showing-crystal {
+    left: 8px !important;
+    width: min(310px, calc(100vw - 16px)) !important;
+    min-width: 0 !important;
+  }
+}
 @media (max-height: 500px) and (min-width: 600px) {
-  #detector-window:not(.showing-crystal) .detector-body { grid-template-rows: minmax(0, 1fr); overflow: hidden; }
-  #detector-window:not(.showing-crystal) .detector-controls { display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+  #detector-window:not(.showing-crystal) .detector-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); overflow: hidden; padding: 6px 10px; gap: 8px; }
+  #detector-window:not(.showing-crystal) .detector-controls { display: flex; flex-direction: column; gap: 4px; height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+  #detector-window:not(.showing-crystal) .detector-angles { gap: 2px; }
+  #detector-window:not(.showing-crystal) .detector-angles label { gap: 1px; }
+  #detector-window:not(.showing-crystal) .detector-angles input[type="range"] { height: 28px; }
   #detector-window:not(.showing-crystal) .detector-controls > * { flex: none; }
   #detector-window:not(.showing-crystal) .detector-visuals { display: flex; flex-direction: column; gap: 6px; height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   #detector-window:not(.showing-crystal) .detector-view-tabs { flex: none; }
   #detector-window:not(.showing-crystal) .detector-views { flex: none; width: 100%; }
+  #detector-window:not(.showing-crystal) .detector-views svg { max-height: 175px; }
+  .xrd-head { flex-wrap: nowrap; overflow-x: auto; min-height: 36px; padding: 3px 6px; padding-right: calc(var(--touch) + 8px); gap: 4px 6px; }
 }
 .detector-controls > *, .detector-view-tabs { flex: none; }
 #app[data-profile="side"] .pair-sub { gap: 4px; }
@@ -3422,7 +3564,7 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 #app[data-launcher="menu"] .tool-rail.menu-open { z-index: 3000; }
 #app[data-launcher="menu"] .tools-menu { z-index: 3001; }
 #warnings[data-informational="true"] { background: var(--raised); color: var(--muted); outline-color: var(--line-strong); }
-#shell-cutoff { min-height: var(--touch); padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-field); background: var(--field); color: var(--text); }
+#shell-cutoff { min-height: var(--touch); padding: 6px 8px; border: 1px solid var(--control-border); border-radius: var(--radius-field); background: var(--field); color: var(--text); }
 #shell-controls label { font-size: 13px; line-height: 1.5; }
 /* Center native checkboxes too, without changing the full-chip hit targets. */
 #app label:has(> input[type="checkbox"]):not(.chip) {
@@ -3437,7 +3579,7 @@ body:has(.analysis-window[open], #reflection-explorer[open]) #app .tool-layer.in
 #analysis-family { align-items: center; font-size: 13px; }
 #analysis-family select { max-width: 100%; min-height: var(--touch); }
 #analysis-observed input[type="file"] { font-size: 13px; color: var(--muted); }
-input[type="file"]::file-selector-button { min-height: 36px; border: 1px solid var(--line-strong); border-radius: var(--radius-field); background: var(--raised); color: var(--text); font: inherit; padding: 6px 10px; margin-right: 8px; cursor: pointer; }
+input[type="file"]::file-selector-button { min-height: 36px; border: 1px solid var(--control-border); border-radius: var(--radius-field); background: var(--raised); color: var(--text); font: inherit; padding: 6px 10px; margin-right: 8px; cursor: pointer; }
 #reflection-explorer { position: fixed; inset: auto; margin: 0; }
 .reflection-head { cursor: move; touch-action: none; user-select: none; }
 /* Leave room for the complete diagram inside the shallow landscape viewport. */
@@ -3507,7 +3649,7 @@ input[type="file"]::file-selector-button { min-height: 36px; border: 1px solid v
 #detector-options input[type="file"] { width: 100%; min-width: 0; }
 #detector-calibration .detector-actions label { display: grid; min-width: 0; gap: 4px; }
 #detector-options :is(input:not([type="checkbox"]), select, textarea) { font-size: 14px; min-height: 40px; }
-#detector-matrix { font-family: ui-monospace, monospace; white-space: pre; overflow-x: auto; }
+#detector-matrix { font-family: var(--font-mono); white-space: pre; overflow-x: auto; }
 #detector-window input[type="range"] { accent-color: var(--accent); }
 #app[data-launcher="rail"] .rail-button { width: 56px; }
 @media (max-height: 500px) {
@@ -3556,7 +3698,7 @@ body:has(#app[data-launcher="rail"]) :is(.analysis-window, #reflection-explorer)
 #reflection-content { padding-bottom: 12px; }
 #detector-coverage { font-size: 13px; line-height: 1.5; }
 #detector-options input[type="file"]::file-selector-button {
-  min-height: 36px; border: 1px solid var(--line-strong); border-radius: 6px;
+  min-height: 36px; border: 1px solid var(--control-border); border-radius: 6px;
   padding: 4px 8px; background: var(--raised); color: var(--text); cursor: pointer;
 }
 .science-file { border: 1px solid var(--line-strong); border-radius: 6px; background: var(--raised); color: var(--text); }
@@ -3679,7 +3821,7 @@ body:fullscreen, body:-webkit-full-screen { width: 100%; height: 100%; backgroun
 
 /* Science windows can shrink around a short result or a collapsed
    settings group. The viewport limits still bound long tables and diagrams. */
-body:has(#app:is([data-launcher="menu"], [data-profile="float"])) :is(#analysis-window, #reflection-explorer, #detector-window, #detector-options) {
+body:has(#app:is([data-launcher="menu"], [data-profile="float"])) :is(#analysis-window, #reflection-explorer:not(.xrd-panel *), #detector-window:not(.xrd-panel *), #detector-options) {
   height: auto;
   min-height: 0;
 }
@@ -3768,4 +3910,1694 @@ body:has(#app) #detector-window.showing-crystal[data-linked-resized] {
   .touch-keypad [data-key="backspace"] { grid-area: 1 / 4; }
   .touch-keypad [data-key="done"] { grid-area: 2 / 4 / span 3; }
   .touch-keypad [data-key="newline"] { grid-area: 5 / 4; }
+}
+
+/* ---- Accessibility: reduced motion and Windows high-contrast themes ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+  .speed-knob {
+    transition: none !important;
+  }
+}
+@media (forced-colors: active) {
+  .chip,
+  .icon-toggle,
+  .toggle-button,
+  .turn-preset,
+  .view-button,
+  .rail-button,
+  .window-button,
+  .element,
+  .swatch {
+    border: 1px solid ButtonText;
+  }
+  .atoms-bar .chip,
+  .view-button,
+  .rail-button,
+  .window-button,
+  .element {
+    border-color: transparent;
+  }
+  .chip span::before {
+    forced-color-adjust: none;
+    border-color: ButtonText;
+    background: Canvas;
+  }
+  .chip:has(input:checked),
+  .icon-toggle:has(input:checked),
+  [aria-pressed="true"],
+  [aria-expanded="true"]:is(.rail-button, .tools-menu, .turn-open, .measure-more) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+    border-color: Highlight;
+  }
+  .chip:has(input:checked) span::before {
+    background: Highlight;
+    border-color: Highlight;
+  }
+  .chip:has(input:focus-visible),
+  .icon-toggle:has(input:focus-visible),
+  :focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+  button.element[aria-pressed="false"] .dot {
+    box-shadow: none;
+    border: 1.5px solid GrayText;
+  }
+  .dot,
+  .swatch,
+  .tool-color,
+  .analysis-pair-swatch {
+    forced-color-adjust: none;
+  }
+  .data-table tbody tr.selected {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  .toolbar,
+  .tool-rail,
+  .measure-details,
+  .view-readout,
+  .tool-window,
+  .turn-panel,
+  #direction-form,
+  dialog {
+    border: 1px solid CanvasText;
+  }
+  :disabled {
+    color: GrayText;
+  }
+}
+
+/* ---- v1.0.2 Finishing Sweep: cards, custom sliders, tables, header/error,
+   command palette, shortcut sheet, drop overlay, and inset scroller focus ---- */
+
+/* Light-mode card elevation (no-op in dark mode where --card-shadow is none). */
+.pair-rule,
+.tool-row,
+.library-card {
+  box-shadow: var(--card-shadow);
+}
+
+/* Native <button id="warnings"> keeps the 2-line clamped box appearance. */
+button.warnings {
+  width: 100%;
+  max-height: calc(3em + 16px);
+  text-align: left;
+  -webkit-appearance: none;
+  appearance: none;
+}
+button.warnings[aria-expanded="true"] {
+  max-height: none;
+}
+
+/* Hide legacy #export-transparent label visually while keeping its checkbox
+   in DOM for backward compatibility; #export-background is the visible control. */
+.export-transparent-legacy {
+  display: none !important;
+}
+
+/* Header CIF warnings badge */
+.header-warnings {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: calc(var(--touch) - 4px);
+  padding: 0 10px;
+  border: 1px solid var(--warn-line);
+  border-radius: 999px;
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--numeric-features);
+  white-space: nowrap;
+}
+@media (hover: hover) {
+  .header-warnings:hover {
+    filter: brightness(1.08);
+  }
+}
+
+/* Dismissible error banner */
+#error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+#error #error-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+#error .error-close {
+  color: var(--error-text);
+  min-width: 32px;
+  height: 32px;
+}
+
+/* Inset focus rings inside scroll containers so outlines are never clipped. */
+:where(
+  .elements,
+  .table-scroll,
+  .measure-details,
+  .analysis-table-scroll,
+  .sym-ops,
+  .reflection-atom-table
+) :focus-visible {
+  outline-offset: -2px;
+}
+
+/* Right-aligned numeric table columns with tabular numerals. */
+#site-table :is(th, td):nth-child(n + 3),
+#poly-table :is(th, td):nth-child(n + 3),
+#shell-controls .data-table :is(th, td):nth-child(n + 3),
+#analysis-table :is(th, td):is(:nth-child(1), :last-child),
+.reflection-atom-table .data-table :is(th, td):nth-child(n + 3) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--numeric-features);
+}
+
+/* Custom precision range sliders (separate vendor rules so neither engine
+   drops the block; pair/plane accent colors stay intact). */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--control-border) 55%, var(--field));
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--panel);
+  box-shadow: 0 1px 3px var(--shadow);
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--control-border) 55%, var(--field));
+}
+input[type="range"]::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--panel);
+  box-shadow: 0 1px 3px var(--shadow);
+}
+.polyhedra-opacity input[type="range"]::-webkit-slider-thumb {
+  background: var(--pair-color, var(--accent));
+}
+.polyhedra-opacity input[type="range"]::-moz-range-thumb {
+  background: var(--pair-color, var(--accent));
+}
+.polyhedra-opacity input[type="range"]::-moz-range-progress {
+  background: var(--pair-color, var(--accent));
+}
+.plane-slider input[type="range"]::-webkit-slider-thumb {
+  background: var(--tool-color, var(--accent));
+}
+.plane-slider input[type="range"]::-moz-range-thumb {
+  background: var(--tool-color, var(--accent));
+}
+.plane-slider input[type="range"]::-moz-range-progress {
+  background: var(--tool-color, var(--accent));
+}
+input[type="range"]:focus-visible {
+  outline: none;
+}
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 5px var(--accent);
+}
+input[type="range"]:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 5px var(--accent);
+}
+@media (any-pointer: coarse) {
+  input[type="range"]::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+    margin-top: -9px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+  }
+}
+@media (forced-colors: active) {
+  input[type="range"] {
+    -webkit-appearance: auto;
+    appearance: auto;
+  }
+  input[type="range"]:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px;
+  }
+}
+
+/* Command palette (⌘K) */
+.command-palette {
+  width: min(520px, calc(100vw - 24px));
+  max-height: min(460px, calc(100dvh - 80px));
+  margin: min(14vh, 96px) auto auto;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 18px 60px var(--shadow);
+  overflow: hidden;
+}
+.command-palette[open] {
+  display: flex;
+  flex-direction: column;
+}
+.command-palette::backdrop {
+  background: var(--scrim);
+}
+.command-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+.command-search:focus-within {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.command-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+}
+.command-search input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.command-search kbd {
+  padding: 2px 6px;
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--muted);
+}
+.command-list {
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.command-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: var(--touch);
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.command-item:hover {
+  background: var(--hover);
+}
+.command-item[aria-selected="true"] {
+  background: color-mix(in srgb, var(--accent) 26%, var(--panel));
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+@media (forced-colors: active) {
+  .command-item[aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+    border-color: Highlight;
+  }
+}
+.command-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
+}
+.command-item kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.command-empty {
+  padding: 16px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* Keyboard shortcut cheat sheet (?) */
+.shortcut-sheet {
+  width: min(600px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  padding: 20px 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 18px 60px var(--shadow);
+  overflow-y: auto;
+}
+.shortcut-sheet::backdrop {
+  background: var(--scrim);
+}
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 24px;
+  margin-top: 12px;
+}
+.shortcut-grid h3 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.shortcut-grid dl {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.shortcut-grid dl > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+.shortcut-grid dt {
+  color: var(--text);
+}
+.shortcut-grid dd {
+  margin: 0;
+  display: inline-flex;
+  gap: 4px;
+}
+.shortcut-grid kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  padding: 2px 6px;
+  border: 1px solid var(--control-border);
+  border-radius: 5px;
+  background: var(--raised);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+}
+@media (max-width: 560px) {
+  .shortcut-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Drag-and-drop intake overlay (file-intake.js) */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: var(--scrim);
+  pointer-events: none;
+}
+.drop-overlay p {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 24px 36px;
+  border: 2px dashed var(--accent);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 16px 48px var(--shadow);
+}
+.drop-overlay small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* ============================================================================
+   Combined Floating XRD Workspace (Powder | Reflection | Detector), 8-way
+   edge resize handles, Distances 3D actions, and Style AO/ORTEP toggles.
+   ============================================================================ */
+
+/* ---- Combined Floating XRD Workspace (always floating; never bottom-docked) */
+.xrd-workspace {
+  position: absolute;
+  left: 24px;
+  top: 72px;
+  width: min(860px, calc(100% - 120px));
+  height: min(680px, calc(100% - 96px));
+  min-width: min(460px, calc(100% - 16px));
+  min-height: min(360px, calc(100% - 16px));
+  max-width: calc(100% - 16px);
+  max-height: calc(100% - 16px);
+  z-index: 32;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+  overflow: visible;
+  container-type: inline-size;
+}
+.xrd-workspace.moving .xrd-head {
+  cursor: grabbing;
+}
+.xrd-workspace .xrd-head {
+  border-radius: 12px 12px 0 0;
+}
+.xrd-workspace .xrd-body {
+  border-radius: 0 0 12px 12px;
+}
+.xrd-workspace[hidden] {
+  display: none;
+}
+.xrd-head {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-height: calc(var(--touch) + 8px);
+  padding: 5px 8px 5px 10px;
+  background: var(--raised);
+  border-bottom: 1px solid var(--line);
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.xrd-head :is(button, input, select, label) {
+  cursor: auto;
+}
+.xrd-head button {
+  cursor: pointer;
+}
+.xrd-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--field);
+}
+.xrd-tab {
+  min-height: calc(var(--touch) - 4px);
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+@media (hover: hover) {
+  .xrd-tab:hover {
+    color: var(--text);
+    background: var(--hover);
+  }
+}
+.xrd-tab[aria-selected="true"] {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--text);
+}
+
+/* Shared Radiation Bar */
+.radiation-bar {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.radiation-preset select {
+  min-height: calc(var(--touch) - 2px);
+  max-width: 170px;
+  font-size: 13px;
+}
+.radiation-lambda {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.radiation-symbol {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--text);
+}
+.radiation-lambda input {
+  width: 92px;
+  min-height: calc(var(--touch) - 2px);
+  padding: 0 7px;
+  font-size: 13px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--numeric-features);
+}
+.radiation-lambda input[readonly] {
+  opacity: 0.72;
+  cursor: default;
+}
+.radiation-energy {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--numeric-features);
+}
+.radiation-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: calc(var(--touch) - 4px);
+  color: var(--warn-text);
+  border-color: var(--warn-line);
+  background: var(--warn-bg);
+}
+
+/* Shared Active (hkl) Chip */
+.active-hkl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 0 10px;
+  min-height: calc(var(--touch) - 2px);
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  background: var(--field);
+  font-size: 12px;
+}
+.active-hkl-label {
+  font-weight: 650;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--numeric-features);
+}
+.active-hkl-meta {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--numeric-features);
+  white-space: nowrap;
+}
+.active-hkl .text-button {
+  min-height: calc(var(--touch) - 6px);
+  padding: 0 8px;
+  font-size: 12px;
+}
+.xrd-close {
+  margin-left: auto;
+}
+
+/* Tab Body & Embedded Panels */
+.xrd-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.xrd-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.xrd-panel[hidden] {
+  display: none;
+}
+.powder-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.powder-observed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.powder-observed input[type="file"] {
+  max-width: 100%;
+  font-size: 13px;
+  color: var(--muted);
+}
+#xrd-panel-reflection #reflection-explorer {
+  position: static;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 12px 16px 14px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  resize: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#xrd-panel-detector #detector-window {
+  position: static;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  resize: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  container-type: inline-size;
+}
+.detector-top-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.detector-top-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.detector-radiation-note {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+#powder-table :is(th, td):is(:nth-child(1), :nth-child(2), :last-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--numeric-features);
+}
+#powder-zoom-reset {
+  margin-left: auto;
+  min-height: var(--touch);
+  padding: 4px 12px;
+}
+/* Full-viewport sheet on phones */
+@media (max-width: 640px) {
+  .xrd-workspace {
+    left: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none;
+    max-height: none;
+    min-width: 0;
+    min-height: 0;
+    border-width: 0;
+    border-radius: 0;
+    z-index: 45;
+  }
+  .xrd-head {
+    cursor: default;
+  }
+  .radiation-energy,
+  .active-hkl-meta {
+    display: none;
+  }
+}
+
+/* ---- 8-way OS-style edge & corner resize handles (.win-edge) -------------- */
+.win-edge {
+  position: absolute;
+  z-index: 6;
+  touch-action: none;
+}
+.win-edge-n { top: 0; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+.win-edge-s { bottom: 0; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+.win-edge-w { left: 0; top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+.win-edge-e { right: 0; top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+.win-edge-nw { top: 0; left: 0; width: 12px; height: 12px; cursor: nwse-resize; }
+.win-edge-ne { top: 0; right: 0; width: 12px; height: 12px; cursor: nesw-resize; }
+.win-edge-sw { bottom: 0; left: 0; width: 12px; height: 12px; cursor: nesw-resize; }
+.win-edge-se { bottom: 0; right: 0; width: 12px; height: 12px; cursor: nwse-resize; }
+@media (max-width: 640px) {
+  .win-edge {
+    display: none;
+  }
+}
+
+/* ---- Distances 3D actions bar inside #analysis-window --------------------- */
+.dist-3d-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+.dist-3d-actions .secondary {
+  min-height: calc(var(--touch) - 4px);
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+/* ---- Style visual clarity toggles (Depth cue, Two-tone, Contact AO, ORTEP) */
+.style-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 5px 0;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+.style-clarity-toggles {
+  margin: 6px 0 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+@media (forced-colors: active) {
+  .xrd-workspace {
+    border: 1px solid CanvasText;
+  }
+  .xrd-tab[aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+
+/* ============================================================================
+   Precision Studio Redesign Pass
+   Solid matte monolithic pane shells, cool-alabaster + elevated white cards
+   in Light Mode, fill-before-stroke control grammar, inset entity color ticks,
+   left-aligned disclosures, pure-CSS toggle switches, filled-track sliders,
+   and pane-specific polish. Lower-right viewport overlays remain untouched.
+   ============================================================================ */
+
+/* ---- 1. Monolithic solid-matte pane shells & headers ----------------------- */
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options, #structure-library) {
+  background: var(--pane-bg);
+  border: 1px solid var(--pane-edge);
+  border-radius: 12px;
+  box-shadow: var(--pane-shadow), var(--pane-highlight);
+}
+:is(.tool-window-head, .analysis-head, .xrd-head) {
+  background: transparent;
+  border-bottom: 1px solid var(--hairline);
+}
+.tool-window-head .tool-icon {
+  color: var(--muted);
+}
+.analysis-head h2,
+.reflection-head h2 {
+  font-size: 13.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.window-button {
+  color: var(--muted);
+  border-radius: 7px;
+}
+@media (hover: hover) {
+  .window-button:hover {
+    background: var(--ctl-hover);
+    color: var(--text);
+  }
+}
+
+/* Always-visible, calm neutral scrollbars whenever content overflows */
+.panel-scroll-track {
+  background: var(--scroll-track);
+}
+.panel-scroll-track > span {
+  background: var(--scroll-thumb);
+  transition: background 0.15s ease;
+}
+@media (hover: hover) {
+  .panel-scroll-track:hover > span {
+    background: var(--scroll-thumb-hover);
+  }
+}
+/* Native scrollable regions inside panes (tables, XRD tabs, library) */
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options, #structure-library)
+  :is(.table-scroll, .analysis-body, .detector-body, .reflection-explorer-panel, .library-grid) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options, #structure-library)
+  :is(.table-scroll, .analysis-body, .detector-body, .reflection-explorer-panel, .library-grid)::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options, #structure-library)
+  :is(.table-scroll, .analysis-body, .detector-body, .reflection-explorer-panel, .library-grid)::-webkit-scrollbar-track {
+  background: var(--scroll-track);
+  border-radius: 6px;
+}
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options, #structure-library)
+  :is(.table-scroll, .analysis-body, .detector-body, .reflection-explorer-panel, .library-grid)::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options, #structure-library)
+  :is(.table-scroll, .analysis-body, .detector-body, .reflection-explorer-panel, .library-grid)::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
+  background-clip: padding-box;
+}
+
+/* ---- 2. Entity cards & groups: fill before stroke + inset 3px color tick --- */
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options, #structure-library)
+  :is(.pair-rule, .tool-row, .library-card) {
+  position: relative;
+  background: var(--group-bg);
+  border: 1px solid var(--group-border);
+  box-shadow: var(--group-shadow);
+  border-radius: 8px;
+}
+.pair-rule {
+  padding: 8px 8px 8px 13px;
+  border-left: 1px solid var(--group-border);
+}
+.pair-rule::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 99px;
+  background: var(--pair-color, transparent);
+}
+/* Remove duplicate left stripe on center select */
+.pair-main select[data-field="center"] {
+  border-left: 1px solid var(--well-edge);
+}
+.tool-row {
+  padding: 8px 8px 8px 13px;
+  border-left: 1px solid var(--group-border);
+}
+.tool-row::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 99px;
+  background: var(--tool-color, transparent);
+}
+
+/* ---- 3. Left-aligned disclosures (fixes flex justify-end right-align bug) -- */
+details.tool-options {
+  display: block;
+  margin: 10px 0 4px;
+  padding: 0;
+  border-top: 1px solid var(--hairline);
+}
+details.tool-options > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+details.tool-options > summary::-webkit-details-marker {
+  display: none;
+}
+details.tool-options > summary::before {
+  content: "";
+  flex: none;
+  width: 11px;
+  height: 11px;
+  background-color: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+  transition: transform 0.16s ease;
+}
+details.tool-options[open] > summary {
+  color: var(--text);
+  margin-bottom: 6px;
+}
+details.tool-options[open] > summary::before {
+  transform: rotate(90deg);
+}
+@media (hover: hover) {
+  details.tool-options > summary:hover {
+    color: var(--text);
+  }
+}
+@media (any-pointer: coarse) {
+  details.tool-options > summary {
+    min-height: 44px;
+  }
+}
+
+/* ---- 4. Custom <select> and calm WCAG-safe input wells inside panes -------- */
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options, #structure-library)
+  :is(select, input[type="number"], input[type="text"], input[type="search"], .tool-field) {
+  background-color: var(--well-bg);
+  border: 1px solid var(--well-edge);
+  border-radius: 6px;
+  color: var(--text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options, #structure-library)
+  select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 24px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237d92a8' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  cursor: pointer;
+}
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options, #structure-library)
+  :is(select, input[type="number"], input[type="text"], input[type="search"], .tool-field):focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+@media (pointer: fine) {
+  :is(.tool-window, .analysis-window, .xrd-workspace, #detector-options)
+    :is(select, input[type="number"], input[type="text"], .tool-field) {
+    min-height: 30px;
+    font-size: 12.5px;
+  }
+  .analysis-fields select {
+    min-height: 30px;
+  }
+}
+
+/* ---- 5. Pure-CSS Toggle Switches for native checkboxes inside panes -------- */
+/* Preserves native <input type="checkbox"> role for Playwright & screen readers */
+:is(.style-toggle-row, .detector-navigation label, #shell-controls label) input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 99px;
+  background: var(--ctl-bg);
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+:is(.style-toggle-row, .detector-navigation label, #shell-controls label) input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+:is(.style-toggle-row, .detector-navigation label, #shell-controls label) input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+:is(.style-toggle-row, .detector-navigation label, #shell-controls label) input[type="checkbox"]:checked::after {
+  transform: translateX(12px);
+}
+:is(.style-toggle-row, .detector-navigation label, #shell-controls label) input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.style-toggle-row {
+  justify-content: space-between;
+  flex-direction: row-reverse;
+  min-height: 26px;
+  padding: 2px 0;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.style-clarity-toggles {
+  margin: 8px 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--hairline);
+}
+
+/* ---- 6. Calm borderless filter pills (.chip inside panes) ------------------ */
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options) .chip {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--ctl-bg);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options) .chip > span {
+  gap: 6px;
+}
+/* Replace clunky 8x8 checkbox square with a clean 6px indicator dot */
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options) .chip span::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 0;
+  background: currentColor;
+  opacity: 0.45;
+}
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options) .chip:has(input:checked) {
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 550;
+}
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options) .chip:has(input:checked) span::before {
+  background: var(--accent);
+  opacity: 1;
+}
+@media (hover: hover) {
+  :is(.tool-window, .analysis-window, .xrd-workspace, #detector-options) .chip:hover:not(:has(input:disabled)) {
+    background: var(--ctl-hover);
+    color: var(--text);
+  }
+  :is(.tool-window, .analysis-window, .xrd-workspace, #detector-options) .chip:has(input:checked):hover:not(:has(input:disabled)) {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+}
+@media (any-pointer: coarse) {
+  :is(.tool-window, .analysis-window, .xrd-workspace, #detector-options) .chip {
+    min-height: 36px;
+  }
+}
+/* Zero-count symmetry chips: render off & muted without killing text contrast */
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options) #sym-filters .chip.sym-zero,
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options) #sym-filters .chip.sym-zero:has(input:checked) {
+  background: var(--ctl-bg);
+  border-color: transparent;
+  color: var(--muted);
+  font-weight: 450;
+}
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options) #sym-filters .chip.sym-zero span::before,
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options) #sym-filters .chip.sym-zero:has(input:checked) span::before {
+  background: var(--muted);
+  opacity: 0.35;
+}
+
+/* ---- 7. Filled-track precision sliders (WebKit/Chromium + Firefox) --------- */
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--slider-fill, var(--accent)) var(--fill, 0%),
+    var(--well-track) var(--fill, 0%)
+  );
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+input[type="range"]::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  background: #ffffff;
+  border: 2px solid var(--slider-fill, var(--accent));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--well-track);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border: 2px solid var(--slider-fill, var(--accent));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+.polyhedra-opacity input[type="range"] {
+  --slider-fill: var(--pair-color, var(--accent));
+}
+.plane-slider input[type="range"] {
+  --slider-fill: var(--tool-color, var(--accent));
+}
+
+/* ---- 8. Unified calm in-pane button grammar -------------------------------- */
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options)
+  :is(
+    .secondary,
+    .toggle-button,
+    .btn-secondary,
+    .file-picker button,
+    .analysis-actions button,
+    #detector-window button:not(.window-button):not(#detector-go),
+    #reflection-explorer button:not(.text-button):not(.window-button)
+  ):not([hidden]) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--ctl-bg);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+@media (any-pointer: coarse) {
+  :is(.tool-window, .analysis-window, .xrd-workspace, #detector-options)
+    :is(
+      .secondary,
+      .toggle-button,
+      .btn-secondary,
+      .file-picker button,
+      .analysis-actions button,
+      #detector-window button:not(.window-button):not(#detector-go),
+      #reflection-explorer button:not(.text-button):not(.window-button)
+    ):not([hidden]) {
+    min-height: 44px;
+  }
+}
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options) .text-button:not([hidden]) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+}
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options)
+  input[type="file"]::file-selector-button {
+  min-height: 28px;
+  padding: 0 10px;
+  margin-right: 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--ctl-bg);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options)
+  :is(
+    .toggle-button,
+    .dpi-preset,
+    .analysis-actions button,
+    #detector-window button:not(.window-button),
+    #reflection-explorer button:not(.text-button):not(.window-button)
+  )[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+:is(.tool-window, .analysis-window, .xrd-workspace, #detector-options) .primary {
+  min-height: 32px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+/* Add-row buttons (+ Pair, + Plane, + Arrow): subtle full-width dashed bar */
+:is(#add-rule, #plane-add, #arrow-add) {
+  border: 1px dashed var(--hairline-strong) !important;
+  background: transparent !important;
+  color: var(--muted) !important;
+}
+@media (hover: hover) {
+  :is(#add-rule, #plane-add, #arrow-add):hover {
+    background: var(--group-hover) !important;
+    border-color: var(--muted) !important;
+    color: var(--text) !important;
+  }
+}
+/* Hover-only danger tint on delete/trash icons */
+:is(.tool-window, .analysis-window, .xrd-workspace) .delete-button {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+@media (hover: hover) {
+  :is(.tool-window, .analysis-window, .xrd-workspace) .delete-button:hover {
+    background: color-mix(in srgb, var(--danger) 14%, transparent);
+    color: var(--danger);
+    border-color: transparent;
+  }
+  :is(.tool-window, .analysis-window, .xrd-workspace, #detector-options)
+    :is(
+      .secondary,
+      .toggle-button,
+      .btn-secondary,
+      .file-picker button,
+      .analysis-actions button,
+      #detector-window button:not(.window-button),
+      #reflection-explorer button:not(.text-button):not(.window-button)
+    ):hover:not(:disabled):not([aria-pressed="true"]) {
+    background: var(--ctl-hover);
+  }
+  :is(.tool-window, .analysis-window, .xrd-workspace, #detector-options)
+    input[type="file"]::file-selector-button:hover {
+    background: var(--ctl-hover);
+  }
+  :is(.tool-window, .analysis-window, .xrd-workspace, #detector-options)
+    .text-button:hover:not(:disabled) {
+    background: var(--accent-soft);
+  }
+}
+
+/* ---- 9. Pane-by-pane craft fixes ------------------------------------------- */
+
+/* 02 Style: round custom color well matching round swatches */
+.swatch-custom,
+#tool-window-style input[type="color"] {
+  border-radius: 50%;
+}
+#tool-window-style input[type="color"]::-webkit-color-swatch {
+  border-radius: 50%;
+}
+#tool-window-style input[type="color"]::-moz-color-swatch {
+  border-radius: 50%;
+}
+/* 11 Reflection: ensure active mode buttons clearly highlight */
+.xrd-workspace #reflection-explorer button[aria-pressed="true"],
+.xrd-workspace #reflection-explorer button[aria-selected="true"] {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* 05 Symmetry: uniform 2-column grid for element type chips */
+#sym-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+#sym-filters .chip {
+  justify-content: space-between;
+  width: 100%;
+}
+#sym-filters .chip:has(input:checked):not(.sym-zero) span::before {
+  background: var(--sym-color, var(--accent));
+}
+
+/* 06 Sites: hide orphan "Site coordination" heading when no site is selected */
+h3.table-title:has(+ #shell-controls[hidden]) {
+  display: none;
+}
+.site-el-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+  box-shadow: 0 0 0 1px var(--hairline-strong);
+}
+.frac-trail {
+  opacity: 0.45;
+}
+
+/* 07 Extent: sleek capsule steppers with subtle internal hairlines */
+.range-stepper {
+  border: 1px solid var(--well-edge);
+  border-radius: 6px;
+  background: var(--well-bg);
+  overflow: hidden;
+}
+.range-stepper input {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  border-left: 1px solid var(--hairline) !important;
+  border-right: 1px solid var(--hairline) !important;
+}
+.range-stepper button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+@media (hover: hover) {
+  .range-stepper button:hover:not(:disabled) {
+    background: var(--ctl-hover);
+    color: var(--text);
+  }
+}
+
+/* 08 Export: segmented-look Scale & DPI preset strips */
+#png-options .export-row[role="radiogroup"] .chip,
+#png-options .dpi-preset {
+  border-radius: 6px;
+}
+
+/* 10-12 XRD Workspace: clean tabs, grouped radiation capsule, joined Ewald strip */
+.xrd-tabs {
+  background: var(--well-track);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+}
+.xrd-tab {
+  min-height: 28px;
+  font-size: 12.5px;
+}
+.xrd-tab[aria-selected="true"] {
+  background: var(--seg-active);
+  border-color: transparent;
+  box-shadow: var(--seg-shadow);
+  color: var(--text);
+}
+.radiation-bar {
+  padding: 2px 6px;
+  border-radius: 7px;
+  background: var(--well-track);
+  border: 1px solid var(--hairline);
+}
+.radiation-bar select,
+.radiation-bar input {
+  border-color: transparent !important;
+  background-color: transparent !important;
+}
+.radiation-bar select:focus-visible,
+.radiation-bar input:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+#radiation-wavelength {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+#radiation-wavelength::-webkit-outer-spin-button,
+#radiation-wavelength::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+#detector-window .ewald-controls {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--well-track);
+  border: 1px solid var(--hairline);
+}
+#detector-window .ewald-controls button {
+  min-height: 26px;
+  padding: 0 7px;
+  font-size: 11.5px;
+  background: transparent;
+  border-color: transparent;
+}
+@media (hover: hover) {
+  #detector-window .ewald-controls button:hover {
+    background: var(--ctl-hover);
+  }
+}
+@media (any-pointer: coarse) {
+  #detector-window .ewald-controls button {
+    min-height: 34px;
+    min-width: 34px;
+  }
+}
+#reflection-stage {
+  max-height: 260px;
+}
+#xrd-panel-reflection > #reflection-explorer {
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+}
+/* Coarse-pointer / touch targets after Precision Studio desktop overrides */
+@media (any-pointer: coarse) {
+  .style-toggle-row {
+    min-height: 44px;
+  }
+  .xrd-tab {
+    min-height: 38px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+    margin-top: -9px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+/* 13 Structure Library: stronger scrim, body-text titles (blue on hover), SG badge */
+#structure-library::backdrop {
+  background: var(--scrim);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.library-card {
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+@media (hover: hover) {
+  .library-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--group-border));
+    background: var(--group-hover);
+  }
+}
+.library-card .library-pick {
+  color: var(--text);
+  text-decoration: none;
+}
+@media (hover: hover) {
+  .library-card:hover .library-pick {
+    color: var(--accent);
+  }
+}
+
+/* Data tables inside panes: recessed well + crisp Precision Blue selection */
+:is(.tool-window, .analysis-window, .xrd-workspace) .table-scroll {
+  border-color: var(--hairline);
+  border-radius: 8px;
+  background: var(--well-bg);
+}
+:is(.tool-window, .analysis-window, .xrd-workspace) .data-table th {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--hairline-strong);
+}
+:is(.tool-window, .analysis-window, .xrd-workspace) .data-table td {
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* ---- 10. Accessibility & contrast fallbacks -------------------------------- */
+@media (prefers-contrast: more) {
+  :is(.tool-window, .analysis-window, .xrd-workspace, #detector-options)
+    :is(.chip, .secondary, .toggle-button, .btn-secondary, .pair-rule, .tool-row) {
+    border-color: var(--control-border);
+  }
+}
+@media (forced-colors: active) {
+  :is(.tool-window, .analysis-window, .xrd-workspace, #detector-options, #structure-library) {
+    border: 1px solid CanvasText;
+  }
+  :is(.style-toggle-row, .detector-navigation label, #shell-controls label) input[type="checkbox"] {
+    forced-color-adjust: auto;
+    appearance: auto;
+    width: auto;
+    height: auto;
+  }
+  :is(.style-toggle-row, .detector-navigation label, #shell-controls label) input[type="checkbox"]::after {
+    display: none;
+  }
+}
+
+/* ---- 11. Rail XRD label, pinned #xrd-close, Distances columns, Phone 390px - */
+#app[data-launcher="rail"] #mode-diffraction .rail-long {
+  display: none;
+}
+.xrd-head {
+  position: relative;
+  padding-right: calc(var(--touch) + 14px);
+}
+.xrd-head .xrd-close {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  margin-left: 0;
+}
+#analysis-distance-fields.analysis-fields {
+  grid-template-columns: 0.72fr 0.72fr 0.96fr 1.4fr;
+}
+@media (max-width: 540px) {
+  #analysis-distance-fields.analysis-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .analysis-window .analysis-actions {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 640px) {
+  header {
+    gap: 4px;
+    padding: 5px 8px;
+  }
+  header #fullscreen-toggle {
+    display: none;
+  }
+  .header-warnings {
+    min-height: 36px;
+    padding: 0 7px;
+    gap: 4px;
+    font-size: 11.5px;
+  }
+  #app:has(#xrd-workspace:not([hidden])) .tools-menu {
+    display: none;
+  }
+  .xrd-workspace {
+    z-index: 32;
+    border: 0;
+    border-radius: 0;
+  }
+  .xrd-head {
+    gap: 3px 6px;
+    padding: 4px 6px;
+    padding-right: calc(var(--touch) + 8px);
+  }
+  #xrd-panel-reflection #reflection-explorer {
+    padding: 6px 10px 8px;
+  }
+  #xrd-panel-reflection #reflection-structure {
+    display: none;
+  }
+  #xrd-panel-reflection #reflection-phasors {
+    height: 115px !important;
+    min-height: 0 !important;
+    max-height: 115px !important;
+  }
+  #tool-window-style label.radius-field:has(#element-palette) {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    white-space: nowrap;
+  }
+  #tool-window-style label.radius-field:has(#element-palette) > select {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+@media (max-height: 500px) and (min-width: 600px) {
+  .xrd-head {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    min-height: 36px;
+    padding: 3px 6px;
+    padding-right: calc(var(--touch) + 8px);
+    gap: 4px 6px;
+  }
+  .xrd-head .radiation-bar {
+    flex-wrap: nowrap;
+  }
 }

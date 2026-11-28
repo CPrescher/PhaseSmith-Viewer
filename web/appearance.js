@@ -10,6 +10,8 @@
 // radius scale changes only the drawn sphere (and its hit radius).
 // Polyhedron faces and edges always pass through the true neighbor positions.
 
+import { getElementPalette, setElementPalette } from "./elements.js";
+
 export const PALETTE = [
   "#ed7073",
   "#efa04c",
@@ -84,7 +86,8 @@ export function createAppearanceEditor(host) {
     reset = $("style-reset"),
     resetIndividual = $("style-reset-individual"),
     pick = $("style-pick"),
-    open = $("style-open");
+    open = $("style-open"),
+    paletteSelect = $("element-palette");
   let target = "",
     isOpen = false,
     picking = false,
@@ -145,6 +148,14 @@ export function createAppearanceEditor(host) {
     target = select.value;
     refresh();
   };
+  // Element palette (Mineral, CPK, colorblind-safe) recolors every element
+  // that has no custom color; custom colors always win.
+  paletteSelect.value = getElementPalette();
+  paletteSelect.onchange = () => {
+    setElementPalette(paletteSelect.value);
+    host.onPaletteChange?.(getElementPalette());
+    refresh();
+  };
   pick.onclick = () => setPicking(!picking);
   // The Appearance tool window opens and closes the editor (host.setOpen);
   // Escape first ends picking, then the window's own Escape closes it.
@@ -201,6 +212,7 @@ export function createAppearanceEditor(host) {
       }),
     );
     select.value = target;
+    paletteSelect.value = getElementPalette();
     const info = target ? host.describe(target) : null;
     for (const control of [custom, size, opacity, reset, ...swatches.children])
       control.disabled = !info;
@@ -282,6 +294,16 @@ export function createAppearanceEditor(host) {
     },
     get target() {
       return target;
+    },
+    get palette() {
+      return getElementPalette();
+    },
+    /** Apply a saved palette; unknown names fall back to Mineral. */
+    setPalette(name) {
+      setElementPalette(typeof name === "string" && name ? name : "mineral");
+      if (getElementPalette() !== name) setElementPalette("mineral");
+      paletteSelect.value = getElementPalette();
+      refresh();
     },
     /** The Appearance window shows or hides the editor. */
     setOpen(show) {

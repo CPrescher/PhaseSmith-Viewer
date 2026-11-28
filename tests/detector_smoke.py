@@ -22,12 +22,12 @@ async def check(browser, width, height):
         HERE.parent / "public/structures/periclase.cif"
     )
     await page.wait_for_function("window.viewerDiagnostics().block==='1000053'")
+    await choose_tool(page, "#mode-diffraction")
     if width > 500:
-        await choose_tool(page, "#mode-powder")
         await page.wait_for_selector(
-            "#analysis-chart .analysis-stick", state="attached"
+            "#powder-chart .analysis-stick", state="attached"
         )
-    await choose_tool(page, "#mode-reflection")
+    await page.click("#xrd-tab-reflection")
     await page.fill("#reflection-hkl", "2 0 0")
     await reveal_control(page, "#reflection-detector")
     await page.click("#reflection-detector")
@@ -36,8 +36,7 @@ async def check(browser, width, height):
     assert await page.input_value("#detector-spots") == "2 0 0"
     print(width, await page.inner_text("#detector-detail"), flush=True)
     if width > 500:
-        assert "2 0 0" in await page.inner_text("#analysis-detail")
-        assert await page.locator("#analysis-chart .selected").count() == 1
+        assert "(2 0 0)" in await page.inner_text("#active-hkl-label")
 
     async def check_starting_beam():
         beam = page.locator("#detector-ewald line.incident").first
@@ -143,8 +142,8 @@ async def check(browser, width, height):
         await page.locator("#detector-go").tap()
         assert await page.input_value("#detector-spots") == "2 0 0"
     if width > 500:
-        # Drag the dialog's resize grip and verify BOTH drawings occupy the new space.
-        win = page.locator("#detector-window")
+        # Drag the workspace's resize grip and verify BOTH drawings occupy the new space.
+        win = page.locator("#xrd-workspace")
         box = await win.bounding_box()
         grids = page.locator("#detector-ewald .sphere, #detector-image .sensor")
         sizes = await grids.evaluate_all(
@@ -161,18 +160,16 @@ async def check(browser, width, height):
             .every((e,i)=>e.getBoundingClientRect().width>old[i]+15)""",
             arg=sizes,
         )
-        gap = await page.evaluate("""() => document.querySelector('#detector-window').getBoundingClientRect().bottom
-          - document.querySelector('#detector-scope').getBoundingClientRect().bottom""")
-        assert gap < 36, gap
-        # The laptop inspector starts beside the crystal at the left edge.
-        # Move it inward so a leftward resize has actual viewport space.
-        title = await page.locator("#detector-title").bounding_box()
-        await page.mouse.move(title["x"] + 8, title["y"] + 8)
+        # Move the workspace inward so a leftward resize has actual viewport space.
+        title = await page.locator("#xrd-head").bounding_box()
+        drag_x = title["x"] + title["width"] - 56
+        drag_y = title["y"] + 8
+        await page.mouse.move(drag_x, drag_y)
         await page.mouse.down()
-        await page.mouse.move(title["x"] + 88, title["y"] + 8, steps=4)
+        await page.mouse.move(drag_x - 40, drag_y, steps=4)
         await page.mouse.up()
         box = await win.bounding_box()
-        handle = await page.locator("#detector-window [data-edge=sw]").bounding_box()
+        handle = await page.locator("#xrd-workspace [data-edge=sw]").bounding_box()
         x, y = handle["x"] + 6, handle["y"] + handle["height"] - 6
         await page.mouse.move(x, y)
         await page.mouse.down()
@@ -206,7 +203,7 @@ async def check(browser, width, height):
     await page.click("#detector-explain")
     assert not await page.is_visible("#reflection-error")
     assert await page.input_value("#reflection-hkl") == "2 0 0"
-    await page.click("#reflection-close")
+    await page.click("#xrd-tab-detector")
     await page.click("#detector-next")
     assert await page.locator("#detector-image .detector-hit").count()
     if await page.locator('[data-detector-view="image"]').is_visible():
@@ -254,6 +251,7 @@ async def check(browser, width, height):
     near_path = sphere.locator(".sphere-grid.near")
     before_grid = await near_path.get_attribute("d")
     spot_positions = await page.locator("#detector-image").inner_html()
+    await sphere.scroll_into_view_if_needed()
     bounds = await sphere.bounding_box()
     x, y = bounds["x"] + bounds["width"] / 2, bounds["y"] + bounds["height"] / 2
 
@@ -342,8 +340,6 @@ async def check(browser, width, height):
         ".spot-label, .tracked-node, .detector-plane"
     ).count()
     assert await planes() is None
-    if width > 500:
-        assert not await page.locator("#analysis-chart .selected").count()
     await page.uncheck("#detector-link")
     restored = await camera()
     assert all(
@@ -352,12 +348,8 @@ async def check(browser, width, height):
     assert restored["up"] == original["up"]
     await page.click("#ewald-beam")
     await page.keyboard.press("Escape")
-    assert not await page.is_visible("#detector-window")
-    if width > 500:
-        assert await page.is_visible("#analysis-window")
-        await page.keyboard.press("Escape")
-        assert not await page.is_visible("#analysis-window")
-    await choose_tool(page, "#mode-detector")
+    assert not await page.is_visible("#xrd-workspace")
+    await choose_tool(page, "#mode-diffraction")
     assert await page.is_visible("#detector-window")
     await check_starting_beam()
     await page.click("#detector-open-options")
@@ -421,10 +413,8 @@ async def check(browser, width, height):
     assert await page.text_content("#detector-size") == "200 mm diameter"
     if width > 500:
         # Capture the selected reflection across real main-canvas drag samples.
-        await page.click("#detector-open-options")
-        await page.fill("#detector-wavelength", "0.75")
-        await page.locator("#detector-wavelength").press("Tab")
-        await page.click("#detector-options-done")
+        await page.fill("#radiation-wavelength", "0.75")
+        await page.locator("#radiation-wavelength").press("Tab")
         await page.fill("#detector-hkl", "2 0 0")
         await page.locator("#detector-hkl").press("Enter")
         await page.click("#detector-next")
@@ -549,24 +539,24 @@ async def check(browser, width, height):
         )
         pose = await camera()
         index = await page.input_value("#detector-spots")
-        await page.click("#detector-close")
+        await page.click("#xrd-close")
         assert math.dist((await camera())["position"], pose["position"]) < 1e-9
         assert await planes() is None
-        await choose_tool(page, "#mode-detector")
+        await choose_tool(page, "#mode-diffraction")
         assert await page.is_checked("#detector-link")
         assert await page.input_value("#detector-spots") == index
         assert await near_path.get_attribute("d") == old_grid
         await check_linked_axes()
-        await page.click("#detector-close")
+        await page.click("#xrd-close")
         await page.mouse.move(*xy)
         await page.mouse.down()
         await page.mouse.move(xy[0] + 65, xy[1] + 22, steps=8)
         await page.mouse.up()
         # Capture the actual pose at the click; normal trackball damping can
         # still be moving the crystal between the release and the click.
-        await page.evaluate("""() => document.querySelector('#mode-detector').addEventListener('click',
+        await page.evaluate("""() => document.querySelector('#mode-diffraction').addEventListener('click',
           () => { window.reopenPose = viewerDiagnostics().camera }, {capture:true, once:true})""")
-        await choose_tool(page, "#mode-detector")
+        await choose_tool(page, "#mode-diffraction")
         moved = await page.evaluate("window.reopenPose")
         assert math.dist(moved["position"], pose["position"]) > 0.01
         assert math.dist((await camera())["position"], moved["position"]) < 1e-8

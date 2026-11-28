@@ -89,7 +89,7 @@ export function distanceDistribution(structure, { rMin = 0, rMax = 6, tolerance 
  * Conventional unpolarized powder LP = (1+cos²2θ)/(sin²θ cosθ).
  */
 export function powderPattern(structure, { wavelength = 1.5406, twoThetaMin = 5, twoThetaMax = 90 } = {}) {
-  inRange(wavelength, 0.1, 3, "Wavelength (Å)");
+  inRange(wavelength, 0.01, 5, "Wavelength (Å)");
   inRange(twoThetaMin, 0.1, 170, "Minimum 2θ (°)");
   inRange(twoThetaMax, 0.1, 170, "Maximum 2θ (°)");
   if (twoThetaMin >= twoThetaMax) throw Error("Maximum 2θ must exceed minimum 2θ.");
@@ -145,9 +145,7 @@ export function powderPattern(structure, { wavelength = 1.5406, twoThetaMin = 5,
   return { rows, wavelength, twoThetaMin, twoThetaMax };
 }
 
-/** Gaussian visualization only; integrated line intensity is conserved
- * before scaling the displayed profile maximum to 100. Width is in 2θ. */
-export function powderProfile(rows, min, max, fwhm, points = Math.max(1600, Math.ceil((max - min) / fwhm * 8) + 1)) {
+function samplePowderProfile(rows, min, max, fwhm, points) {
   inRange(fwhm, 0.01, 2, "Peak width (° 2θ)");
   const sigma = fwhm / Math.sqrt(8 * Math.log(2));
   const y = new Float64Array(points);
@@ -157,6 +155,27 @@ export function powderProfile(rows, min, max, fwhm, points = Math.max(1600, Math
     const hi = Math.min(points - 1, Math.floor((row.twoTheta + 5 * sigma - min) / step));
     for (let i = lo; i <= hi; i++) y[i] += row.intensity * Math.exp(-0.5 * ((min + i * step - row.twoTheta) / sigma) ** 2);
   }
-  const peak = y.reduce((a, b) => Math.max(a, b), 0) || 1;
+  return { y, step };
+}
+
+/** Unnormalized Gaussian profile peak over [min, max] for consistent zoom scaling. */
+export function powderProfilePeak(rows, min, max, fwhm, points = Math.max(1600, Math.ceil((max - min) / fwhm * 8) + 1)) {
+  if (!rows?.length || !(max > min)) return 1;
+  const { y } = samplePowderProfile(rows, min, max, fwhm, points);
+  return y.reduce((a, b) => Math.max(a, b), 0) || 1;
+}
+
+/** Gaussian visualization only; integrated line intensity is conserved
+ * before scaling the displayed profile maximum to 100. Width is in 2θ. */
+export function powderProfile(
+  rows,
+  min,
+  max,
+  fwhm,
+  points = Math.max(1600, Math.ceil((max - min) / fwhm * 8) + 1),
+  normalizeTo = null,
+) {
+  const { y, step } = samplePowderProfile(rows, min, max, fwhm, points);
+  const peak = (normalizeTo > 0 ? normalizeTo : y.reduce((a, b) => Math.max(a, b), 0)) || 1;
   return Array.from(y, (v, i) => [min + i * step, 100 * v / peak]);
 }

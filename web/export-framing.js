@@ -51,6 +51,13 @@ export function sceneExportBounds(scene, camera, { width, height, target, axis }
       if (geometry.type === "SphereGeometry") {
         world.set(0, 0, 0).applyMatrix4(transform);
         add(world, geometry.parameters.radius * transform.getMaxScaleOnAxis());
+      } else if (geometry.isLineSegmentsGeometry) {
+        // Screen-space lines store segment ends as instance attributes; the
+        // position attribute is only the shared unit quad.
+        for (const name of ["instanceStart", "instanceEnd"]) {
+          const ends = geometry.attributes[name];
+          for (let i = 0; ends && i < ends.count; i++) add(world.fromBufferAttribute(ends, i).applyMatrix4(transform));
+        }
       } else if (boxed) {
         if (!geometry.boundingBox) geometry.computeBoundingBox();
         const box = geometry.boundingBox;

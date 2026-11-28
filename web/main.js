@@ -7,6 +7,8 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { Line2 } from "three/addons/lines/Line2.js";
 import { LineGeometry } from "three/addons/lines/LineGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
+import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
+import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 import "./style.css";
 import {
   defaultRanges,
@@ -18,7 +20,7 @@ import { latticeViewDirection } from "./view-direction.js";
 // Namespace import: describeViewDirection is root's helper (readout).
 import * as viewDirection from "./view-direction.js";
 import { createSessionStore } from "./session-store.js";
-import { parseProject, serializeProject, projectFilename } from "./project-file.js";
+import { parseProject, serializeProject, projectFilename, MAX_PROJECT_BYTES } from "./project-file.js";
 import { createHistory } from "./history.js";
 import { buildCoordinationEnvironments, convexHull } from "./coordination.js";
 import { elementColor as defaultColor } from "./elements.js";
@@ -41,13 +43,18 @@ import { createDepthPeeler } from "./peel.js";
 import { createLiveAntialias } from "./live-antialias.js";
 import { rotatedView } from "./view-rotation.js";
 import { createTurnControls } from "./turn-controls.js";
-import { createStructureLibrary, libraryEntry, libraryFilename, entryForFilename } from "./structure-library.js";
+import { createStructureLibrary, structureLibrary, libraryEntry, libraryFilename, entryForFilename } from "./structure-library.js";
 import { installPanelScrollbars } from "./panel-scrollbars.js";
 import { createToolWindows, revealAddedRow, TOOL_IDS } from "./tool-windows.js";
 import { setDiffractionModule } from "./diffraction-engine.js";
 import { createDetectorWindow } from "./detector-window.js";
-import { createAnalysisWindow } from "./analysis-window.js";
+import { createAnalysisWindow, createPowderPanel } from "./analysis-window.js";
 import { createReflectionExplorer } from "./reflection-explorer.js";
+import { createRadiation } from "./radiation.js";
+import { createXrdWorkspace } from "./xrd-workspace.js";
+import { createCommandPalette } from "./command-palette.js";
+import { createFileIntake } from "./file-intake.js";
+import { normalizePair, pairName as normalizedPairName } from "./pair-presentation.js";
 import {
   createAppearance,
   clearAppearance,
@@ -106,12 +113,12 @@ for (const type of ["gesturestart", "gesturechange"])
   document.addEventListener(type, (event) => event.preventDefault(), {
     passive: false,
   });
-for (const input of document.querySelectorAll('#analysis-file, #detector-poni, #detector-orientation-file')) {
+for (const input of document.querySelectorAll('#analysis-file, #powder-import, #detector-poni, #detector-orientation-file')) {
   const picker = document.createElement("div"), button = document.createElement("button"), name = document.createElement("span");
   picker.className = "file-picker";
   button.type = "button";
   button.textContent = "Choose file…";
-  button.setAttribute("aria-label", `Choose ${input.id === "analysis-file" ? "measured powder trace" : input.id === "detector-poni" ? "PONI calibration" : "PhaseSmith JSON"} file`);
+  button.setAttribute("aria-label", `Choose ${input.id === "analysis-file" || input.id === "powder-import" ? "measured powder trace" : input.id === "detector-poni" ? "PONI calibration" : "PhaseSmith JSON"} file`);
   button.onclick = () => input.click();
   name.textContent = "No file chosen";
   input.addEventListener("change", () => name.textContent = input.files?.[0]?.name || "No file chosen");
@@ -119,15 +126,24 @@ for (const input of document.querySelectorAll('#analysis-file, #detector-poni, #
   input.after(picker);
   picker.append(button, name);
 }
+function setError(message) {
+  const box = $("error");
+  if (!box) return;
+  const textEl = $("error-text");
+  if (textEl) textEl.textContent = message || "";
+  else box.textContent = message || "";
+  box.hidden = !message;
+}
+$("error-close")?.addEventListener("click", () => setError(""));
 function initialize() {
   let renderer;
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   } catch (error) {
     $("loading").hidden = true;
-    $("error").hidden = false;
-    $("error").textContent =
-      "This browser could not start WebGL2, which is needed for 3D viewing. Enable hardware acceleration or open this page in a browser with WebGL2 support.";
+    setError(
+      "This browser could not start WebGL2, which is needed for 3D viewing. Enable hardware acceleration or open this page in a browser with WebGL2 support.",
+    );
     $("name").textContent = "3D view unavailable";
     $("source").textContent = "The graphics context could not be created.";
     $("open").disabled = true;
@@ -148,7 +164,28 @@ function initialize() {
     "Interactive crystal structure. Drag to rotate, scroll or pinch to zoom, and select an atom for information. Choose Distance or Angle to measure.",
   );
   renderer.domElement.setAttribute("role", "img");
-  viewport.append(renderer.domElement);
+  // A lost GPU context (driver reset, sleep, too many contexts) stops
+  // rendering until the browser restores it; then rebuild GPU resources.
+  let contextLost = false;
+  const CONTEXT_LOST_MESSAGE = "The 3D graphics context was lost. Attempting to restore the view…";
+  renderer.domElement.addEventListener("webglcontextlost", (event) => {
+    event.preventDefault();
+    contextLost = true;
+    cancelAnimationFrame(frame);
+    frame = 0;
+    peeler.resetContext();
+    setError(CONTEXT_LOST_MESSAGE);
+  });
+  renderer.domElement.addEventListener("webglcontextrestored", () => {
+    contextLost = false;
+    peeler.resetContext();
+    studio.dispose();
+    studio = createStudioEnvironment();
+    if (($("error-text") ?? $("error"))?.textContent === CONTEXT_LOST_MESSAGE) setError("");
+    if (structure) build(true);
+    else invalidate();
+  });
+  viewport.prepend(renderer.domElement);
   const scene = new THREE.Scene(),
     camera = new THREE.PerspectiveCamera(38, 1, 0.01, 10000);
   // A perspective control camera supplies intuitive distance-based zoom;
@@ -192,11 +229,26 @@ function initialize() {
     viewCamera.up.copy(camera.up);
     viewCamera.updateProjectionMatrix();
     viewCamera.updateMatrixWorld();
+    // Optional depth cueing: linear fog along the view axis, from just in
+    // front of the scene centre to past its back, toward the canvas color
+    // (white for White exports; none for transparent images).
+    if (depthCue && !sceneBox.isEmpty() && fogBackground !== "transparent") {
+      const toCenter = sceneDelta.copy(viewCamera.position).sub(sceneSphere.center).dot(viewAxis);
+      depthFog.color.set(fogBackground === "white" ? "#ffffff" : canvasFogColor);
+      depthFog.near = Math.max(near, toCenter - sceneSphere.radius * 0.25);
+      depthFog.far = Math.max(depthFog.near + 0.5, toCenter + sceneSphere.radius * 1.45);
+      scene.fog = depthFog;
+    } else scene.fog = null;
   }
   const viewAxis = new THREE.Vector3(),
     sceneBox = new THREE.Box3(),
     sceneSphere = new THREE.Sphere(),
-    sceneDelta = new THREE.Vector3();
+    sceneDelta = new THREE.Vector3(),
+    depthFog = new THREE.Fog(0x15263a, 1, 100);
+  let depthCue = false,
+    fogBackground = null;
+  const readCanvasFog = () => getComputedStyle(document.documentElement).getPropertyValue("--canvas-2").trim() || "#15263a";
+  let canvasFogColor = readCanvasFog();
   // A Retina canvas multiplies the cost of every transparency pass. Restore
   // full detail once the fingers and any subsequent camera inertia settle.
   let touchPreviewTimer = 0;
@@ -356,57 +408,81 @@ function initialize() {
   const selectionRims = [];
   scene.add(selectionGroup);
   const liveAntialias = createLiveAntialias(renderer);
+  const viewportSize = {
+    width: Math.max(1, viewport.clientWidth || innerWidth || 1),
+    height: Math.max(1, viewport.clientHeight || innerHeight || 1),
+  };
   const livePixelRatio = (width, height) => Math.min(window.devicePixelRatio || 1, 2,
     Math.sqrt(4_000_000 / Math.max(1, width * height)));
   function render(exportView) {
     frame = 0;
-    if (!exportView?.crop) {
-      // Keep native display detail within the live pixel budget; FXAA smooths
-      // translucent edges without forcing extra supersampling on low-DPI screens.
-      // Bound live pixels: each transparency layer otherwise multiplies the
-      // full-screen Retina workload. Export frames use their own resolution.
-      const scale = Math.min(livePixelRatio(viewport.clientWidth, viewport.clientHeight), touchPreviewTimer ? 1.5 : Infinity);
-      if (renderer.getPixelRatio() !== scale) renderer.setPixelRatio(scale);
-    }
-    // Trackball emits change while damping moves the camera. That event
-    // schedules the next frame; once settled, no animation frames remain.
-    controls.update();
-    const sweepSpecimen = specimenDragMoved;
-    specimenDragMoved = false;
-    if (detectorLink && detectorLink.rotation.angleTo(camera.quaternion) > 1e-7) {
-      detectorLink.rotation.copy(camera.quaternion);
-      updatingFromMain = true;
-      // Trackball maps the canvas width to two radians before rotateSpeed.
-      const degreesPerPixel = THREE.MathUtils.radToDeg(2 * controls.rotateSpeed / controls.screen.width);
-      try { diffractionDetector.rotateSpecimen(mainCameraRotation(), sweepSpecimen ? degreesPerPixel : 0); }
-      finally { updatingFromMain = false; }
-    }
-    syncViewCamera();
-    for (const rim of selectionRims) rim.quaternion.copy(viewCamera.quaternion);
-    syncStudio();
-    faceSorter.sync([...faceMeshes.values()], viewCamera);
-    if (exportView?.crop) {
-      // Render the cropped region directly. The movie envelope can reach
-      // beyond the live viewport at other orientations; it still fits in
-      // the export without changing the user's camera or zoom.
-      const { crop, css } = exportView;
-      const px = (viewCamera.right - viewCamera.left) / css.width;
-      const py = (viewCamera.top - viewCamera.bottom) / css.height;
-      viewCamera.left += crop.x * px;
-      viewCamera.right = viewCamera.left + crop.width * px;
-      viewCamera.top -= crop.y * py;
-      viewCamera.bottom = viewCamera.top - crop.height * py;
-      viewCamera.updateProjectionMatrix();
-      try {
-        peeler.render(scene, viewCamera);
-      } finally {
-        // Labels retain their live CSS coordinates; the exporter translates
-        // them into the cropped frame after drawing the rendered geometry.
-        syncViewCamera();
+    if (contextLost || renderer.getContext().isContextLost?.()) return;
+    const prevLightTheme = atomThemeUniform.value;
+    const scaledLines = [];
+    fogBackground = exportView?.background ?? null;
+    if (exportView?.background === "white") atomThemeUniform.value = 1;
+    try {
+      if (!exportView?.crop) {
+        // Keep native display detail within the live pixel budget; FXAA smooths
+        // translucent edges without forcing extra supersampling on low-DPI screens.
+        // Bound live pixels: each transparency layer otherwise multiplies the
+        // full-screen Retina workload. Export frames use their own resolution.
+        const scale = Math.min(livePixelRatio(viewportSize.width, viewportSize.height), touchPreviewTimer ? 1.5 : Infinity);
+        if (renderer.getPixelRatio() !== scale) renderer.setPixelRatio(scale);
       }
-    } else {
-      peeler.render(scene, viewCamera);
-      liveAntialias.render();
+      // Trackball emits change while damping moves the camera. That event
+      // schedules the next frame; once settled, no animation frames remain.
+      controls.update();
+      const sweepSpecimen = specimenDragMoved;
+      specimenDragMoved = false;
+      if (detectorLink && detectorLink.rotation.angleTo(camera.quaternion) > 1e-7) {
+        detectorLink.rotation.copy(camera.quaternion);
+        updatingFromMain = true;
+        // Trackball maps the canvas width to two radians before rotateSpeed.
+        const degreesPerPixel = THREE.MathUtils.radToDeg(2 * controls.rotateSpeed / controls.screen.width);
+        try { diffractionDetector.rotateSpecimen(mainCameraRotation(), sweepSpecimen ? degreesPerPixel : 0); }
+        finally { updatingFromMain = false; }
+      }
+      syncViewCamera();
+      for (const rim of selectionRims) rim.quaternion.copy(viewCamera.quaternion);
+      syncStudio();
+      faceSorter.sync([...faceMeshes.values()], viewCamera);
+      if (exportView?.crop) {
+        // Render the cropped region directly. The movie envelope can reach
+        // beyond the live viewport at other orientations; it still fits in
+        // the export without changing the user's camera or zoom.
+        const { crop, css } = exportView;
+        const px = (viewCamera.right - viewCamera.left) / css.width;
+        const py = (viewCamera.top - viewCamera.bottom) / css.height;
+        viewCamera.left += crop.x * px;
+        viewCamera.right = viewCamera.left + crop.width * px;
+        viewCamera.top -= crop.y * py;
+        viewCamera.bottom = viewCamera.top - crop.height * py;
+        viewCamera.updateProjectionMatrix();
+        const lineScale = exportView.pixelScale || 1;
+        if (lineScale !== 1) {
+          scene.traverse((obj) => {
+            if (obj.material?.isLineMaterial) {
+              scaledLines.push([obj.material, obj.material.linewidth]);
+              obj.material.linewidth *= lineScale;
+            }
+          });
+        }
+        try {
+          peeler.render(scene, viewCamera);
+        } finally {
+          // Labels retain their live CSS coordinates; the exporter translates
+          // them into the cropped frame after drawing the rendered geometry.
+          syncViewCamera();
+        }
+      } else {
+        peeler.render(scene, viewCamera);
+        liveAntialias.render();
+      }
+    } finally {
+      for (const [mat, width] of scaledLines) mat.linewidth = width;
+      fogBackground = null;
+      atomThemeUniform.value = prevLightTheme;
     }
     updateViewReadout();
     if (labelsOn || shownLabels) updateLabels();
@@ -429,7 +505,14 @@ function initialize() {
   // CIF site labels projected onto visible atoms. A small reused pool of
   // spans (front-most first, overlaps skipped, capped) keeps the DOM light
   // while rotating on tablets.
-  const compass = createAxisCompass($("axis-compass"), $("axis-compass-text"));
+  // Clicking an axis views along it; Shift-click views along its negative.
+  const compass = createAxisCompass($("axis-compass"), $("axis-compass-text"), {
+    onAxisClick(axis, { opposite } = {}) {
+      const sign = opposite ? -1 : 1;
+      const indices = { a: [sign, 0, 0], b: [0, sign, 0], c: [0, 0, sign] }[axis];
+      if (indices && !exporter?.busy) orient(indices, opposite ? "uvw" : axis);
+    },
+  });
   const compassInverse = new THREE.Quaternion(),
     compassVector = new THREE.Vector3();
   let compassState = null;
@@ -441,7 +524,7 @@ function initialize() {
     projected = new THREE.Vector3();
   function updateLabels() {
     const layer = $("atom-labels");
-    const { width, height } = renderer.domElement.getBoundingClientRect();
+    const { width, height } = viewportSize;
     let placed = [];
     if (labelsOn && atoms.length <= LABEL_ATOM_LIMIT) {
       const candidates = [];
@@ -525,9 +608,14 @@ function initialize() {
   renderer.domElement.addEventListener("wheel", invalidate, { passive: true });
   const resize = new ResizeObserver(() => {
     const { width, height } = viewport.getBoundingClientRect();
+    viewportSize.width = Math.max(1, width);
+    viewportSize.height = Math.max(1, height);
     // Resize and set density together so entering full screen never allocates
     // a transient, oversized buffer at the previous smaller view's density.
     renderer.setDrawingBufferSize(width, height, livePixelRatio(width, height));
+    scene.traverse((obj) => {
+      if (obj.material?.isLineMaterial) obj.material.resolution.set(Math.max(1, width), Math.max(1, height));
+    });
     controls.handleResize();
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
@@ -569,19 +657,22 @@ function initialize() {
   // A neutral procedural studio (no remote assets) lights the atoms only:
   // soft panel reflections give broad highlights, while polyhedra and bonds
   // keep their existing flat, colour-true shading.
-  const studio = (() => {
+  function createStudioEnvironment() {
     const pmrem = new THREE.PMREMGenerator(renderer);
     const room = new RoomEnvironment();
     const texture = pmrem.fromScene(room, 0.04).texture;
     room.dispose();
     pmrem.dispose();
     return texture;
-  })();
+  }
+  let studio = createStudioEnvironment();
+  const atomThemeUniform = { value: document.documentElement.dataset.theme === "light" ? 1 : 0 };
+  const atomContactAoUniform = { value: $("style-contact-ao") ? ($("style-contact-ao").checked ? 1 : 0) : 1 };
   function atomMaterial(color) {
     // Satin finish: a broad, modest key highlight and only a faint studio
     // reflection, so saturated element colours are not lifted to white and
     // the shaded side keeps depth (no clear coat, which added white rims).
-    return new THREE.MeshStandardMaterial({
+    const material = new THREE.MeshStandardMaterial({
       color,
       // Grazing-angle studio reflection produced a pale rim on the upper
       // silhouette; a weaker, rougher reflection keeps the edge colored.
@@ -590,6 +681,27 @@ function initialize() {
       envMap: studio,
       envMapIntensity: 0.08,
     });
+    // Analytic contact ambient occlusion (per-instance aAtomAo) + light-theme
+    // Fresnel silhouette darkening so pale elements (H, Y, Ce) stay crisp.
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.uLightTheme = atomThemeUniform;
+      shader.uniforms.uContactAo = atomContactAoUniform;
+      shader.vertexShader = "attribute float aAtomAo;\nvarying float vAtomAo;\n" + shader.vertexShader.replace(
+        "#include <begin_vertex>",
+        "vAtomAo = aAtomAo;\n#include <begin_vertex>",
+      );
+      shader.fragmentShader = "uniform float uLightTheme;\nuniform float uContactAo;\nvarying float vAtomAo;\n" + shader.fragmentShader.replace(
+        "#include <tonemapping_fragment>",
+        `gl_FragColor.rgb *= mix(1.0, clamp(vAtomAo, 0.5, 1.0), uContactAo);
+        if (uLightTheme > 0.5) {
+          float rim = pow(1.0 - clamp(abs(dot(normalize(vNormal), vec3(0.0, 0.0, 1.0))), 0.0, 1.0), 2.5);
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb * 0.72, rim * 0.45);
+        }
+        #include <tonemapping_fragment>`,
+      );
+    };
+    material.customProgramCacheKey = () => "phasesmith-atom-ao-fresnel-v2";
+    return material;
   }
   // Segment count follows a fixed triangle budget, so small scenes get
   // smooth silhouettes at close zoom and large supercells stay light,
@@ -682,22 +794,31 @@ function initialize() {
       rotation = new THREE.Quaternion(),
       scale = new THREE.Vector3(),
       tint = new THREE.Color();
+    // Precompute atom transforms so a.radius is ready for spatial-hashed contact AO.
+    for (const a of atoms) {
+      a.color = styleOf(a).color;
+      a.radius = atomRadius(a);
+    }
+    const aoByAtom = computeAtomAo(atoms);
     for (const [e, list] of byElement) {
       // One instanced mesh per element; per-copy colours ride on the
       // instance colour attribute (material colour stays white).
+      const geom = sphere.clone();
+      const aoValues = new Float32Array(list.length);
       const mesh = new THREE.InstancedMesh(
-        sphere.clone(),
+        geom,
         atomMaterial(0xffffff),
         list.length,
       );
       mesh.visible = atomVisible(list[0]);
       mesh.userData.atoms = list;
       list.forEach((a, i) => {
-        a.color = styleOf(a).color;
         atomTransform(a, matrix, rotation, scale);
         mesh.setMatrixAt(i, matrix);
         mesh.setColorAt(i, tint.set(a.color));
+        aoValues[i] = aoByAtom.get(a) ?? 1;
       });
+      geom.setAttribute("aAtomAo", new THREE.InstancedBufferAttribute(aoValues, 1));
       mesh.instanceMatrix.needsUpdate = true;
       mesh.instanceColor.needsUpdate = true;
       model.add(mesh);
@@ -707,14 +828,18 @@ function initialize() {
     fitCorners = corners.map((p) => p.clone().sub(modelCenter));
     updateSphereBounds();
     const points = rangeEdges(plotRanges).map((p) => cart(p).sub(modelCenter));
-    cellLines = new THREE.LineSegments(
-      new THREE.BufferGeometry().setFromPoints(points),
-      new THREE.LineBasicMaterial({
+    // Screen-space (fat) lines keep cell edges crisp at every zoom and
+    // display density; the resolution follows the render viewport.
+    cellLines = new LineSegments2(
+      new LineSegmentsGeometry().setPositions(points.flatMap((p) => [p.x, p.y, p.z])),
+      new LineMaterial({
         color: scenePalette().cell,
+        linewidth: 1.5,
         transparent: true,
         opacity: 0.48,
       }),
     );
+    cellLines.userData.segmentCount = points.length / 2;
     cellLines.visible = $("cell").checked;
     model.add(cellLines);
     fitDistance = Math.max(box.getSize(new THREE.Vector3()).length(), 2) * 1.65;
@@ -726,6 +851,8 @@ function initialize() {
     updateAtomSummary();
     updateSelection();
     updatePickMarker();
+    buildOrtepRings();
+    if (activeDistanceSpec) highlightDistance(activeDistanceSpec);
     // Overlays follow the new model center, ranges and atom list.
     latticeTools.rebuild();
     highlightSite(highlightedSite);
@@ -746,6 +873,242 @@ function initialize() {
     }
     matrix.compose(a.position, rotation, scale.setScalar(a.radius));
   }
+  const haloQuat = new THREE.Quaternion(),
+    haloScale = new THREE.Vector3(),
+    haloScaleMat = new THREE.Matrix4();
+  function applyHaloMatrix(atom, factor, out) {
+    atomTransform(atom, out, haloQuat, haloScale);
+    out.multiply(haloScaleMat.makeScale(factor, factor, factor));
+    return out;
+  }
+  // Spatial-hashed analytic contact ambient occlusion: sums neighbor solid-angle
+  // occlusion within 4.5 Å so exposed surface atoms stay 1.0 and recessed interior
+  // atoms gently darken to ~0.62–0.75.
+  function computeAtomAo(atomList) {
+    const out = new Map();
+    const visible = atomList.filter(atomVisible);
+    if (!visible.length) return out;
+    const cutoff = 4.5;
+    const cutoff2 = cutoff * cutoff;
+    const bins = new Map();
+    const keyOf = (x, y, z) => `${x},${y},${z}`;
+    for (const a of visible) {
+      const k = keyOf(Math.floor(a.position.x / cutoff), Math.floor(a.position.y / cutoff), Math.floor(a.position.z / cutoff));
+      let bucket = bins.get(k);
+      if (!bucket) { bucket = []; bins.set(k, bucket); }
+      bucket.push(a);
+    }
+    for (const a of visible) {
+      const cx = Math.floor(a.position.x / cutoff);
+      const cy = Math.floor(a.position.y / cutoff);
+      const cz = Math.floor(a.position.z / cutoff);
+      let occ = 0;
+      for (let dx = -1; dx <= 1; dx++)
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dz = -1; dz <= 1; dz++) {
+            const bucket = bins.get(keyOf(cx + dx, cy + dy, cz + dz));
+            if (!bucket) continue;
+            for (const b of bucket) {
+              if (b === a) continue;
+              const d2 = a.position.distanceToSquared(b.position);
+              if (d2 <= 1e-8 || d2 >= cutoff2) continue;
+              const d = Math.sqrt(d2);
+              const r = Math.max(0.15, b.radius || 0.4);
+              const solid = Math.min(1, (r * r) / d2);
+              occ += solid * (1 - d / cutoff);
+            }
+          }
+      out.set(a, Math.max(0.58, 1 / (1 + occ * 0.42)));
+    }
+    return out;
+  }
+  function refreshAtomAo() {
+    if (!meshes.length) return;
+    const aoByAtom = computeAtomAo(atoms);
+    for (const mesh of meshes) {
+      const attr = mesh.geometry.getAttribute("aAtomAo");
+      if (!attr) continue;
+      const list = mesh.userData.atoms;
+      for (let i = 0; i < list.length; i++) {
+        attr.array[i] = aoByAtom.get(list[i]) ?? 1;
+      }
+      attr.needsUpdate = true;
+    }
+  }
+  // ORTEP-style principal-axis equatorial rings (XY, YZ, XZ) on anisotropic ADP ellipsoids.
+  const ortepGroup = new THREE.Group();
+  scene.add(ortepGroup);
+  const ORTEP_UNIT_SEGMENTS = (() => {
+    const segs = [];
+    const steps = 32;
+    for (let i = 0; i < steps; i++) {
+      const t0 = (i / steps) * Math.PI * 2;
+      const t1 = ((i + 1) / steps) * Math.PI * 2;
+      const c0 = Math.cos(t0), s0 = Math.sin(t0), c1 = Math.cos(t1), s1 = Math.sin(t1);
+      segs.push([c0, s0, 0], [c1, s1, 0]); // XY
+      segs.push([0, c0, s0], [0, c1, s1]); // YZ
+      segs.push([c0, 0, s0], [c1, 0, s1]); // XZ
+    }
+    return segs;
+  })();
+  function buildOrtepRings() {
+    dispose(ortepGroup);
+    ortepGroup.clear();
+    if (
+      !$("adp-ellipsoids")?.checked ||
+      ($("style-ortep-rings") && !$("style-ortep-rings").checked) ||
+      !$("show-atoms")?.checked
+    ) return;
+    const positions = [];
+    const colors = [];
+    const mat = new THREE.Matrix4();
+    const v = new THREE.Vector3();
+    const atomTint = new THREE.Color();
+    const lightRing = new THREE.Color(0xf1f5f9);
+    const darkRing = new THREE.Color(0x1e293b);
+    let count = 0;
+    for (const a of atoms) {
+      if (!a.displacementAxes || !atomVisible(a)) continue;
+      if (++count > 1200) break;
+      atomTint.set(a.color ?? styleOf(a).color);
+      const lum = 0.2126 * atomTint.r + 0.7152 * atomTint.g + 0.0722 * atomTint.b;
+      const ringColor = lum < 0.36 ? lightRing : darkRing;
+      applyHaloMatrix(a, 1.008, mat);
+      for (const p of ORTEP_UNIT_SEGMENTS) {
+        v.set(p[0], p[1], p[2]).applyMatrix4(mat);
+        positions.push(v.x, v.y, v.z);
+        colors.push(ringColor.r, ringColor.g, ringColor.b);
+      }
+    }
+    if (!positions.length) return;
+    const geom = new LineSegmentsGeometry();
+    geom.setPositions(positions);
+    geom.setColors(colors);
+    const rings = new LineSegments2(
+      geom,
+      new LineMaterial({
+        vertexColors: true,
+        linewidth: 1.15,
+        transparent: true,
+        opacity: 0.68,
+        resolution: new THREE.Vector2(viewportSize.width, viewportSize.height),
+      }),
+    );
+    ortepGroup.add(rings);
+  }
+  // 3D Pair-distance highlight (from Distances window -> Highlight in 3D).
+  const distanceGroup = new THREE.Group();
+  scene.add(distanceGroup);
+  let activeDistanceSpec = null;
+  function clearDistanceHighlight() {
+    dispose(distanceGroup);
+    distanceGroup.clear();
+    activeDistanceSpec = null;
+  }
+  function highlightDistance(spec) {
+    clearDistanceHighlight();
+    if (!spec || !atoms.length) {
+      invalidate();
+      return;
+    }
+    activeDistanceSpec = spec;
+    const min = Math.max(0, spec.min - 1e-4);
+    const max = spec.max + 1e-4;
+    const min2 = min * min;
+    const max2 = max * max;
+    const cell = Math.max(0.25, max + 0.01);
+    const visibleAtoms = atoms.filter(atomVisible);
+    const bins = new Map();
+    const bKey = (x, y, z) => `${x},${y},${z}`;
+    for (let i = 0; i < visibleAtoms.length; i++) {
+      const p = visibleAtoms[i].position;
+      const k = bKey(Math.floor(p.x / cell), Math.floor(p.y / cell), Math.floor(p.z / cell));
+      if (!bins.has(k)) bins.set(k, []);
+      bins.get(k).push(i);
+    }
+    const positions = [];
+    const CAP = 600;
+    let total = 0;
+    for (let i = 0; i < visibleAtoms.length; i++) {
+      const a = visibleAtoms[i];
+      const cx = Math.floor(a.position.x / cell);
+      const cy = Math.floor(a.position.y / cell);
+      const cz = Math.floor(a.position.z / cell);
+      for (let dx = -1; dx <= 1; dx++)
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dz = -1; dz <= 1; dz++) {
+            const bucket = bins.get(bKey(cx + dx, cy + dy, cz + dz));
+            if (!bucket) continue;
+            for (const j of bucket) {
+              if (j <= i) continue;
+              const b = visibleAtoms[j];
+              if (spec.pair && spec.pair !== "all" && normalizePair(normalizedPairName(a.element, b.element)) !== spec.pair) continue;
+              const d2 = a.position.distanceToSquared(b.position);
+              if (d2 >= min2 && d2 <= max2 && d2 > 1e-12) {
+                total++;
+                if (total <= CAP) {
+                  positions.push(a.position.x, a.position.y, a.position.z, b.position.x, b.position.y, b.position.z);
+                }
+              }
+            }
+          }
+    }
+    if (positions.length) {
+      const geom = new LineSegmentsGeometry();
+      geom.setPositions(positions);
+      const { width, height } = viewport.getBoundingClientRect();
+      const segs = new LineSegments2(
+        geom,
+        new LineMaterial({
+          color: scenePalette().select,
+          linewidth: 2.2,
+          dashed: true,
+          dashSize: 0.14,
+          gapSize: 0.08,
+          depthTest: false,
+          transparent: true,
+          opacity: 0.95,
+          resolution: new THREE.Vector2(Math.max(1, width || innerWidth || 1), Math.max(1, height || innerHeight || 1)),
+        }),
+      );
+      segs.computeLineDistances();
+      segs.renderOrder = 5;
+      distanceGroup.add(segs);
+    }
+    invalidate();
+  }
+  function applyDistanceCutoff({ pair, cutoff }) {
+    if (!structure || !pair || !Number.isFinite(cutoff)) return;
+    historyLabel = "Apply distance cutoff";
+    const norm = normalizePair(pair);
+    const existing = rules.find((r) => normalizePair(normalizedPairName(r.center, r.neighbor)) === norm);
+    if (existing) {
+      existing.cutoff = Math.max(CUTOFF_MIN, cutoff);
+      const card = document.querySelector(`.pair-rule[data-rule-id="${existing.id}"]`);
+      const field = card?.querySelector('input[data-field="cutoff"]');
+      if (field) {
+        field.value = formatCutoff(existing.cutoff);
+        field.setCustomValidity("");
+      }
+      build();
+      flushHistory();
+      return;
+    }
+    const [center, neighbor] = norm.split("–");
+    if (!center || !neighbor) return;
+    rules.push({
+      id: ++nextRule,
+      center,
+      neighbor,
+      cutoff: Math.max(CUTOFF_MIN, cutoff),
+      bonds: true,
+      polyhedra: false,
+      opacity: 0.34,
+    });
+    renderRules();
+    build();
+    flushHistory();
+  }
   function updateSphereBounds() {
     fitBounds.setFromPoints(fitCorners);
     const corner = new THREE.Vector3();
@@ -760,11 +1123,49 @@ function initialize() {
       fitBounds.union(faces.geometry.boundingBox);
     }
   }
-  const structureAnalysis = createAnalysisWindow({ getStructure: () => structure, onExplain: (hkl, wavelength) => reflectionExplorer.open(hkl, wavelength), onChange: () => scheduleSave() });
+  const radiation = createRadiation();
+  const xrdWorkspace = createXrdWorkspace({
+    viewport,
+    radiation,
+    onAddPlane: (hkl) => {
+      if (!structure || !Array.isArray(hkl)) return;
+      latticeTools.addPlane(hkl);
+      toolWindows.choose("lattice");
+      scheduleSave();
+    },
+    onChange: () => scheduleSave(),
+  });
+  const structureAnalysis = createAnalysisWindow({
+    getStructure: () => structure,
+    onHighlightDistance: highlightDistance,
+    onApplyCutoff: applyDistanceCutoff,
+    onChange: () => scheduleSave(),
+  });
+  const powderPanel = createPowderPanel({
+    radiation,
+    getStructure: () => structure,
+    onExplain: (hkl, wavelength) => {
+      if (Number.isFinite(wavelength) && !radiation.locked) {
+        try { radiation.set({ wavelength }); } catch { /* ignore */ }
+      }
+      xrdWorkspace.open("reflection", { handoff: { hkl, align: true } });
+    },
+    onActive: (hkl, origin, meta) => xrdWorkspace.setActive(hkl, origin, meta),
+    onChange: () => scheduleSave(),
+  });
   const reflectionExplorer = createReflectionExplorer({
+    host: $("xrd-panel-reflection"),
+    radiation,
     atomRadius,
     getStructure: () => structure,
-    onDetector: (hkl, wavelength) => diffractionDetector.open(hkl, wavelength),
+    onDetector: (hkl, wavelength) => {
+      if (Number.isFinite(wavelength) && !radiation.locked) {
+        try { radiation.set({ wavelength }); } catch { /* ignore */ }
+      }
+      xrdWorkspace.open("detector", { handoff: { hkl, align: true } });
+    },
+    onActive: (hkl, origin, meta) => xrdWorkspace.setActive(hkl, origin, meta),
+    onSaveProject: () => $("project-save")?.click(),
   });
   let detectorLink = null, updatingFromMain = false, specimenDragMoved = false;
   renderer.domElement.addEventListener("pointerdown", () => {
@@ -823,12 +1224,23 @@ function initialize() {
     invalidate();
   }
   const diffractionDetector = createDetectorWindow({
+    host: $("detector-window"),
+    radiation,
     getStructure: () => structure,
-    onExplain: (hkl, wavelength) => reflectionExplorer.open(hkl, wavelength),
-    onPeak: peak => structureAnalysis.selectDetectorPeak(peak),
+    onExplain: (hkl, wavelength) => {
+      if (Number.isFinite(wavelength) && !radiation.locked) {
+        try { radiation.set({ wavelength }); } catch { /* ignore */ }
+      }
+      xrdWorkspace.open("reflection", { handoff: { hkl, align: true } });
+    },
+    onPeak: peak => powderPanel.selectDetectorPeak(peak),
+    onActive: (hkl, origin, meta) => xrdWorkspace.setActive(hkl, origin, meta),
     onMainView: linkDetectorView,
     getMainRotation: mainCameraRotation,
   });
+  xrdWorkspace.registerPanel("powder", powderPanel);
+  xrdWorkspace.registerPanel("reflection", reflectionExplorer);
+  xrdWorkspace.registerPanel("detector", diffractionDetector);
   const latticeTools = createLatticeTools({
     THREE,
     scene,
@@ -880,10 +1292,11 @@ function initialize() {
               .add(center.position),
           ),
         );
-        const edges = new THREE.LineSegments(
-          new THREE.BufferGeometry().setFromPoints(points),
-          new THREE.LineBasicMaterial({
+        const edges = new LineSegments2(
+          new LineSegmentsGeometry().setPositions(points.flatMap((p) => [p.x, p.y, p.z])),
+          new LineMaterial({
             color: scenePalette().pick,
+            linewidth: 2,
             transparent: true,
             opacity: 0.95,
             depthTest: false,
@@ -1585,6 +1998,9 @@ function initialize() {
     selection = selection.filter(atomVisible);
     updateSelection();
     updateAtomSummary();
+    refreshAtomAo();
+    buildOrtepRings();
+    if (activeDistanceSpec) highlightDistance(activeDistanceSpec);
     invalidate();
   }
   $("show-atoms").onchange = updateAtomVisibility;
@@ -1737,26 +2153,38 @@ function initialize() {
           ),
       ).length;
       if (acceptedBonds.length) {
+        // Two-tone bonds draw each half in its end atom's color; otherwise
+        // one cylinder per bond takes the pair color. 16 segments keep the
+        // round profile at close zoom.
+        const twoTone = $("style-two-tone-bonds").checked;
         const cylinders = new THREE.InstancedMesh(
-          new THREE.CylinderGeometry(1, 1, 1, 8),
+          new THREE.CylinderGeometry(1, 1, 1, 16),
           new THREE.MeshStandardMaterial({
-            color: plan.color,
+            color: twoTone ? 0xffffff : plan.color,
             roughness: 0.55,
           }),
-          acceptedBonds.length,
+          acceptedBonds.length * (twoTone ? 2 : 1),
         );
+        const position = new THREE.Vector3(), tint = new THREE.Color();
         acceptedBonds.forEach(([a, b], i) => {
           const delta = b.position.clone().sub(a.position);
-          const midpoint = a.position
-            .clone()
-            .add(b.position)
-            .multiplyScalar(0.5);
-          scale.set(0.045, delta.length(), 0.045);
-          rotation.setFromUnitVectors(up, delta.normalize());
-          matrix.compose(midpoint, rotation, scale);
-          cylinders.setMatrixAt(i, matrix);
+          const length = delta.length();
+          rotation.setFromUnitVectors(up, delta.clone().normalize());
+          if (!twoTone) {
+            scale.set(0.045, length, 0.045);
+            matrix.compose(position.copy(a.position).addScaledVector(delta, 0.5), rotation, scale);
+            cylinders.setMatrixAt(i, matrix);
+            return;
+          }
+          scale.set(0.045, length / 2, 0.045);
+          [[a, 0.25], [b, 0.75]].forEach(([atom, t], half) => {
+            matrix.compose(position.copy(a.position).addScaledVector(delta, t), rotation, scale);
+            cylinders.setMatrixAt(2 * i + half, matrix);
+            cylinders.setColorAt(2 * i + half, tint.set(styleOf(atom).color));
+          });
         });
         cylinders.instanceMatrix.needsUpdate = true;
+        if (cylinders.instanceColor) cylinders.instanceColor.needsUpdate = true;
         model.add(cylinders);
       }
       // All polyhedra of a pair share one face mesh and one edge mesh.
@@ -1785,7 +2213,7 @@ function initialize() {
         for (const edge of hull.edges)
           for (const i of edge) {
             edges.push(...place(vertices[i]).toArray());
-            edgeColors.push(tint.r, tint.g, tint.b);
+            edgeColors.push(tint.r * 0.78, tint.g * 0.78, tint.b * 0.78);
           }
       });
       if (positions.length) {
@@ -1816,19 +2244,17 @@ function initialize() {
         faces.userData.styles = styles;
         faceMeshes.set(plan.stat.id, faces);
         model.add(faces);
-        const edgeGeometry = new THREE.BufferGeometry();
-        edgeGeometry.setAttribute(
-          "position",
-          new THREE.Float32BufferAttribute(edges, 3),
-        );
-        edgeGeometry.setAttribute(
-          "color",
-          new THREE.Float32BufferAttribute(edgeColors, 3),
-        );
-        const outline = new THREE.LineSegments(
+        // Crisp screen-space edges, one per-vertex color per polyhedron.
+        const edgeGeometry = new LineSegmentsGeometry();
+        if (edges.length) {
+          edgeGeometry.setPositions(edges);
+          edgeGeometry.setColors(edgeColors);
+        }
+        const outline = new LineSegments2(
           edgeGeometry,
-          new THREE.LineBasicMaterial({
+          new LineMaterial({
             vertexColors: true,
+            linewidth: 1.25,
             transparent: true,
             opacity: 0.9,
           }),
@@ -1900,11 +2326,30 @@ function initialize() {
         row.tabIndex = 0;
         row.dataset.site = s.label;
         row.title = `Highlight every visible copy of ${s.label}`;
-        for (const text of [s.label, s.element, ...frac3(s.frac), s.occupancy != null ? Number(s.occupancy).toFixed(3) : "—"]) {
+        const vals = [s.label, s.element, ...frac3(s.frac), s.occupancy != null ? Number(s.occupancy).toFixed(3) : "—"];
+        vals.forEach((text, col) => {
           const cell = document.createElement("td");
-          cell.textContent = text;
+          if (col === 1) {
+            const dot = document.createElement("span");
+            dot.className = "site-el-dot";
+            dot.style.background = colorFor(s.element);
+            dot.setAttribute("aria-hidden", "true");
+            cell.append(dot, document.createTextNode(text));
+          } else if (col >= 2 && col <= 4) {
+            const m = text.match(/^(.*?\.\d*?)(0+)$/);
+            if (m && m[1].length > 2) {
+              const trail = document.createElement("span");
+              trail.className = "frac-trail";
+              trail.textContent = m[2];
+              cell.append(document.createTextNode(m[1]), trail);
+            } else {
+              cell.textContent = text;
+            }
+          } else {
+            cell.textContent = text;
+          }
           row.append(cell);
-        }
+        });
         const choose = () => selectSite(highlightedSite === s.label ? null : s.label);
         row.onclick = choose;
         row.onkeydown = (e) => {
@@ -2036,8 +2481,9 @@ function initialize() {
         );
         const m = new THREE.Matrix4();
         copies.forEach((a, i) =>
-          shells.setMatrixAt(i, m.compose(a.position, new THREE.Quaternion(), new THREE.Vector3().setScalar(a.radius * 1.12))),
+          shells.setMatrixAt(i, applyHaloMatrix(a, 1.12, m)),
         );
+        shells.instanceMatrix.needsUpdate = true;
         siteGroup.add(shells);
       }
     }
@@ -2701,6 +3147,14 @@ function initialize() {
     individualCount: () => appearance.atoms.size + appearance.polyhedra.size,
     // Reset every one-copy atom and polyhedron override; element and pair
     // styles stay as they are.
+    // A new element palette recolors every element without a custom color.
+    onPaletteChange() {
+      if (!structure) return;
+      for (const e of new Set(structure.atoms.map((a) => a.element))) refreshElementDot(e);
+      for (const rule of rules) refreshPairColor(rule);
+      restyle(true);
+      scheduleSave();
+    },
     resetIndividuals() {
       appearance.atoms.clear();
       appearance.polyhedra.clear();
@@ -2923,6 +3377,7 @@ function initialize() {
     radiusControls.setSites(independentSites(), data);
     showSphereSize();
     pairEstimates.clear();
+    clearDistanceHighlight();
     latticeTools.reset();
     hiddenElements.clear();
     $("show-atoms").checked = true;
@@ -2941,7 +3396,7 @@ function initialize() {
     updateStructureInfo(data, reference?.name || data.name || data.block || "Crystal structure", currentFilename, reference);
     $("stats").replaceChildren(
       textStat("V", `${Number(data.volume).toFixed(2)} Å³`),
-      textStat("Sites", data.atoms.length.toLocaleString()),
+      textStat("Atoms", data.atoms.length.toLocaleString()),
     );
     const counts = new Map();
     data.atoms.forEach((a) =>
@@ -2996,6 +3451,13 @@ function initialize() {
     $("warnings").textContent = $("warnings").dataset.summary;
     $("warnings").title = warnings.join(" ");
     $("warnings").setAttribute("aria-expanded", "false");
+    const headerWarn = $("header-warnings");
+    if (headerWarn) {
+      headerWarn.hidden = !warnings.length;
+      const countEl = $("header-warnings-count");
+      if (countEl) countEl.textContent = String(warnings.length);
+      headerWarn.title = warnings.join(" ");
+    }
     plotRanges = defaultRanges();
     if (currentFilename === "Wollastonite example") plotRanges[1] = [0, 3];
     writeRanges();
@@ -3006,18 +3468,24 @@ function initialize() {
     styleEditor.clear();
     renderSiteTable();
     updateAsymmetricNote();
+    xrdWorkspace.setActive(null);
     structureAnalysis.setStructure();
+    powderPanel.setStructure();
     reflectionExplorer.setStructure();
     diffractionDetector.setStructure();
   }
   const worker = new Worker(new URL("./import-worker.js", import.meta.url), {
     type: "module",
   });
-  let pending = [];
+  // Match responses to requests by ID so a failed or reordered reply can
+  // never be applied to a different file.
+  const pending = new Map();
   let userIntent = 0;
-  worker.onmessage = ({ data }) => {
-    if (data.diffractionModule) { setDiffractionModule(data.diffractionModule); return; }
-    const task = pending.shift();
+  worker.onmessage = ({ data: message }) => {
+    if (message?.diffractionModule) { setDiffractionModule(message.diffractionModule); return; }
+    const { id: responseId, ...data } = message ?? {};
+    const task = pending.get(responseId);
+    pending.delete(responseId);
     if (!task || task.id !== request || task.intent !== userIntent) return;
     $("loading").hidden = true;
     $("open").disabled = false;
@@ -3026,8 +3494,7 @@ function initialize() {
     if (data.error) {
       if (task.project) {
         projectStatus(`Could not open ${task.project.name}: ${data.error}`, true);
-        $("error").textContent = `Could not open this project: ${data.error}`;
-        $("error").hidden = false;
+        setError(`Could not open this project: ${data.error}`);
         updateHistoryButtons();
         if (structure) $("block").value = structure.block;
         return;
@@ -3044,8 +3511,7 @@ function initialize() {
       }
       updateHistoryButtons();
       if (structure) $("block").value = structure.block;
-      $("error").textContent = `Could not open this CIF: ${data.error}`;
-      $("error").hidden = false;
+      setError(`Could not open this CIF: ${data.error}`);
       if (!structure) $("name").textContent = "Open a crystal structure";
       return;
     }
@@ -3056,9 +3522,9 @@ function initialize() {
     display(data);
     if (task.restore) {
       try {
-        // File snapshots retain all user-created rules and lattice objects;
-        // restore still validates their individual values and references.
-        restoreViewerState(task.restore, { trusted: Boolean(task.project) });
+        // Local browser autosaves are trusted; externally imported .psv files
+        // remain bounded by hard resource ceilings (see restoreViewerState).
+        restoreViewerState(task.restore, { trusted: Boolean(task.project), external: Boolean(task.project) });
         if (task.project) {
           themeSwitch.setTheme(task.project.theme);
           currentProjectFilename = task.project.name;
@@ -3093,31 +3559,33 @@ function initialize() {
     );
   };
   worker.onerror = (e) => {
+    pending.clear();
     $("loading").hidden = true;
     $("open").disabled = false;
+    $("block").disabled = false;
     updateHistoryButtons();
     updateProjectButtons();
-    $("error").textContent =
-      "The crystal reader could not start. Reload the viewer and try again.";
-    $("error").hidden = false;
+    setError("The crystal reader could not start. Reload the viewer and try again.");
     console.error(e);
   };
   function load(text, filename, block, restore = null, project = null) {
+    if (saveTimer) saveNow();
     flushHistory();
-    $("error").hidden = true;
+    setError("");
     $("loading").hidden = false;
     $("open").disabled = true;
     $("block").disabled = true;
     updateHistoryButtons();
     updateProjectButtons();
-    pending.push({ id: ++request, text, filename, block, restore, project, intent: userIntent });
-    worker.postMessage({ text, block });
+    const id = ++request;
+    pending.set(id, { id, text, filename, block, restore, project, intent: userIntent });
+    worker.postMessage({ id, text, block });
   }
   async function openLibraryEntry(entry, startup = false) {
     if (exporter.busy) return;
     const intent = startup ? userIntent : ++userIntent;
     flushHistory();
-    $("error").hidden = true;
+    setError("");
     $("loading").hidden = false;
     updateHistoryButtons();
     updateProjectButtons();
@@ -3132,10 +3600,9 @@ function initialize() {
       $("loading").hidden = true;
       $("open").disabled = false;
       $("block").disabled = false;
-      $("error").hidden = false;
       updateHistoryButtons();
       updateProjectButtons();
-      $("error").textContent = `Could not open ${entry.name}: ${error.message}`;
+      setError(`Could not open ${entry.name}: ${error.message}`);
     }
   }
   createStructureLibrary({ onSelect: openLibraryEntry, isBusy: () => exporter.busy });
@@ -3143,9 +3610,12 @@ function initialize() {
   async function openDocument(file, projectOnly = false) {
     const intent = ++userIntent;
     try {
+      const isProject = projectOnly || /\.psv$/i.test(file.name);
+      if (isProject && file.size > MAX_PROJECT_BYTES)
+        throw Error("This project file exceeds the 24 MiB import limit.");
       const text = await file.text();
       if (intent !== userIntent) return;
-      if (projectOnly || /\.psv$/i.test(file.name)) {
+      if (isProject) {
         const project = parseProject(text);
         projectStatus(`Opening ${file.name}…`);
         load(project.document.text, project.document.filename, project.state.block, project.state,
@@ -3159,8 +3629,7 @@ function initialize() {
       updateProjectButtons();
       updateHistoryButtons();
       if (projectOnly || /\.psv$/i.test(file.name)) projectStatus(`Could not open ${file.name}: ${err.message}`, true);
-      $("error").hidden = false;
-      $("error").textContent = err.message;
+      setError(err.message);
     }
   }
   async function openFile(e, projectOnly = false) {
@@ -3236,6 +3705,11 @@ function initialize() {
       toggleWarnings();
     }
   };
+  $("header-warnings")?.addEventListener("click", () => {
+    toolWindows.choose("sites", { focus: true });
+    if ($("warnings").getAttribute("aria-expanded") !== "true") toggleWarnings();
+    $("warnings").scrollIntoView?.({ block: "nearest" });
+  });
   function updateRangeSteps() {
     for (const axis of ["a", "b", "c"]) {
       const lower = $(`range-${axis}-min`);
@@ -3352,9 +3826,11 @@ function initialize() {
       m.boundingSphere = null;
     }
     updateSphereBounds();
+    refreshAtomAo();
     updateSelection();
     updatePickMarker();
     highlightSite(highlightedSite);
+    buildOrtepRings();
   }
   $("adp-ellipsoids").onchange = () => {
     $("adp-note").hidden = !$("adp-ellipsoids").checked;
@@ -3459,6 +3935,7 @@ function initialize() {
         })),
       ),
       lattice: latticeTools.diagnostics(),
+      xrd: xrdWorkspace.diagnostics(),
       // View-space unit directions of a, b, c as drawn by the compass
       // (x right, y up, z toward the viewer).
       axisCompass: compassState,
@@ -3492,7 +3969,7 @@ function initialize() {
         isolated: $("polyhedra-only").checked,
       },
       ranges: plotRanges.map((r) => [...r]),
-      cellSegmentCount: cellLines?.geometry.attributes.position.count / 2,
+      cellSegmentCount: cellLines?.userData.segmentCount,
       block: structure?.block,
       basis: structure?.basis,
     };
@@ -3520,6 +3997,20 @@ function initialize() {
     atomLabels: () => (labelsOn ? lastAtomLabels : []),
     latticeLabels: () => latticeTools.placedLabels(),
     exportObstacles: (rects) => latticeTools.setExportObstacles(rects),
+    // Visible elements and their current colors, for the figure legend.
+    activeElements: () => {
+      if (!structure || !$("show-atoms").checked) return [];
+      return [...new Set(structure.atoms.map((a) => a.element))]
+        .filter((e) => !hiddenElements.has(e))
+        .map((symbol) => ({ symbol, color: colorFor(symbol) }));
+    },
+    // CSS pixels per ångström of the orthographic view (scale bar).
+    pixelsPerUnit: () => {
+      syncViewCamera();
+      const height = renderer.domElement.getBoundingClientRect().height || 1;
+      const world = viewCamera.top - viewCamera.bottom;
+      return world > 0 ? height / world : 0;
+    },
     compass: () => compassState,
     // The measurement card, only while atoms are picked for it.
     measurement: () => {
@@ -3579,6 +4070,36 @@ function initialize() {
       $("export-dpi").value = preset.dataset.dpi;
       updateExportInfo();
     };
+  $("style-depth-cue").addEventListener("change", () => {
+    depthCue = $("style-depth-cue").checked;
+    invalidate();
+    scheduleSave();
+  });
+  $("style-two-tone-bonds").addEventListener("change", () => {
+    restyle(true);
+    scheduleSave();
+  });
+  $("style-contact-ao")?.addEventListener("change", () => {
+    atomContactAoUniform.value = $("style-contact-ao").checked ? 1 : 0;
+    invalidate();
+    scheduleSave();
+  });
+  $("style-ortep-rings")?.addEventListener("change", () => {
+    buildOrtepRings();
+    invalidate();
+    scheduleSave();
+  });
+  // The Background menu and the Transparent chip are two views of one choice.
+  $("export-background").addEventListener("change", () => {
+    $("export-transparent").checked = $("export-background").value === "transparent";
+    scheduleSave();
+  });
+  $("export-transparent").addEventListener("change", () => {
+    $("export-background").value = $("export-transparent").checked ? "transparent" : "theme";
+    scheduleSave();
+  });
+  for (const id of ["export-scale-bar", "export-legend", "export-compass", "export-measure"])
+    $(id).addEventListener("change", () => scheduleSave());
   $("export-video").disabled = !videoFormat.mime;
   $("export-video-note").textContent = videoFormat.mime
     ? `Turntable: one full turn, ${videoFormat.extension.toUpperCase()} video.`
@@ -3592,7 +4113,7 @@ function initialize() {
         $("export-status").textContent = "Enter a DPI between 30 and 2400.";
         return;
       }
-      const result = await exporter.exportPNG({ scale: exportScale(), transparent: $("export-transparent").checked, dpi });
+      const result = await exporter.exportPNG({ scale: exportScale(), background: $("export-background").value, dpi });
       if (!result) { $("export-status").textContent = "Save canceled."; return; }
       $("export-status").textContent = `Saved ${result.filename} (${result.width} × ${result.height} px, ${result.dpi} dpi).`;
       lastExport = result;
@@ -3683,9 +4204,13 @@ function initialize() {
     button: $("theme-toggle"),
     onChange: () => {
       if (cellLines) cellLines.material.color.set(scenePalette().cell);
+      canvasFogColor = readCanvasFog();
+      atomThemeUniform.value = document.documentElement.dataset.theme === "light" ? 1 : 0;
       updateSelection();
       updatePickMarker();
       highlightSite(highlightedSite);
+      buildOrtepRings();
+      if (activeDistanceSpec) highlightDistance(activeDistanceSpec);
       latticeTools.rebuild();
       invalidate();
     },
@@ -3695,12 +4220,25 @@ function initialize() {
   // (session-store.js) and restored on the next start of the same page
   // entrypoint. Derived geometry, Three.js objects and label caches are
   // rebuilt, never stored. Transient popovers are not reopened.
+  const cifUrlParam = (() => {
+    const raw = new URLSearchParams(location.search).get("cif");
+    if (!raw) return null;
+    try {
+      const url = new URL(raw, location.href);
+      if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+      const seg = url.pathname.split("/").filter(Boolean).pop() || "structure.cif";
+      return { url: url.href, filename: decodeURIComponent(seg), entrypoint: `cif:${url.href}` };
+    } catch {
+      return null;
+    }
+  })();
   const examples = {
     forsterite: { file: "examples/forsterite.cif", name: "Forsterite example" },
     wollastonite: { file: "examples/wollastonite.cif", name: "Wollastonite example" },
     "halite-222": { file: "examples/halite-222.psv", name: "Halite (222).psv" },
   };
   const ENTRYPOINT = (() => {
+    if (cifUrlParam) return cifUrlParam.entrypoint;
     const params = new URLSearchParams(location.search);
     const entry = libraryEntry(params.get("structure"));
     if (entry) return `structure:${entry.id}`;
@@ -3779,6 +4317,8 @@ function initialize() {
       highlightedSite,
       shellCutoff: $("shell-cutoff").value, shellOutline: $("shell-outline").checked,
       lattice: latticeTools.exportState(),
+      xrd: xrdWorkspace.exportState(),
+      powder: powderPanel.exportState(),
       analysis: structureAnalysis.exportState(),
       reflection: reflectionExplorer.exportState(),
       detector: diffractionDetector.exportState(),
@@ -3796,12 +4336,22 @@ function initialize() {
       windows: toolWindows.exportState(),
       // Added later in version 1 (optional on restore).
       uvwText: $("view-direction").value,
+      palette: styleEditor.palette,
+      depthCue,
+      twoToneBonds: $("style-two-tone-bonds").checked,
+      contactAo: $("style-contact-ao") ? $("style-contact-ao").checked : true,
+      ortepRings: $("style-ortep-rings") ? $("style-ortep-rings").checked : true,
       activeView: activeView && lastOrientIndices ? { id: activeView.id, indices: [...lastOrientIndices] } : null,
       styleTarget: styleEditor.target || null,
       export: {
         scale: exportScale(),
         dpi: $("export-dpi").value,
-        transparent: $("export-transparent").checked,
+        transparent: $("export-background").value === "transparent",
+        background: $("export-background").value,
+        scaleBar: $("export-scale-bar").checked,
+        legend: $("export-legend").checked,
+        compass: $("export-compass").checked,
+        measurement: $("export-measure").checked,
         seconds: $("export-seconds").value,
         fps: $("export-fps").value,
       },
@@ -3810,8 +4360,13 @@ function initialize() {
   // Apply a saved state to the freshly displayed document. Every value is
   // validated; unknown fields are ignored and references that do not
   // exist in this structure (elements, rules, atoms, sites) are dropped.
-  function restoreViewerState(s, { trusted = false } = {}) {
+  function restoreViewerState(s, { trusted = false, external = false } = {}) {
     if (!s || typeof s !== "object") return;
+    // Autosaves are capped tightly; trusted project files keep every user
+    // object, but an external file still gets hard ceilings so a crafted
+    // .psv cannot request unbounded bond searches.
+    const ruleLimit = trusted ? (external ? 512 : undefined) : 24;
+    const cutoffLimit = trusted ? (external ? 100 : Infinity) : 50;
     const finite = (v) => typeof v === "number" && Number.isFinite(v);
     const triple = (v) => Array.isArray(v) && v.length === 3 && v.every(finite);
     const hex = (v) => typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v);
@@ -3836,9 +4391,9 @@ function initialize() {
     if (Array.isArray(s.rules)) {
       const seen = new Set();
       rules = [];
-      for (const r of trusted ? s.rules : s.rules.slice(0, 24)) {
+      for (const r of s.rules.slice(0, ruleLimit)) {
         if (!r || !elements.has(r.center) || !elements.has(r.neighbor)) continue;
-        if (!finite(r.cutoff) || r.cutoff < CUTOFF_MIN || (!trusted && r.cutoff > 50)) continue;
+        if (!finite(r.cutoff) || r.cutoff < CUTOFF_MIN || r.cutoff > cutoffLimit) continue;
         if (!Number.isInteger(r.id) || r.id <= 0 || seen.has(r.id)) continue;
         seen.add(r.id);
         rules.push({
@@ -3857,6 +4412,15 @@ function initialize() {
     }
     // Appearance overrides.
     clearAppearance(appearance);
+    // Scene clarity settings (added after 1.0.2; absent → defaults).
+    styleEditor.setPalette(typeof s.palette === "string" ? s.palette : "mineral");
+    depthCue = s.depthCue === true;
+    $("style-depth-cue").checked = depthCue;
+    $("style-two-tone-bonds").checked = s.twoToneBonds === true;
+    const contactAoOn = s.contactAo !== false;
+    atomContactAoUniform.value = contactAoOn ? 1 : 0;
+    if ($("style-contact-ao")) $("style-contact-ao").checked = contactAoOn;
+    if ($("style-ortep-rings")) $("style-ortep-rings").checked = s.ortepRings !== false;
     // Keep picked-copy metadata within this document, including an
     // unstyled target after undo or a copy temporarily outside the extent.
     const style = (v, min, max) => {
@@ -3915,7 +4479,7 @@ function initialize() {
       const atom = atoms.find((x) => atomKey(x) === centerKey);
       if (atom) targetMeta.set(`poly:${key}`, { label: atom.label, frac: fracText(atom) });
     }
-    latticeTools.restoreState(s.lattice, { trusted });
+    latticeTools.restoreState(s.lattice, { trusted, external });
     structureAnalysis.restoreState(s.analysis);
     $("shell-cutoff").value = Number(s.shellCutoff) > 0 && Number(s.shellCutoff) <= 30 ? s.shellCutoff : "";
     $("shell-outline").checked = s.shellOutline !== false;
@@ -3951,7 +4515,14 @@ function initialize() {
     const scaleInput = document.querySelector(`input[name="export-scale"][value="${Number(ex.scale)}"]`);
     if ([1, 2, 4].includes(Number(ex.scale)) && scaleInput) scaleInput.checked = true;
     if (validDpi(ex.dpi)) $("export-dpi").value = String(validDpi(ex.dpi));
-    if (typeof ex.transparent === "boolean") $("export-transparent").checked = ex.transparent;
+    const background = ["theme", "white", "transparent"].includes(ex.background) ? ex.background
+      : typeof ex.transparent === "boolean" ? (ex.transparent ? "transparent" : "theme") : null;
+    if (background) {
+      $("export-background").value = background;
+      $("export-transparent").checked = background === "transparent";
+    }
+    for (const [id, value] of [["export-scale-bar", ex.scaleBar], ["export-legend", ex.legend], ["export-compass", ex.compass], ["export-measure", ex.measurement]])
+      if (typeof value === "boolean") $(id).checked = value;
     for (const [id, value] of [
       ["export-seconds", ex.seconds],
       ["export-fps", ex.fps],
@@ -3961,8 +4532,27 @@ function initialize() {
     // Camera last: nothing after this refits the view.
     restoreCameraState(s);
     if (!historyApplying) {
+      // Restore shared radiation BEFORE detector restore so a PONI calibration
+      // lock set by diffractionDetector.restoreState() is preserved. Fall back
+      // to legacy v1.0.2 wavelengths when s.xrd?.radiation is absent.
+      const legacyWl =
+        s.detector?.wavelength ??
+        s.reflection?.wavelength ??
+        (s.analysis?.mode === "powder" ? s.analysis.wavelength : null);
+      if (s.xrd?.radiation) radiation.restoreState(s.xrd.radiation);
+      else if (Number.isFinite(Number(legacyWl)) && Number(legacyWl) > 0) radiation.restoreState({ wavelength: Number(legacyWl) });
+      powderPanel.restoreState(s.powder ?? (s.analysis?.mode === "powder" ? s.analysis : null));
       diffractionDetector.restoreState(s.detector);
       reflectionExplorer.restoreState(s.reflection);
+      const legacyXrd = s.detector?.open
+        ? { open: true, tab: "detector", radiation: null }
+        : s.reflection?.open
+          ? { open: true, tab: "reflection", radiation: null }
+          : s.analysis?.mode === "powder" && s.analysis?.open
+            ? { open: true, tab: "powder", radiation: null }
+            : null;
+      const xrdState = s.xrd ? { ...s.xrd, radiation: null } : legacyXrd;
+      xrdWorkspace.restoreState(xrdState);
     }
     invalidate();
   }
@@ -4166,6 +4756,22 @@ function initialize() {
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !typing && ["z", "y"].includes(event.key.toLowerCase())) {
       event.preventDefault();
       travelHistory(event.key.toLowerCase() === "y" || event.shiftKey ? "redo" : "undo");
+    } else if ((event.metaKey || event.ctrlKey) && !event.altKey && !typing && !exporter.busy && event.key.toLowerCase() === "o") {
+      event.preventDefault();
+      $("file").click();
+    } else if ((event.metaKey || event.ctrlKey) && !event.altKey && !typing && !exporter.busy && event.key.toLowerCase() === "s") {
+      event.preventDefault();
+      $("project-save")?.click();
+    } else if ((event.metaKey || event.ctrlKey) && !event.altKey && !typing && !exporter.busy && event.key.toLowerCase() === "e") {
+      event.preventDefault();
+      if (event.shiftKey) $("export-png")?.click();
+      else {
+        toolWindows.choose("export", { focus: true });
+        $("export-png")?.focus({ preventScroll: true });
+      }
+    } else if (!event.metaKey && !event.ctrlKey && !event.altKey && !event.repeat && !typing && !target?.closest?.("select") && !exporter.busy && !document.querySelector("dialog:modal") && event.key.toLowerCase() === "d") {
+      event.preventDefault();
+      xrdWorkspace.toggle();
     } else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"].includes(event.key) && target.matches("input[type=range], input[data-field=cutoff], [role=slider]")) {
       if (!historyKeyHeld) flushHistory();
       historyKeyHeld = true;
@@ -4259,6 +4865,25 @@ function initialize() {
     location.reload();
   };
   function loadExample() {
+    if (cifUrlParam) {
+      fetch(cifUrlParam.url)
+        .then(async (r) => {
+          if (!r.ok) throw Error(`HTTP ${r.status}`);
+          const text = await r.text();
+          if (new TextEncoder().encode(text).byteLength > 16 * 1024 * 1024)
+            throw Error("CIF exceeds the 16 MiB import limit.");
+          return text;
+        })
+        .then((text) => {
+          if (!userIntent && (!request || !structure)) load(text, cifUrlParam.filename);
+        })
+        .catch((error) => {
+          if (userIntent || structure) return;
+          $("loading").hidden = true;
+          setError(`Could not load ${cifUrlParam.filename}: ${error.message}`);
+        });
+      return;
+    }
     if (ENTRYPOINT.startsWith("structure:")) {
       openLibraryEntry(libraryEntry(ENTRYPOINT.slice(10)), true);
       return;
@@ -4298,10 +4923,7 @@ function initialize() {
         if (!structure || saveSuspended > 0) return true;
         return await saveNow() || confirm("The current session could not be saved. Quit with the last saved session?");
       },
-      report: message => {
-        $("error").hidden = false;
-        $("error").textContent = message;
-      },
+      report: message => setError(message),
     });
     // Following a shared link starts the published view. A browser refresh
     // can resume edits from this example's own autosave.
@@ -4322,5 +4944,142 @@ function initialize() {
       load(session.document.text, session.document.filename, block, session.state);
     } else loadExample();
   })();
+
+  // ---- Drag-and-drop & clipboard paste intake (CIF / .psv / trace / PONI) -
+  createFileIntake({
+    overlay: $("drop-overlay"),
+    isBusy: () => exporter.busy,
+    isPowderActive: () => xrdWorkspace.isOpen && xrdWorkspace.tab === "powder",
+    onBeforeOpen: () => {
+      const lib = $("structure-library");
+      if (lib?.open) lib.close();
+      if (fileMenu?.matches?.(":popover-open")) fileMenu.hidePopover?.();
+    },
+    onStructureFile: (file) => {
+      if (xrdWorkspace.isOpen && xrdWorkspace.tab === "powder" && /\.(xy|xye|dat|csv|txt)$/i.test(file.name)) {
+        powderPanel.loadTraceFile(file);
+        return;
+      }
+      openDocument(file);
+    },
+    onTraceFile: (file) => powderPanel.loadTraceFile(file),
+    onPoniFile: (file) => diffractionDetector.loadPoniFile(file),
+    onPasteCif: (text) => {
+      userIntent++;
+      load(text, "Pasted structure.cif");
+    },
+    onPasteProject: (text) => {
+      try {
+        const project = parseProject(text);
+        userIntent++;
+        projectStatus("Opening pasted project…");
+        load(project.document.text, project.document.filename, project.state.block, project.state,
+          { name: "Pasted project.psv", theme: project.theme });
+      } catch (err) {
+        setError(err.message);
+      }
+    },
+    onToast: (msg) => sessionStatus(msg),
+  });
+
+  // ---- Command Palette (⌘K), Shortcut Sheet (?) & single-key shortcuts ----
+  createCommandPalette({
+    getLibrary: () => structureLibrary,
+    onOpenLibraryEntry: (entry) => openLibraryEntry(entry),
+    onAxis(axis, { opposite } = {}) {
+      const s = opposite ? -1 : 1;
+      const map = { a: [s, 0, 0], b: [0, s, 0], c: [0, 0, s] };
+      if (map[axis]) orient(map[axis], opposite ? "uvw" : axis);
+    },
+    onFit: () => reset(true),
+    onReset: () => reset(false),
+    onMeasureMode: (mode) => setMeasureMode(mode),
+    onEscape: () => {
+      if (fileMenu?.matches?.(":popover-open")) {
+        fileMenu.hidePopover?.();
+        return;
+      }
+      if (xrdWorkspace.isOpen) {
+        xrdWorkspace.close();
+        return;
+      }
+      if (detailsOpen) {
+        setDetailsOpen(false);
+        return;
+      }
+      if (selection.length) {
+        historyLabel = "Clear selection";
+        selection = [];
+        updateSelection();
+      }
+    },
+    isBusy: () => exporter.busy,
+    commands: [
+      { id: "open", label: "Open CIF or .psv file…", group: "File", shortcut: "⌘O", run: () => $("file").click() },
+      { id: "library", label: "Open Structure Library…", group: "File", run: () => $("library-open").click() },
+      { id: "save", label: "Save project (.psv)", group: "File", shortcut: "⌘S", run: () => $("project-save")?.click() },
+      { id: "export-png", label: "Export PNG image", group: "File", shortcut: "⌘⇧E", run: () => $("export-png")?.click() },
+      { id: "view-a", label: "View along +a", group: "View", shortcut: "A", run: () => orient([1, 0, 0], "a") },
+      { id: "view-b", label: "View along +b", group: "View", shortcut: "B", run: () => orient([0, 1, 0], "b") },
+      { id: "view-c", label: "View along +c", group: "View", shortcut: "C", run: () => orient([0, 0, 1], "c") },
+      { id: "fit", label: "Fit crystal to view", group: "View", shortcut: "F", run: () => reset(true) },
+      { id: "reset", label: "Reset view & selection", group: "View", shortcut: "R", run: () => reset(false) },
+      { id: "theme", label: "Toggle light / dark theme", group: "View", run: () => $("theme-toggle").click() },
+      { id: "measure-info", label: "Atom info mode", group: "Measure", shortcut: "1", run: () => setMeasureMode("info") },
+      { id: "measure-distance", label: "Distance measurement mode", group: "Measure", shortcut: "2", run: () => setMeasureMode("distance") },
+      { id: "measure-angle", label: "Angle measurement mode", group: "Measure", shortcut: "3", run: () => setMeasureMode("angle") },
+      { id: "tool-pairs", label: "Bonds & polyhedra", group: "Tools", run: () => toolWindows.choose("pairs", { focus: true }) },
+      { id: "tool-planes", label: "Crystal planes (hkl)", group: "Tools", run: () => toolWindows.choose("lattice", { focus: true }) },
+      { id: "tool-directions", label: "Crystal directions [uvw]", group: "Tools", run: () => toolWindows.choose("directions", { focus: true }) },
+      { id: "tool-symmetry", label: "Symmetry elements", group: "Tools", run: () => toolWindows.choose("symmetry", { focus: true }) },
+      { id: "tool-sites", label: "Sites & coordination shells", group: "Tools", run: () => toolWindows.choose("sites", { focus: true }) },
+      { id: "tool-extent", label: "Extent & unit cell", group: "Tools", run: () => toolWindows.choose("extent", { focus: true }) },
+      { id: "tool-style", label: "Style & element palettes", group: "Tools", run: () => toolWindows.choose("style", { focus: true }) },
+      { id: "tool-export", label: "Export PNG / turntable movie", group: "Tools", shortcut: "⌘E", run: () => toolWindows.choose("export", { focus: true }) },
+      { id: "win-distances", label: "Interatomic distances plot", group: "Analysis", run: () => $("mode-analysis")?.click() },
+      { id: "win-powder", label: "Open XRD / Powder", group: "Diffraction", shortcut: "D", run: () => xrdWorkspace.open("powder") },
+      { id: "win-reflection", label: "Open Reflection Explorer", group: "Diffraction", run: () => xrdWorkspace.open("reflection") },
+      { id: "win-detector", label: "Open Diffraction Detector", group: "Diffraction", run: () => xrdWorkspace.open("detector") },
+      { id: "undo", label: "Undo", group: "Edit", shortcut: "⌘Z", run: () => travelHistory("undo") },
+      { id: "redo", label: "Redo", group: "Edit", shortcut: "⌘⇧Z", run: () => travelHistory("redo") },
+    ],
+  });
+  // Keep filled-track CSS variable (--fill) synced on all range sliders
+  const syncRangeFill = (el) => {
+    if (!el || el.tagName !== "INPUT" || el.type !== "range") return;
+    const min = Number(el.min === "" ? 0 : el.min);
+    const max = Number(el.max === "" ? 100 : el.max);
+    const val = Number(el.value);
+    const pct = max > min ? Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100)) : 0;
+    el.style.setProperty("--fill", `${pct.toFixed(1)}%`);
+  };
+  const syncAllRanges = () => {
+    for (const el of document.querySelectorAll('input[type="range"]')) syncRangeFill(el);
+  };
+  let rangeSyncFrame = 0;
+  const scheduleRangeSync = () => {
+    if (rangeSyncFrame) return;
+    rangeSyncFrame = requestAnimationFrame(() => {
+      rangeSyncFrame = 0;
+      syncAllRanges();
+    });
+  };
+  document.addEventListener("input", (e) => syncRangeFill(e.target), true);
+  document.addEventListener("change", (e) => syncRangeFill(e.target), true);
+  document.addEventListener("click", scheduleRangeSync, true);
+  new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      for (const node of m.addedNodes) {
+        if (node.nodeType === 1 && (node.matches?.('input[type="range"]') || node.querySelector?.('input[type="range"]'))) {
+          scheduleRangeSync();
+          return;
+        }
+      }
+    }
+  }).observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+  syncAllRanges();
 }
 initialize();

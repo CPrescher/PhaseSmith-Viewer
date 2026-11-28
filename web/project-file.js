@@ -4,6 +4,8 @@ import { validateRanges } from "./plot-range.js";
 // Keep this version independent of the browser's local session schema.
 export const PROJECT_FORMAT = "phasesmith-viewer-project";
 export const PROJECT_VERSION = 1;
+export const MAX_PROJECT_BYTES = 24 * 1024 * 1024;
+const encoder = new TextEncoder();
 const record = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const triple = (value) => Array.isArray(value) && value.length === 3 && value.every(Number.isFinite);
 
@@ -39,6 +41,8 @@ export function serializeProject({ document, state, theme }) {
 }
 
 export function parseProject(text) {
+  if (typeof text !== "string" || encoder.encode(text).byteLength > MAX_PROJECT_BYTES)
+    throw Error("This project file exceeds the 24 MiB import limit.");
   let project;
   try {
     project = JSON.parse(text.replace(/^\uFEFF/, ""));

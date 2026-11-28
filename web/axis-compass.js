@@ -23,8 +23,10 @@ const el = (tag, attrs = {}) => {
   return node;
 };
 
-export function createAxisCompass(svg, description) {
+export function createAxisCompass(svg, description, { onAxisClick = null } = {}) {
   svg.setAttribute("viewBox", `0 0 ${SIZE} ${SIZE}`);
+  // Only the axis hit targets take pointer input; the rest of the compass
+  // stays transparent so crystal drags may start over it.
   svg.append(el("circle", { cx: CENTER, cy: CENTER, r: 2.2, class: "compass-origin" }));
   const parts = AXES.map(({ name, color }) => {
     const group = el("g", { class: "compass-axis" });
@@ -44,9 +46,30 @@ export function createAxisCompass(svg, description) {
     const label = el("text", { class: "compass-label", "text-anchor": "middle", "dominant-baseline": "central" });
     label.style.fill = color;
     label.textContent = name;
+    const hit = onAxisClick
+      ? el("circle", { r: 11, fill: "transparent", class: "compass-hit" })
+      : null;
+    if (hit) {
+      group.setAttribute("role", "button");
+      group.setAttribute("tabindex", "0");
+      group.setAttribute("aria-label", `View along +${name} (Shift-click for -${name})`);
+      group.style.cursor = "pointer";
+      group.style.pointerEvents = "auto";
+      group.addEventListener("click", (event) => {
+        event.stopPropagation();
+        onAxisClick(name, { opposite: event.shiftKey });
+      });
+      group.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onAxisClick(name, { opposite: event.shiftKey });
+        }
+      });
+    }
     group.append(line, head, sight, label);
+    if (hit) group.append(hit);
     svg.append(group);
-    return { name, group, line, head, sight, ring, dot, cross, label };
+    return { name, group, line, head, sight, ring, dot, cross, label, hit };
   });
   let lastText = "";
 
@@ -92,10 +115,21 @@ export function createAxisCompass(svg, description) {
     projected.forEach((p, i) => {
       const part = parts[i];
       const label = labels[i];
-      part.group.style.opacity = "1";
+      const nearSight = p.length < LINE_OF_SIGHT;
+      // Subtly dim axes pointing away from the viewer (z < -0.25) for instant depth reading.
+      const depthOpacity =
+        p.z < -0.25
+          ? nearSight
+            ? 0.78
+            : Math.max(0.58, 1 - ((-0.25 - p.z) / 0.75) * 0.42)
+          : 1;
+      part.group.style.opacity = depthOpacity === 1 ? "1" : depthOpacity.toFixed(2);
       part.label.setAttribute("x", label.x.toFixed(1));
       part.label.setAttribute("y", label.y.toFixed(1));
-      const nearSight = p.length < LINE_OF_SIGHT;
+      if (part.hit) {
+        part.hit.setAttribute("cx", label.x.toFixed(1));
+        part.hit.setAttribute("cy", label.y.toFixed(1));
+      }
       part.sight.style.display = nearSight ? "" : "none";
       part.line.style.display = part.head.style.display = nearSight ? "none" : "";
       if (nearSight) {
