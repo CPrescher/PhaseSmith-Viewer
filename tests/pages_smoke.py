@@ -88,6 +88,16 @@ async def check_tablet_detector_figures(page):
     await panel.locator("#xrd-close").tap()
 
 
+async def check_shared_halite(page):
+    await page.goto(URL + "/?example=halite-222")
+    await page.wait_for_function("window.viewerDiagnostics?.().lattice.planes[0]?.polygons.length === 5")
+    state = await page.evaluate("viewerDiagnostics()")
+    plane = state["lattice"]["planes"][0]
+    assert state["block"] == "halite" and plane["hkl"] == [2, 2, 2]
+    assert plane["visible"] and plane["family"] and plane["faces"]["visible"]
+    assert abs(plane["d"] - 1.628) < 0.001
+
+
 async def main(tablet_webkit=False):
     async with async_playwright() as p:
         if tablet_webkit:
@@ -101,6 +111,7 @@ async def main(tablet_webkit=False):
             await check_tablet_library(page)
             await check_mixed_pointer_keypads(page)
             await check_tablet_detector_figures(page)
+            await check_shared_halite(page)
             await browser.close()
             print("WebKit tablet: compact menus, Library focus and aragonite faces passed")
             return
@@ -177,6 +188,8 @@ async def main(tablet_webkit=False):
                 await check_tablet_library(page)
                 await check_mixed_pointer_keypads(page)
                 await check_tablet_detector_figures(page)
+            if not example:
+                await check_shared_halite(page)
             assert not errors, errors
             print(
                 f"{example or 'NaCl'}: production assets, PhaseSmith WASM and viewer passed",

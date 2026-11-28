@@ -4232,15 +4232,21 @@ function initialize() {
       return null;
     }
   })();
+  const examples = {
+    forsterite: { file: "examples/forsterite.cif", name: "Forsterite example" },
+    wollastonite: { file: "examples/wollastonite.cif", name: "Wollastonite example" },
+    "halite-222": { file: "examples/halite-222.psv", name: "Halite (222).psv" },
+  };
   const ENTRYPOINT = (() => {
     if (cifUrlParam) return cifUrlParam.entrypoint;
     const params = new URLSearchParams(location.search);
     const entry = libraryEntry(params.get("structure"));
     if (entry) return `structure:${entry.id}`;
     const v = params.get("example");
-    return v === "forsterite" || v === "wollastonite" ? v : "";
+    return Object.hasOwn(examples, v) ? v : "";
   })();
-  const sessionStore = createSessionStore();
+  const sharedScene = ENTRYPOINT === "halite-222";
+  const sessionStore = createSessionStore(sharedScene ? { dbName: "phasesmith-viewer-session-halite-222" } : {});
   let restoredAt = 0;
   let currentProjectFilename = "";
   function projectStatus(text, error = false) {
@@ -4882,18 +4888,21 @@ function initialize() {
       openLibraryEntry(libraryEntry(ENTRYPOINT.slice(10)), true);
       return;
     }
-    const wollastoniteExample = ENTRYPOINT === "wollastonite";
-    const forsteriteExample = ENTRYPOINT === "forsterite";
-    fetch(
-      `${import.meta.env.BASE_URL}${wollastoniteExample ? "examples/wollastonite.cif" : forsteriteExample ? "examples/forsterite.cif" : "example.cif"}`,
-    )
+    const example = examples[ENTRYPOINT] ?? { file: "example.cif", name: "Example structure" };
+    fetch(`${import.meta.env.BASE_URL}${example.file}`)
       .then((r) => {
         if (!r.ok) throw Error("Example unavailable");
         return r.text();
       })
       .then((text) => {
-        if (!userIntent && (!request || !structure))
-          load(text, wollastoniteExample ? "Wollastonite example" : forsteriteExample ? "Forsterite example" : "Example structure");
+        if (userIntent || (request && structure)) return;
+        if (sharedScene) {
+          const project = parseProject(text);
+          load(project.document.text, project.document.filename, project.state.block, project.state,
+            { name: example.name, theme: project.theme });
+        } else {
+          load(text, example.name);
+        }
       })
       .catch(() => {
         if (userIntent || structure) return;
@@ -4916,6 +4925,12 @@ function initialize() {
       },
       report: message => setError(message),
     });
+    // Following a shared link starts the published view. A browser refresh
+    // can resume edits from this example's own autosave.
+    if (sharedScene && performance.getEntriesByType("navigation")[0]?.type !== "reload") {
+      if (!userIntent && !request) loadExample();
+      return;
+    }
     let session = null;
     try {
       session = await sessionStore.load();

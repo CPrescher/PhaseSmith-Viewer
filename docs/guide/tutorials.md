@@ -74,6 +74,8 @@ Restore the upper **b** limit to **3** and press **Enter**. Choose **Turn** in t
 
 **Aim:** separate plane orientation from interplanar spacing.
 
+<a href="../?example=halite-222" target="_blank" rel="noopener">Open rock salt with the (222) planes already visible</a>. Rotate the crystal, then change the existing plane to (111) to compare the spacing.
+
 ### 1. Load the rock-salt model
 
 Download the <a href="../example.cif" target="_blank" rel="noopener">ideal rock-salt CIF</a>, then load it with **Open file** in the upper-right header of the <a href="../" target="_blank" rel="noopener">viewer</a>.
