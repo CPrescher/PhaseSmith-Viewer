@@ -2,7 +2,7 @@
 // with shared radiation bar and active (hkl) handoff.
 import { formatMillerIndices } from "./crystal-math.js";
 import { keV } from "./radiation.js";
-import { attachEdgeResizers, focusLauncher, setSettingsInFront } from "./floating-dialog.js";
+import { attachEdgeResizers, bringToFront, focusLauncher, setSettingsInFront } from "./floating-dialog.js";
 
 export const XRD_TABS = Object.freeze(["powder", "reflection", "detector"]);
 
@@ -53,11 +53,13 @@ export function createXrdWorkspace({
 
   function defaultRect() {
     const { width: vw, height: vh } = bounds();
-    const rail = document.getElementById("tool-rail")?.getBoundingClientRect();
-    const rightReserve = rail && rail.width > 0 ? rail.width + 24 : 84;
-    const top = Math.min(64, Math.max(MARGIN, Math.round(vh * 0.08)));
-    const bottomReserve = 64;
-    const width = Math.max(MIN_W, Math.min(780, Math.round(vw * 0.56), vw - rightReserve - MARGIN));
+    const isRail = document.getElementById("app")?.dataset.launcher === "rail";
+    const rail = isRail ? document.getElementById("tool-rail")?.getBoundingClientRect() : null;
+    const rightReserve = rail && rail.width > 0 ? rail.width + 24 : MARGIN;
+    const top = vh <= 500 ? MARGIN : Math.min(64, Math.max(MARGIN, Math.round(vh * 0.08)));
+    const bottomReserve = vh <= 500 ? MARGIN : 64;
+    const maxW = vh <= 500 ? 760 : Math.min(760, Math.round(vw * 0.50));
+    const width = Math.max(MIN_W, Math.min(maxW, vw - rightReserve - MARGIN));
     const height = Math.max(MIN_H, Math.min(680, vh - top - bottomReserve));
     const left = Math.max(MARGIN, vw - width - rightReserve);
     return { left, top, width, height };
@@ -285,7 +287,10 @@ export function createXrdWorkspace({
     if (wasOpen && targetTab !== currentTab) registry.get(currentTab)?.deactivate?.();
     currentTab = targetTab;
     openState = true;
-    if (root) root.hidden = false;
+    if (root) {
+      root.hidden = false;
+      bringToFront(root);
+    }
     setSettingsInFront(false);
     opener?.setAttribute("aria-pressed", "true");
     syncTabs();
@@ -336,10 +341,10 @@ export function createXrdWorkspace({
   opener?.addEventListener("click", () => toggle());
   closeBtn?.addEventListener("click", () => close());
   root?.addEventListener("pointerdown", () => {
-    if (openState) setSettingsInFront(false);
+    if (openState) bringToFront(root);
   });
   root?.addEventListener("focusin", () => {
-    if (openState) setSettingsInFront(false);
+    if (openState) bringToFront(root);
   });
   root?.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || !openState) return;

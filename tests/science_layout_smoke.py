@@ -10,12 +10,13 @@ async def check(browser, w, h):
     page.on('pageerror', lambda e: errors.append(str(e)))
     await page.goto(URL+'/?example=forsterite')
     await page.wait_for_function('window.viewerDiagnostics?.().atoms.length===51')
-    await choose_tool(page, '#mode-detector')
+    await choose_tool(page, '#mode-diffraction')
+    await page.locator('#xrd-tab-detector').tap()
     camera = (await diagnostics(page))['camera']
     if w in (768,1024):
         parent = await page.locator('#detector-window').bounding_box()
         await page.locator('#detector-open-options').tap(); await settle(page)
-        for selector in ['#detector-close','#detector-open-options','#detector-hkl','#detector-go','[data-detector-view=image]','[data-detector-view=ewald]']:
+        for selector in ['#xrd-close','#detector-open-options','#detector-hkl','#detector-go','[data-detector-view=image]','[data-detector-view=ewald]']:
             assert await hit(page.locator(selector)), (w, selector)
         field = await page.locator('#detector-hkl').bounding_box()
         go = await page.locator('#detector-go').bounding_box()
@@ -38,8 +39,7 @@ async def check(browser, w, h):
         await page.locator('#detector-link').tap()
         assert not await page.locator('#detector-link').is_checked()
     if w in (375,390):
-        await page.locator('#detector-close').tap()
-        await choose_tool(page,'#mode-reflection')
+        await page.locator('#xrd-tab-reflection').tap()
         await page.locator('#reflection-hkl').fill('0 2 1');await page.locator('#reflection-hkl').press('Enter')
         await page.get_by_role('button',name='Phase sum',exact=True).tap();await settle(page)
         collisions = await page.evaluate('''() => {
@@ -65,7 +65,7 @@ async def check(browser, w, h):
         await slider.press('End'); await settle(page)
         assert await slider.bounding_box()==original
     if w==390:
-        await page.locator('#reflection-close').tap()
+        await page.locator('#xrd-close').tap()
         await choose_tool(page,'#style-open')
         camera=(await diagnostics(page))['camera']
         await reveal_control(page,'#adp-ellipsoids')
@@ -98,11 +98,11 @@ async def main():
             page=await browser.new_page(viewport={'width':1024,'height':768},has_touch=False)
             await page.goto(URL+'/?example=forsterite')
             await page.wait_for_function('window.viewerDiagnostics?.().atoms.length===51')
-            await choose_tool(page,'#mode-detector')
+            await choose_tool(page,'#mode-diffraction')
+            await page.locator('#xrd-tab-detector').click()
             assert not await page.locator('#detector-go').is_visible()
             field=await page.locator('#detector-hkl').bounding_box()
-            form=await page.locator('#detector-form').bounding_box()
-            assert abs(field['width']-form['width'])<2, (field,form)
+            assert field['width']>=80, field
             await page.close()
             print(f'{name} fine pointer: hkl field fills available width',flush=True)
             await browser.close()

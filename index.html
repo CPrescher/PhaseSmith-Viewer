@@ -484,13 +484,6 @@
                       ⌖ Style one copy
                     </button>
                   </div>
-                  <label class="radius-field">Element palette
-                    <select id="element-palette">
-                      <option value="mineral">Mineral (default)</option>
-                      <option value="cpk">CPK / Jmol</option>
-                      <option value="colorblind">Colorblind-safe</option>
-                    </select>
-                  </label>
                   <label class="radius-field">Radius model
                     <select id="radius-model">
                       <option value="crystal">Crystal (Shannon 1976)</option>
@@ -569,6 +562,13 @@
                     ></button>
                   </div>
                   <div class="style-clarity-toggles" role="group" aria-label="3D visual clarity">
+                    <label class="radius-field">Element palette
+                      <select id="element-palette">
+                        <option value="mineral">Mineral (default)</option>
+                        <option value="cpk">CPK / Jmol</option>
+                        <option value="colorblind">Colorblind-safe</option>
+                      </select>
+                    </label>
                     <label class="style-toggle-row" title="Fade distant atoms toward the background to separate front and back"><input type="checkbox" id="style-depth-cue"><span>Depth cueing (fog)</span></label>
                     <label class="style-toggle-row" title="Color each half of a bond by the element at its end"><input type="checkbox" id="style-two-tone-bonds"><span>Two-tone bonds</span></label>
                     <label class="style-toggle-row" title="Darken recessed interior atoms using analytic neighbor occlusion"><input type="checkbox" id="style-contact-ao" checked><span>Contact AO</span></label>

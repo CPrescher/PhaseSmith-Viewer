@@ -108,14 +108,19 @@ async def main():
     await page.mouse.click(body['x']+2,body['y']+2)
     await page.keyboard.press('Escape')
     assert not await page.locator('#tool-window-sites').is_visible(), 'Escape after a blank-body click must close the palette'
-   for tool,dialog,close in [('powder','analysis-window','analysis-close'),('detector','detector-window','detector-close')]:
+   for tool,dialog,close,tab in [('analysis','analysis-window','analysis-close',None),('diffraction','xrd-workspace','xrd-close','detector')]:
     await choose_tool(page,'#mode-'+tool)
+    if tab: await page.locator('#xrd-tab-'+tab).click()
     assert await hit(page.locator('#structure-info-open')) and await hit(page.locator('#open'))
     assert await hit(page.locator('#show-atoms')) and await hit(page.locator('#size'))
     assert await page.evaluate("viewerDiagnostics().atoms.some(a=>document.elementFromPoint(a.x,a.y)?.tagName==='CANVAS')")
     if w==1440:
-     # Move away from the left edge before expanding to the left.
-     head=await page.locator('#'+dialog+' header h2').bounding_box();await page.mouse.move(head['x']+10,head['y']+10);await page.mouse.down();await page.mouse.move(head['x']+150,head['y']+10,steps=8);await page.mouse.up()
+     if dialog=='xrd-workspace':
+      head=await page.locator('#xrd-head').bounding_box();dx,dy=head['x']+head['width']-56,head['y']+10
+      await page.mouse.move(dx,dy);await page.mouse.down();await page.mouse.move(dx-40,dy,steps=6);await page.mouse.up()
+     else:
+      # Move away from the left edge before expanding to the left.
+      head=await page.locator('#'+dialog+' header h2').bounding_box();await page.mouse.move(head['x']+10,head['y']+10);await page.mouse.down();await page.mouse.move(head['x']+150,head['y']+10,steps=8);await page.mouse.up()
      await resize_left(page,'#'+dialog,'#'+dialog+' [data-edge=sw]')
     await page.locator('#'+close).click()
    await page.close();print(f'{w}x{h}: header, rail, resize and exposed crystal passed',flush=True)

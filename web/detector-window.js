@@ -526,11 +526,12 @@ export function createDetectorWindow({
   const showOptions = floatingDialog($("options"), $("open-options"), $("options").querySelector("header"), () => $("options").close());
   $("open-options").onclick = () => {
     if ($("options").open) return $("options").close();
+    const outer = win.closest("#xrd-workspace") ?? win;
     const placeAutomatically = $("options").dataset.userMoved !== "true";
     showOptions();
     if (placeAutomatically && innerWidth >= 1000) {
       // Keep most of the live detector visible while its geometry is edited.
-      const rect = win.getBoundingClientRect(), right = rect.right + 12;
+      const rect = outer.getBoundingClientRect(), right = rect.right + 12;
       const limit = document.getElementById("tool-rail").getBoundingClientRect().left - 8;
       const rightSpace = limit - right, leftSpace = rect.left - 20;
       const space = Math.max(rightSpace, leftSpace);
@@ -545,12 +546,13 @@ export function createDetectorWindow({
       // the diagram tabs and both headers, remain usable side by side.
       const limit = document.getElementById("tool-rail").getBoundingClientRect().left - 12;
       const width = Math.min(360, limit - 324);
-      optionsParentLayout = { left: win.style.left, width: win.style.width, temporaryWidth: width, viewport: innerWidth };
-      win.style.left = "12px";
-      win.style.width = width + "px";
+      optionsParentLayout = { outer, left: outer.style.left, width: outer.style.width, minWidth: outer.style.minWidth, temporaryWidth: width, viewport: innerWidth };
+      outer.style.left = "12px";
+      outer.style.minWidth = width + "px";
+      outer.style.width = width + "px";
       $("options").style.width = "300px";
       $("options").style.left = (width + 24) + "px";
-      $("options").style.top = win.getBoundingClientRect().top + "px";
+      $("options").style.top = outer.getBoundingClientRect().top + "px";
     } else if (placeAutomatically) {
       $("options").style.left = "8px";
       $("options").style.top = "8px";
@@ -560,10 +562,12 @@ export function createDetectorWindow({
   $("options").onclose = () => {
     if (optionsParentLayout) {
       const prior = optionsParentLayout;
+      const target = prior.outer ?? win;
       // Respect a subsequent manual drag/resize, or a screen-size change.
-      if (innerWidth === prior.viewport && win.style.left === "12px" && win.style.width === prior.temporaryWidth + "px") {
-        win.style.left = prior.left;
-        win.style.width = prior.width;
+      if (innerWidth === prior.viewport && target.style.left === "12px" && target.style.width === prior.temporaryWidth + "px") {
+        target.style.left = prior.left;
+        target.style.width = prior.width;
+        target.style.minWidth = prior.minWidth ?? "";
       }
       optionsParentLayout = null;
     }

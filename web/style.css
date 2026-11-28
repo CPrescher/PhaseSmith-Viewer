@@ -3516,15 +3516,41 @@ body:has(.analysis-window[open], #reflection-explorer[open], #xrd-workspace:not(
   top: auto !important;
   bottom: var(--linked-bottom, 64px) !important;
   height: auto !important;
-  max-height: min(320px, calc(100dvh - 80px)) !important;
+  min-height: 0 !important;
+  max-height: min(320px, calc(100dvh - 48px)) !important;
+}
+#xrd-workspace.showing-crystal .xrd-head {
+  display: none;
+}
+#xrd-workspace.showing-crystal .detector-body {
+  padding: 4px 10px 6px;
+  gap: 4px;
+}
+@media (max-width: 420px) and (max-height: 700px) {
+  #xrd-workspace.showing-crystal {
+    bottom: 52px !important;
+    max-height: 245px !important;
+  }
+}
+@media (max-height: 500px) {
+  #xrd-workspace.showing-crystal {
+    left: 8px !important;
+    width: min(310px, calc(100vw - 16px)) !important;
+    min-width: 0 !important;
+  }
 }
 @media (max-height: 500px) and (min-width: 600px) {
-  #detector-window:not(.showing-crystal) .detector-body { grid-template-rows: minmax(0, 1fr); overflow: hidden; }
-  #detector-window:not(.showing-crystal) .detector-controls { display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+  #detector-window:not(.showing-crystal) .detector-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); overflow: hidden; padding: 6px 10px; gap: 8px; }
+  #detector-window:not(.showing-crystal) .detector-controls { display: flex; flex-direction: column; gap: 4px; height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+  #detector-window:not(.showing-crystal) .detector-angles { gap: 2px; }
+  #detector-window:not(.showing-crystal) .detector-angles label { gap: 1px; }
+  #detector-window:not(.showing-crystal) .detector-angles input[type="range"] { height: 28px; }
   #detector-window:not(.showing-crystal) .detector-controls > * { flex: none; }
   #detector-window:not(.showing-crystal) .detector-visuals { display: flex; flex-direction: column; gap: 6px; height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   #detector-window:not(.showing-crystal) .detector-view-tabs { flex: none; }
   #detector-window:not(.showing-crystal) .detector-views { flex: none; width: 100%; }
+  #detector-window:not(.showing-crystal) .detector-views svg { max-height: 175px; }
+  .xrd-head { flex-wrap: nowrap; overflow-x: auto; min-height: 36px; padding: 3px 6px; padding-right: calc(var(--touch) + 8px); gap: 4px 6px; }
 }
 .detector-controls > *, .detector-view-tabs { flex: none; }
 #app[data-profile="side"] .pair-sub { gap: 4px; }
@@ -5533,5 +5559,45 @@ h3.table-title:has(+ #shell-controls[hidden]) {
     z-index: 32;
     border: 0;
     border-radius: 0;
+  }
+  .xrd-head {
+    gap: 3px 6px;
+    padding: 4px 6px;
+    padding-right: calc(var(--touch) + 8px);
+  }
+  #xrd-panel-reflection #reflection-explorer {
+    padding: 6px 10px 8px;
+  }
+  #xrd-panel-reflection #reflection-structure {
+    display: none;
+  }
+  #xrd-panel-reflection #reflection-phasors {
+    height: 115px !important;
+    min-height: 0 !important;
+    max-height: 115px !important;
+  }
+  #tool-window-style label.radius-field:has(#element-palette) {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    white-space: nowrap;
+  }
+  #tool-window-style label.radius-field:has(#element-palette) > select {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+@media (max-height: 500px) and (min-width: 600px) {
+  .xrd-head {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    min-height: 36px;
+    padding: 3px 6px;
+    padding-right: calc(var(--touch) + 8px);
+    gap: 4px 6px;
+  }
+  .xrd-head .radiation-bar {
+    flex-wrap: nowrap;
   }
 }

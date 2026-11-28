@@ -3,12 +3,18 @@ import { addResizeEdges, resizedRect } from "./panel-resize.js";
 // Modeless science windows share focus order, dragging, and Escape.
 const windows = [];
 let settingsInFront = false;
+export function bringToFront(el) {
+  if (!el) return;
+  const index = windows.indexOf(el);
+  if (index >= 0) windows.splice(index, 1);
+  windows.push(el);
+  windows.forEach((w, i) => (w.style.zIndex = 1000 + i));
+  if (settingsInFront) setSettingsInFront(false);
+  else placeToolsMenu();
+}
 export function frontScienceWindow() {
   if (settingsInFront) return null;
-  const openDialog = windows.filter(dialog => dialog.open).at(-1);
-  if (openDialog) return openDialog;
-  const xrd = document.getElementById("xrd-workspace");
-  return xrd && !xrd.hidden ? xrd : null;
+  return windows.filter(w => w.open || (w.id === "xrd-workspace" && !w.hidden)).at(-1) ?? null;
 }
 export function isFrontDialog(win) {
   return frontScienceWindow() === win;
