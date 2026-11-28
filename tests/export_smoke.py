@@ -80,7 +80,7 @@ async def check(browser):
     assert Path(await moved.path()).read_bytes() == data, "Editor position changed the exported crystal/labels"
 
     await page.locator("#export-dpi").fill("600")
-    await page.locator("#export-transparent").check()
+    await page.locator("#export-background").select_option("transparent")
     async with page.expect_download() as pending:
         await page.locator("#export-png").tap()
     transparent = await pending.value

@@ -4,7 +4,11 @@ import { addResizeEdges, resizedRect } from "./panel-resize.js";
 const windows = [];
 let settingsInFront = false;
 export function frontScienceWindow() {
-  return settingsInFront ? null : windows.filter(dialog => dialog.open).at(-1);
+  if (settingsInFront) return null;
+  const openDialog = windows.filter(dialog => dialog.open).at(-1);
+  if (openDialog) return openDialog;
+  const xrd = document.getElementById("xrd-workspace");
+  return xrd && !xrd.hidden ? xrd : null;
 }
 export function isFrontDialog(win) {
   return frontScienceWindow() === win;
@@ -27,7 +31,7 @@ function placeToolsMenu() {
     });
   }
   const active = document.getElementById("app")?.dataset.launcher === "menu"
-    ? frontScienceWindow() : null;
+    ? (settingsInFront ? null : windows.filter(dialog => dialog.open).at(-1)) : null;
   menu.classList.toggle("in-science", !!active);
   if (active) {
     const head = active.querySelector("header");
@@ -39,6 +43,98 @@ export function focusLauncher(opener) {
   const trigger = group && document.querySelector(`[aria-controls="${group.id}"]`);
   const target = [opener, trigger, document.getElementById("tools-menu")].find(el => el?.getClientRects().length);
   target?.focus({ preventScroll: true });
+}
+export function attachEdgeResizers(
+  win,
+  {
+    minW = 280,
+    minH = 220,
+    margin = 8,
+    canResize = () => true,
+    getBounds = null,
+    getRect = null,
+    onResize = null,
+    onEnd = null,
+  } = {},
+) {
+  if (!win) return { destroy() {} };
+  let active = null;
+  const resolveBounds = () => {
+    if (typeof getBounds === "function") return getBounds();
+    const parent = win.offsetParent || document.documentElement;
+    const w = parent.clientWidth || innerWidth;
+    const h = parent.clientHeight || innerHeight;
+    return { left: margin, top: margin, right: Math.max(margin + minW, w - margin), bottom: Math.max(margin + minH, h - margin) };
+  };
+  const resolveRect = () => {
+    if (typeof getRect === "function") return getRect();
+    const r = win.getBoundingClientRect();
+    const parent = win.offsetParent;
+    const pr = parent && parent !== document.body && parent !== document.documentElement ? parent.getBoundingClientRect() : { left: 0, top: 0 };
+    return { x: r.left - pr.left, y: r.top - pr.top, w: r.width, h: r.height };
+  };
+  const layer = addResizeEdges(win, (event, edge) => {
+    if (active || !canResize()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const style = getComputedStyle(win);
+    active = {
+      edge,
+      rect: resolveRect(),
+      bounds: resolveBounds(),
+      x: event.clientX,
+      y: event.clientY,
+      id: event.pointerId,
+      minWidth: Math.max(minW, parseFloat(style.minWidth) || 0),
+      minHeight: Math.max(minH, parseFloat(style.minHeight) || 0),
+      target: event.currentTarget,
+    };
+    active.target.setPointerCapture?.(event.pointerId);
+  });
+  for (const handle of layer.querySelectorAll("[data-edge]")) {
+    handle.classList.add("win-edge", `win-edge-${handle.dataset.edge}`);
+  }
+  const onMove = (event) => {
+    if (active?.id !== event.pointerId) return;
+    const next = resizedRect(
+      active.rect,
+      active.edge,
+      event.clientX - active.x,
+      event.clientY - active.y,
+      active.bounds,
+      active.minWidth,
+      active.minHeight,
+    );
+    if (typeof onResize === "function") onResize(next);
+    else {
+      Object.assign(win.style, {
+        left: `${Math.round(next.x)}px`,
+        top: `${Math.round(next.y)}px`,
+        width: `${Math.round(next.w)}px`,
+        height: `${Math.round(next.h)}px`,
+      });
+    }
+  };
+  const onDone = (event) => {
+    if (active?.id !== event.pointerId) return;
+    const finished = active;
+    active = null;
+    if (finished.target.hasPointerCapture?.(finished.id)) finished.target.releasePointerCapture(finished.id);
+    onEnd?.();
+  };
+  win.addEventListener("pointermove", onMove);
+  win.addEventListener("pointerup", onDone);
+  win.addEventListener("pointercancel", onDone);
+  win.addEventListener("lostpointercapture", onDone);
+  return {
+    destroy() {
+      win.removeEventListener("pointermove", onMove);
+      win.removeEventListener("pointerup", onDone);
+      win.removeEventListener("pointercancel", onDone);
+      win.removeEventListener("lostpointercapture", onDone);
+      layer.remove();
+    },
+  };
 }
 export function floatingDialog(win, opener, handle, close) {
   const files = document.createElement("button");

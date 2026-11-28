@@ -136,14 +136,49 @@ export function createExporter(ctx) {
   function measurementSize(g, s = 1) {
     const m = ctx.measurement();
     if (!m) return null;
-    g.font = `500 ${22 * s}px Inter, ui-sans-serif, system-ui, sans-serif`;
+    g.font = `500 ${22 * s}px "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif`;
     let width = g.measureText(m.value).width;
-    g.font = `400 ${12 * s}px Inter, ui-sans-serif, system-ui, sans-serif`;
+    g.font = `400 ${12 * s}px "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif`;
     for (const line of m.lines) width = Math.max(width, g.measureText(line).width);
     return { width: width + 20 * s, height: (46 + m.lines.length * 16) * s };
   }
 
-  function frameFor(turntable = false) {
+  // Figure options: background (theme, white or transparent), calibrated
+  // scale bar, element legend, compass and measurement card. Explicit
+  // options win; otherwise the Export panel controls are read.
+  function readExportOptions(explicit = {}) {
+    const field = (id) => document.getElementById(id);
+    let background = ["theme", "white", "transparent"].includes(explicit.background) ? explicit.background : null;
+    if (!background) {
+      if (explicit.transparent === true) background = "transparent";
+      else if (explicit.transparent === false) background = field("export-background")?.value === "white" ? "white" : "theme";
+      else if (["theme", "white", "transparent"].includes(field("export-background")?.value)) background = field("export-background").value;
+      else background = field("export-transparent")?.checked ? "transparent" : "theme";
+    }
+    return {
+      background,
+      scaleBar: explicit.scaleBar ?? Boolean(field("export-scale-bar")?.checked),
+      legend: explicit.legend ?? Boolean(field("export-legend")?.checked),
+      includeCompass: explicit.includeCompass ?? (field("export-compass") ? field("export-compass").checked : true),
+      includeMeasure: explicit.includeMeasure ?? (field("export-measure") ? field("export-measure").checked : true),
+      elements: explicit.elements ?? ctx.activeElements?.() ?? [],
+    };
+  }
+
+  // Output pixels per ångström in the orthographic view.
+  function pixelsPerAngstrom(size) {
+    const perUnit = ctx.pixelsPerUnit?.();
+    return Number.isFinite(perUnit) && perUnit > 0 ? perUnit * size.scale : null;
+  }
+
+  // Largest 1-2-5 length not above the target.
+  function niceScaleLength(target) {
+    if (!(target > 0) || !Number.isFinite(target)) return null;
+    const base = 10 ** Math.floor(Math.log10(target)), norm = target / base;
+    return Number(((norm < 2 ? 1 : norm < 5 ? 2 : norm < 10 ? 5 : 10) * base).toPrecision(6));
+  }
+
+  function frameFor(turntable = false, opts = readExportOptions()) {
     let bounds = ctx.contentBounds(turntable);
     const include = (rect) => {
       if (!bounds) bounds = { ...rect };
@@ -153,7 +188,7 @@ export function createExporter(ctx) {
           height: Math.max(bounds.y + bounds.height, rect.y + rect.height) - y };
       }
     };
-    measureContext.font = "400 11px Inter, ui-sans-serif, system-ui, sans-serif";
+    measureContext.font = '400 11px "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif';
     let labelWidth = 0;
     for (const label of ctx.atomLabels()) {
       const width = measureContext.measureText(label.label).width + 6;
@@ -170,16 +205,22 @@ export function createExporter(ctx) {
       }
       labelWidth = Math.max(labelWidth, width + 24);
     }
-    const card = measurementSize(measureContext);
-    return exportFrame(bounds, ctx.cssSize(), {
+    const card = opts.includeMeasure ? measurementSize(measureContext) : null;
+    const frame = exportFrame(bounds, ctx.cssSize(), {
       // Labels can change sides while rotating. Reserve their reach around
       // the analytic geometry envelope, once for the entire movie.
       labelMargin: turntable && labelWidth ? { x: labelWidth + 16, y: 40 } : 0,
       overlayWidth: card?.width,
       overlayHeight: card?.height,
-      compass: Boolean(ctx.compass()),
+      compass: opts.includeCompass && Boolean(ctx.compass()),
       clip: !turntable,
     });
+    // Reserve clean bottom margin when lower-left overlays (scale bar / legend)
+    // are enabled so they never overlap tightly cropped crystal geometry.
+    const hasLegend = Boolean(opts.legend && opts.elements?.length);
+    const bottomSafe = (opts.scaleBar ? 40 : 0) + (hasLegend ? (opts.scaleBar ? 34 : 38) : 0);
+    if (bottomSafe > 0) frame.height = Math.ceil(frame.height + bottomSafe);
+    return frame;
   }
 
   /** Export pixel size for a CSS-size scale, bounded and even. */
@@ -210,9 +251,14 @@ export function createExporter(ctx) {
   }
   const sameSize = (a, b) => a.width === b.width && a.height === b.height;
 
-  function background(g, w, h, transparent) {
+  function background(g, w, h, mode) {
     g.clearRect(0, 0, w, h);
-    if (transparent) return;
+    if (mode === true || mode === "transparent") return;
+    if (mode === "white") {
+      g.fillStyle = "#ffffff";
+      g.fillRect(0, 0, w, h);
+      return;
+    }
     // Same radial gradient as the live canvas background (ellipse at 50% 42%).
     const gradient = g.createRadialGradient(w / 2, h * 0.42, 0, w / 2, h * 0.42, Math.hypot(w, h) * 0.6);
     gradient.addColorStop(0, css("--canvas-1"));
@@ -233,7 +279,7 @@ export function createExporter(ctx) {
   }
 
   function labels(g, s) {
-    const font = (px, weight = 400) => `${weight} ${px * s}px Inter, ui-sans-serif, system-ui, sans-serif`;
+    const font = (px, weight = 400) => `${weight} ${px * s}px "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif`;
     g.textBaseline = "middle";
     // Atom labels: box offset like the live view (-20%, -80%).
     for (const l of ctx.atomLabels()) {
@@ -300,26 +346,28 @@ export function createExporter(ctx) {
     g.stroke();
     g.textBaseline = "top";
     g.fillStyle = css("--measure");
-    g.font = `500 ${22 * s}px Inter, ui-sans-serif, system-ui, sans-serif`;
+    g.font = `500 ${22 * s}px "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif`;
     g.fillText(m.value, x + pad, y + pad);
     g.fillStyle = css("--overlay-text");
-    g.font = `400 ${12 * s}px Inter, ui-sans-serif, system-ui, sans-serif`;
+    g.font = `400 ${12 * s}px "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif`;
     m.lines.forEach((line, i) => g.fillText(line, x + pad, y + pad + 28 * s + i * lineH));
   }
 
   // The a/b/c compass from the same projected axis directions as the view.
-  function compass(g, w, h, s) {
+  // On a white figure the overlays use the light palette in either theme.
+  const LIGHT_INK = { text: "#15263a", panel: "rgba(255, 255, 255, 0.9)", line: "rgba(21, 38, 58, 0.18)", a: "#cf3030", b: "#188a33", c: "#1c68c8" };
+  function compass(g, w, h, s, lightSurface = false) {
     const axes = ctx.compass();
     if (!axes) return;
     const size = 72 * s,
       radius = 23 * s,
       cx = w - 12 * s - size / 2,
       cy = h - 12 * s - size / 2;
-    g.fillStyle = css("--compass-bg");
+    g.fillStyle = lightSurface ? LIGHT_INK.panel : css("--compass-bg");
     g.beginPath();
     g.arc(cx, cy, size / 2, 0, Math.PI * 2);
     g.fill();
-    const colors = { a: css("--axis-a"), b: css("--axis-b"), c: css("--axis-c") };
+    const colors = lightSurface ? LIGHT_INK : { a: css("--axis-a"), b: css("--axis-b"), c: css("--axis-c") };
     const order = [...axes].sort((p, q) => p.z - q.z);
     for (const axis of order) {
       const color = colors[axis.name];
@@ -378,7 +426,7 @@ export function createExporter(ctx) {
       g.textAlign = "center";
       g.textBaseline = "middle";
       g.lineWidth = 3 * s;
-      g.strokeStyle = css("--label-halo");
+      g.strokeStyle = lightSurface ? "#ffffff" : css("--label-halo");
       g.strokeText(axis.name, lx, ly);
       g.fillStyle = color;
       g.fillText(axis.name, lx, ly);
@@ -387,23 +435,114 @@ export function createExporter(ctx) {
   }
 
   /** Render the current view into a 2D canvas at `size`. */
-  function composeFrame(target, size, transparent) {
+  /** Calibrated 1-2-5 Å scale bar, lower left. Returns the height used. */
+  function scaleBar(g, w, h, s, perAngstrom, lightSurface) {
+    if (!(perAngstrom > 0)) return 0;
+    const length = niceScaleLength(Math.max(54 * s, Math.min(180 * s, w * 0.18)) / perAngstrom);
+    if (!length) return 0;
+    const bar = length * perAngstrom, pad = 8 * s, boxW = bar + 2 * pad, boxH = 28 * s;
+    const x = 12 * s, y = h - 12 * s - boxH;
+    g.save();
+    g.fillStyle = lightSurface ? LIGHT_INK.panel : css("--overlay-bg");
+    roundRect(g, x, y, boxW, boxH, 6 * s);
+    g.fill();
+    g.strokeStyle = lightSurface ? LIGHT_INK.line : css("--overlay-line");
+    g.lineWidth = s;
+    g.stroke();
+    const ink = lightSurface ? LIGHT_INK.text : css("--text");
+    const x1 = x + pad, x2 = x1 + bar, by = y + boxH - 8 * s;
+    g.strokeStyle = g.fillStyle = ink;
+    g.lineWidth = 2 * s;
+    g.lineCap = "butt";
+    g.beginPath();
+    g.moveTo(x1, by - 3 * s); g.lineTo(x1, by + 3 * s);
+    g.moveTo(x1, by); g.lineTo(x2, by);
+    g.moveTo(x2, by - 3 * s); g.lineTo(x2, by + 3 * s);
+    g.stroke();
+    g.font = `600 ${11 * s}px ${css("--font-sans") || "sans-serif"}`;
+    g.textAlign = "center";
+    g.textBaseline = "bottom";
+    g.fillText(`${length} Å`, (x1 + x2) / 2, by - 4 * s);
+    g.restore();
+    return boxH + 8 * s;
+  }
+
+  /** Element legend strip, lower left (above the scale bar). */
+  function legend(g, w, h, s, elements, bottomOffset, lightSurface) {
+    if (!elements?.length) return;
+    g.save();
+    g.font = `600 ${11.5 * s}px ${css("--font-sans") || "sans-serif"}`;
+    const dot = 5 * s, gap = 10 * s, pad = 10 * s, boxH = 26 * s;
+    const items = elements.map(({ symbol, color }) => ({ symbol, color, width: g.measureText(symbol).width }));
+    const content = items.reduce((sum, item, i) => sum + (i ? gap : 0) + 2 * dot + 5 * s + item.width, 0);
+    const boxW = Math.min(w - 24 * s, content + 2 * pad), x = 12 * s, y = h - 12 * s - bottomOffset - boxH;
+    g.fillStyle = lightSurface ? LIGHT_INK.panel : css("--overlay-bg");
+    roundRect(g, x, y, boxW, boxH, 7 * s);
+    g.fill();
+    g.strokeStyle = lightSurface ? LIGHT_INK.line : css("--overlay-line");
+    g.lineWidth = s;
+    g.stroke();
+    let cursor = x + pad;
+    const cy = y + boxH / 2;
+    g.textAlign = "left";
+    g.textBaseline = "middle";
+    for (const item of items) {
+      if (cursor + 2 * dot + 5 * s + item.width > x + boxW - pad + 2) break;
+      g.fillStyle = item.color;
+      g.beginPath();
+      g.arc(cursor + dot, cy, dot, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = lightSurface ? "rgba(21, 38, 58, 0.25)" : "rgba(255, 255, 255, 0.25)";
+      g.lineWidth = 0.8 * s;
+      g.stroke();
+      g.fillStyle = lightSurface ? LIGHT_INK.text : css("--text");
+      g.fillText(item.symbol, cursor + 2 * dot + 5 * s, cy);
+      cursor += 2 * dot + 5 * s + item.width + gap;
+    }
+    g.restore();
+  }
+
+  /** Render the current view into a 2D canvas at `size`. */
+  function composeFrame(target, size, transparentOrOptions) {
+    const opts = transparentOrOptions && typeof transparentOrOptions === "object"
+      ? transparentOrOptions
+      : readExportOptions({ transparent: Boolean(transparentOrOptions) });
     const g = target.getContext("2d");
     const s = size.scale;
-    background(g, size.width, size.height, transparent);
-    withRenderSize(size, () => {
-      ctx.render({ crop: size.crop, css: size.css });
+    const lightSurface = opts.background === "white";
+    background(g, size.width, size.height, opts.background);
+    // Small PNGs render WebGL at 2× and downsample, so depth-peeled
+    // translucent edges (no MSAA in the peel targets) stay anti-aliased.
+    const gl = ctx.renderer.getContext();
+    const limit = Math.min(MAX_IMAGE_SIDE, gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || MAX_IMAGE_SIDE, gl.getParameter(gl.MAX_VIEWPORT_DIMS)?.[0] || MAX_IMAGE_SIDE);
+    const supersample = opts.supersample === true && size.width * 2 <= limit && size.height * 2 <= limit;
+    const renderSize = supersample ? { ...size, width: size.width * 2, height: size.height * 2, scale: size.scale * 2 } : size;
+    withRenderSize(renderSize, () => {
+      ctx.render({
+        crop: size.crop,
+        css: size.css,
+        background: opts.background,
+        pixelScale: renderSize.scale,
+      });
+      g.save();
+      g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = "high";
       g.drawImage(ctx.renderer.domElement, 0, 0, size.width, size.height);
+      g.restore();
     });
     g.save();
     g.translate(-size.crop.x * s, -size.crop.y * s);
     labels(g, s);
     g.restore();
-    measurement(g, size.width, s);
-    compass(g, size.width, size.height, s);
+    if (opts.includeMeasure !== false) measurement(g, size.width, s);
+    if (opts.includeCompass !== false) compass(g, size.width, size.height, s, lightSurface);
+    const used = opts.scaleBar ? scaleBar(g, size.width, size.height, s, pixelsPerAngstrom(size), lightSurface) : 0;
+    if (opts.legend) legend(g, size.width, size.height, s, opts.elements, used, lightSurface);
   }
 
-  async function exportPNG({ scale = 2, transparent = false, dpi = 300 } = {}) {
+  async function exportPNG(options = {}) {
+    const { scale = 2, dpi = 300 } = options;
+    const opts = { ...readExportOptions(options), supersample: scale <= 1.25 };
     if (!validDpi(dpi)) throw Error("Enter a DPI between 30 and 2400.");
     if (busy) throw Error("An export is already running.");
     busy = true;
@@ -412,11 +551,11 @@ export function createExporter(ctx) {
       // Recompute labels without application windows before measuring the
       // crop, so moving an editor cannot change the exported frame.
       ctx.render();
-      const size = exportSize(scale, MAX_IMAGE_SIDE);
+      const size = exportSize(scale, MAX_IMAGE_SIDE, frameFor(false, opts));
       const canvas = document.createElement("canvas");
       canvas.width = size.width;
       canvas.height = size.height;
-      composeFrame(canvas, size, transparent);
+      composeFrame(canvas, size, opts);
       const encoded = await new Promise((resolve, reject) =>
         canvas.toBlob((b) => (b ? resolve(b) : reject(Error("The browser could not encode the PNG."))), "image/png"),
       );
@@ -455,14 +594,17 @@ export function createExporter(ctx) {
     // Setup can throw synchronously (e.g. Safari rejecting captureStream or
     // the MediaRecorder options). Then stop whatever tracks exist and give
     // the app back: not busy, controls enabled, camera untouched.
-    let size, canvas,
+    let size, canvas, movieOptions,
       manual = null,
       stream = null,
       track = null,
       recorder = null;
     try {
       ctx.render();
-      size = exportSize(scale, MAX_VIDEO_SIDE, frameFor(true));
+      // Video has no alpha channel: a transparent choice records the theme.
+      movieOptions = readExportOptions();
+      if (movieOptions.background === "transparent") movieOptions.background = "theme";
+      size = exportSize(scale, MAX_VIDEO_SIDE, frameFor(true, movieOptions));
       canvas = document.createElement("canvas");
       canvas.width = size.width;
       canvas.height = size.height;
@@ -571,7 +713,7 @@ export function createExporter(ctx) {
       camera.position.copy(saved.target).add(offset.clone().applyAxisAngle(axis, angle));
       camera.up.copy(saved.up);
       try {
-        composeFrame(canvas, size, false);
+        composeFrame(canvas, size, movieOptions);
         track?.requestFrame?.();
       } catch (error) {
         recorder.onerror({ error });

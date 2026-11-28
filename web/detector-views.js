@@ -57,7 +57,7 @@ function gridPaths(project, depth, center, radius) {
   return paths;
 }
 
-export function drawEwald(root, model, rock, azimuth, spots, tracked, view, pointScale = 1) {
+export function drawEwald(root, model, rock, azimuth, spots, tracked, view, pointScale = 1, onSelect = null) {
   root.replaceChildren();
   const width = root.clientWidth,
     height = root.clientHeight;
@@ -123,21 +123,61 @@ export function drawEwald(root, model, rock, azimuth, spots, tracked, view, poin
       return { point, p: map(g), depth: depth(g) };
     });
   nodes.sort((a, b) => a.depth - b.depth);
-  for (const { point, p } of nodes) {
-    if (p[0] > 0 && p[0] < width && p[1] > 0 && p[1] < height)
-      circle(svg, p, spotRadius(point, 1.5, 3.5) * pointScale, "lattice-node");
+  const minDepth = nodes.length ? nodes[0].depth : 0;
+  const maxDepth = nodes.length ? nodes[nodes.length - 1].depth : 1;
+  const depthSpan = maxDepth - minDepth;
+  for (const { point, p, depth: nodeDepth } of nodes) {
+    if (p[0] > 0 && p[0] < width && p[1] > 0 && p[1] < height) {
+      const dot = circle(svg, p, spotRadius(point, 1.5, 3.5) * pointScale, "lattice-node");
+      const t = depthSpan > 1e-6 ? (nodeDepth - minDepth) / depthSpan : 1;
+      dot.style.opacity = (0.28 + 0.72 * t).toFixed(2);
+    }
   }
   const alongBeam = Math.hypot(origin[0] - center[0], origin[1] - center[1]) < 1;
   if (!alongBeam) arrow(svg, center, origin, "incident");
+  const drawCrossing = (spot, p, style) => {
+    const r = spotRadius(spot.point, 2.5, 4.8) * pointScale;
+    const hklText = "(" + formatMillerIndices(spot.point.hkl) + ")";
+    if (typeof onSelect === "function") {
+      const hit = element(svg, "g", {
+        class: "detector-hit",
+        role: "button",
+        tabindex: "0",
+        "aria-label": "Select " + hklText,
+      });
+      element(hit, "title", {}, hklText);
+      circle(hit, p, Math.max(9, r + 4), "hit-target");
+      circle(hit, p, r, style);
+      hit.onpointerdown = (e) => e.stopPropagation();
+      hit.onclick = (e) => {
+        e.stopPropagation();
+        onSelect(spot);
+      };
+      hit.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.stopPropagation();
+          onSelect(spot);
+        }
+      };
+    } else {
+      const node = circle(svg, p, r, style);
+      element(node, "title", {}, hklText);
+    }
+  };
   for (const spot of spots)
-    if (spot.point !== tracked)
-      circle(svg, locate(spot.point), spotRadius(spot.point, 2.5, 4.8) * pointScale, "crossing");
+    if (spot.point !== tracked) drawCrossing(spot, locate(spot.point), "crossing");
   if (tracked?.intensity > 0) {
     const onSphere = model.onSphere(tracked, rock);
     const p = locate(tracked);
     arrow(svg, origin, p, "reciprocal");
     if (onSphere) arrow(svg, center, p, "outgoing");
-    circle(svg, p, spotRadius(tracked, 2.5, 4.8) * pointScale, onSphere ? "crossing" : "tracked-node");
+    const trackedSpot = spots.find((s) => s.point === tracked);
+    if (trackedSpot && onSphere) drawCrossing(trackedSpot, p, "crossing");
+    else {
+      const node = circle(svg, p, spotRadius(tracked, 2.5, 4.8) * pointScale, onSphere ? "crossing" : "tracked-node");
+      element(node, "title", {}, "(" + formatMillerIndices(tracked.hkl) + ")");
+    }
     label(
       svg,
       Math.min(width - 60, Math.max(5, p[0] + 7)),
@@ -251,15 +291,106 @@ export function drawEwald(root, model, rock, azimuth, spots, tracked, view, poin
   label(root, width - 6, height - 4, "Unit cell").setAttribute("text-anchor", "end");
 }
 
-export function drawDetector(svg, detector, spots, chosen, ring, onChoose) {
+function inferGeometry(detector, spots, chosen, options) {
+  const sample = chosen?.point ?? spots[0]?.point ?? null;
+  let distance = options.distance ?? detector.distance ?? null;
+  if (!(distance > 0) && detector.width && detector.maxAngle > 0 && detector.maxAngle < Math.PI / 2 - 1e-4) {
+    distance = Math.hypot(detector.width, detector.height) / (2 * Math.tan(detector.maxAngle));
+  }
+  if (
+    !(distance > 0) &&
+    sample &&
+    sample.twoTheta > 1e-4 &&
+    sample.twoTheta < 89.99 &&
+    Number.isFinite(sample.radius) &&
+    sample.radius > 0
+  ) {
+    distance = sample.radius / Math.tan((sample.twoTheta * Math.PI) / 180);
+  }
+  let wavelength = options.wavelength ?? detector.wavelength ?? null;
+  if (!(wavelength > 0) && sample && sample.twoTheta > 1e-4 && sample.length > 1e-9) {
+    wavelength = (2 * Math.sin((sample.twoTheta * Math.PI) / 360)) / sample.length;
+  }
+  return { distance: distance > 0 ? distance : null, wavelength: wavelength > 0 ? wavelength : null };
+}
+
+function referenceAngles(maxTwoThetaDeg) {
+  if (!(maxTwoThetaDeg > 4)) return [];
+  const cap = Math.min(maxTwoThetaDeg * 0.96, 85);
+  const steps = [5, 10, 15, 20, 30, 45];
+  const step = steps.find((s) => Math.floor(cap / s) <= 4) ?? 45;
+  const angles = [];
+  for (let a = step; a <= cap; a += step) angles.push(a);
+  return angles;
+}
+
+function styleRefRing(el) {
+  el.style.fill = "none";
+  el.style.stroke = "var(--line-strong)";
+  el.style.strokeDasharray = "2 3";
+  el.style.strokeWidth = "0.9";
+  el.style.opacity = "0.5";
+  el.style.pointerEvents = "none";
+}
+
+function styleRefLabel(el) {
+  el.style.fill = "var(--muted)";
+  el.style.fontSize = "9.5px";
+  el.style.stroke = "var(--panel)";
+  el.style.strokeWidth = "2.5px";
+  el.style.paintOrder = "stroke";
+  el.style.opacity = "0.85";
+  el.style.pointerEvents = "none";
+}
+
+function drawIntensityLegend(svg, width, height) {
+  if (width < 150 || height < 120) return;
+  const group = element(svg, "g", { class: "detector-legend", "aria-hidden": "true" });
+  group.style.pointerEvents = "none";
+  const boxW = 136,
+    boxH = 20,
+    bx = 6,
+    by = height - boxH - 5;
+  const bg = element(group, "rect", { x: bx, y: by, width: boxW, height: boxH, rx: 4 });
+  bg.style.fill = "var(--field)";
+  bg.style.fillOpacity = "0.82";
+  bg.style.stroke = "var(--line)";
+  bg.style.strokeWidth = "0.8";
+  const title = label(group, bx + 5, by + 13.5, "|F|²");
+  title.style.fontSize = "9.5px";
+  title.style.fontWeight = "600";
+  title.style.fill = "var(--muted)";
+  const entries = [
+    { logArea: 0, text: "1%", dx: 33 },
+    { logArea: 0.5, text: "10%", dx: 63 },
+    { logArea: 1, text: "100%", dx: 98 },
+  ];
+  for (const { logArea, text, dx } of entries) {
+    const r = spotRadius({ logArea }, 2.2, 6);
+    const dot = circle(group, [bx + dx, by + boxH / 2], r, "crossing");
+    dot.style.pointerEvents = "none";
+    const t = label(group, bx + dx + r + 3, by + 13.5, text);
+    t.style.fontSize = "9px";
+    t.style.fill = "var(--muted)";
+  }
+}
+
+export function drawDetector(svg, detector, spots, chosen, ring, onChoose, options = {}) {
   svg.replaceChildren();
+  svg.onpointermove = null;
+  svg.onpointerleave = null;
   const width = svg.clientWidth,
     height = svg.clientHeight;
   if (!width || !height) return;
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
   const center = [width / 2, height / 2],
     [cx, cy] = center;
-  let spotPosition;
+  const { distance, wavelength } = inferGeometry(detector, spots, chosen, options);
+  const showRefRings = options.referenceRings !== false;
+  const showLegend = options.intensityLegend !== false;
+  const showHover = options.hoverReadout !== false;
+  let spotPosition, hoverInfo;
+
   if (detector.pixel1) {
     const scale = Math.min((width - 16) / detector.width, (height - 16) / detector.height);
     const w = detector.width * scale,
@@ -274,6 +405,52 @@ export function drawDetector(svg, detector, spots, chosen, ring, onChoose) {
     element(svg, "rect", { ...rect, class: "sensor" });
     const clip = element(element(svg, "defs", {}), "clipPath", { id: "sensor-clip" });
     element(clip, "rect", rect);
+    if (showRefRings && detector.maxAngle > 0) {
+      const angles = referenceAngles((detector.maxAngle * 180) / Math.PI);
+      const showD = wavelength && width >= 260 && angles.length <= 3;
+      for (const deg of angles) {
+        const theta = (deg * Math.PI) / 180;
+        let path = "",
+          move = true,
+          anchor = null;
+        for (let i = 0; i <= 180; i++) {
+          const t = (i * Math.PI) / 90;
+          const hit = detector.project([
+            Math.cos(theta),
+            Math.sin(theta) * Math.cos(t),
+            Math.sin(theta) * Math.sin(t),
+          ]);
+          if (!hit) {
+            move = true;
+            continue;
+          }
+          const pt = spotPosition(hit);
+          path += (move ? "M" : "L") + pt[0].toFixed(1) + "," + pt[1].toFixed(1);
+          move = false;
+          if (
+            pt[0] > x + 14 &&
+            pt[0] < x + w - 28 &&
+            pt[1] > y + 14 &&
+            pt[1] < y + h - 18 &&
+            (!anchor || pt[0] - pt[1] > anchor[0] - anchor[1])
+          )
+            anchor = pt;
+        }
+        if (path) {
+          const ringEl = element(svg, "path", {
+            d: path,
+            "clip-path": "url(#sensor-clip)",
+            class: "detector-ref-ring",
+          });
+          styleRefRing(ringEl);
+          if (anchor) {
+            const dText = showD ? ` · ${(wavelength / (2 * Math.sin(theta / 2))).toFixed(1)}Å` : "";
+            const lbl = label(svg, anchor[0] + 3, anchor[1] - 3, `${deg}°${dText}`, "detector-ref-label");
+            styleRefLabel(lbl);
+          }
+        }
+      }
+    }
     if (chosen && ring) {
       const theta = (chosen.point.twoTheta * Math.PI) / 180;
       let path = "",
@@ -312,6 +489,25 @@ export function drawDetector(svg, detector, spots, chosen, ring, onChoose) {
       });
     const beam = detector.project([1, 0, 0]);
     if (detector.contains(beam)) circle(svg, spotPosition(beam), 3, "origin");
+    const flipRow = detector.orientation === 1 || detector.orientation === 2;
+    const flipCol = detector.orientation === 1 || detector.orientation === 4;
+    hoverInfo = (vx, vy) => {
+      const col = (vx - x) / (detector.pixel2 * scale) - 0.5;
+      const row = (vy - y) / (detector.pixel1 * scale) - 0.5;
+      if (row < -0.5 || row >= detector.rows - 0.5 || col < -0.5 || col >= detector.cols - 0.5) return null;
+      const ray = matVec(detector.axes, [
+        (flipRow ? detector.rows - (row + 0.5) : row + 0.5) * detector.pixel1 - detector.poni1,
+        (flipCol ? detector.cols - (col + 0.5) : col + 0.5) * detector.pixel2 - detector.poni2,
+        detector.distance,
+      ]);
+      const twoThetaRad = Math.atan2(Math.hypot(ray[1], ray[2]), ray[0]);
+      const twoThetaDeg = (twoThetaRad * 180) / Math.PI;
+      const dPart =
+        wavelength && twoThetaRad > 1e-5
+          ? ` · d ${(wavelength / (2 * Math.sin(twoThetaRad / 2))).toFixed(2)} Å`
+          : "";
+      return `2θ ${twoThetaDeg.toFixed(1)}°${dPart} · ${Math.round(col)}, ${Math.round(row)} px`;
+    };
   } else {
     const w = detector.width ?? detector.diameter,
       h = detector.height ?? detector.diameter;
@@ -320,21 +516,60 @@ export function drawDetector(svg, detector, spots, chosen, ring, onChoose) {
       ry = (h * scale) / 2;
     spotPosition = (spot) => [cx - spot.y * scale, cy - spot.z * scale];
     const rect = { x: cx - rx, y: cy - ry, width: 2 * rx, height: 2 * ry };
-    if (detector.width) element(svg, "rect", { ...rect, class: "sensor" });
-    else circle(svg, center, rx, "sensor");
+    const clip = element(element(svg, "defs", {}), "clipPath", { id: "sensor-clip" });
+    if (detector.width) {
+      element(svg, "rect", { ...rect, class: "sensor" });
+      element(clip, "rect", rect);
+    } else {
+      circle(svg, center, rx, "sensor");
+      element(clip, "circle", { cx, cy, r: rx });
+    }
+    if (showRefRings && distance > 0) {
+      const maxR = detector.width ? Math.hypot(w, h) / 2 : detector.radius;
+      const angles = referenceAngles((Math.atan2(maxR, distance) * 180) / Math.PI);
+      const showD = wavelength && width >= 260 && angles.length <= 3;
+      const diag = Math.SQRT1_2;
+      for (const deg of angles) {
+        const theta = (deg * Math.PI) / 180;
+        const rPx = distance * Math.tan(theta) * scale;
+        if (rPx < 10) continue;
+        const ringEl = circle(svg, center, rPx, "detector-ref-ring");
+        ringEl.setAttribute("clip-path", "url(#sensor-clip)");
+        styleRefRing(ringEl);
+        const lx = cx + rPx * diag;
+        const ly = cy - rPx * diag;
+        if (lx < cx + rx - 18 && ly > cy - ry + 12) {
+          const dText = showD ? ` · ${(wavelength / (2 * Math.sin(theta / 2))).toFixed(1)}Å` : "";
+          const lbl = label(svg, lx + 2, ly - 2, `${deg}°${dText}`, "detector-ref-label");
+          styleRefLabel(lbl);
+        }
+      }
+    }
     line(svg, [cx - rx, cy], [cx + rx, cy], "equator");
     line(svg, [cx, cy - ry], [cx, cy + ry], "equator");
     label(svg, cx - rx + 4, cy + 13, "+y");
     label(svg, cx + 4, cy - ry + 12, "+z");
     if (chosen && ring) {
       const overlay = circle(svg, center, chosen.point.radius * scale, "powder-ring");
-      if (detector.width) {
-        const clip = element(element(svg, "defs", {}), "clipPath", { id: "sensor-clip" });
-        element(clip, "rect", rect);
-        overlay.setAttribute("clip-path", "url(#sensor-clip)");
-      }
+      overlay.setAttribute("clip-path", "url(#sensor-clip)");
     }
     circle(svg, center, 3, "origin");
+    hoverInfo = (vx, vy) => {
+      const yMm = (cx - vx) / scale;
+      const zMm = (cy - vy) / scale;
+      const rMm = Math.hypot(yMm, zMm);
+      if (detector.width ? Math.abs(yMm) > w / 2 || Math.abs(zMm) > h / 2 : rMm > detector.radius)
+        return null;
+      const coords = `y ${yMm.toFixed(1)}, z ${zMm.toFixed(1)} mm`;
+      if (!(distance > 0)) return coords;
+      const twoThetaRad = Math.atan2(rMm, distance);
+      const twoThetaDeg = (twoThetaRad * 180) / Math.PI;
+      const dPart =
+        wavelength && twoThetaRad > 1e-5
+          ? ` · d ${(wavelength / (2 * Math.sin(twoThetaRad / 2))).toFixed(2)} Å`
+          : "";
+      return `2θ ${twoThetaDeg.toFixed(1)}°${dPart} · ${coords}`;
+    };
   }
   // Paint the selected spot last so its outline stays visible in dense patterns.
   for (const spot of [...spots.filter((s) => s !== chosen), ...(chosen ? [chosen] : [])]) {
@@ -366,6 +601,38 @@ export function drawDetector(svg, detector, spots, chosen, ring, onChoose) {
         onChoose(spot);
         svg.querySelector('[aria-pressed="true"]')?.focus();
       }
+    };
+  }
+  if (showLegend) drawIntensityLegend(svg, width, height);
+  if (showHover && hoverInfo) {
+    const readout = element(svg, "g", { class: "detector-hover-readout", "aria-hidden": "true" });
+    readout.style.display = "none";
+    readout.style.pointerEvents = "none";
+    const bg = element(readout, "rect", { x: 6, y: 5, width: 100, height: 18, rx: 4 });
+    bg.style.fill = "var(--field)";
+    bg.style.fillOpacity = "0.88";
+    bg.style.stroke = "var(--line-strong)";
+    bg.style.strokeWidth = "0.8";
+    const readoutText = label(readout, 11, 17, "");
+    readoutText.style.fontSize = "10px";
+    readoutText.style.fill = "var(--text)";
+    svg.onpointermove = (event) => {
+      const box = svg.getBoundingClientRect();
+      if (!box.width || !box.height) return;
+      const vx = ((event.clientX - box.left) / box.width) * width;
+      const vy = ((event.clientY - box.top) / box.height) * height;
+      const text = hoverInfo(vx, vy);
+      if (!text) {
+        readout.style.display = "none";
+        return;
+      }
+      readout.style.display = "";
+      readoutText.textContent = text;
+      const measured = readoutText.getComputedTextLength?.() || text.length * 5.6;
+      bg.setAttribute("width", String(Math.min(width - 12, Math.ceil(measured + 10))));
+    };
+    svg.onpointerleave = () => {
+      readout.style.display = "none";
     };
   }
 }

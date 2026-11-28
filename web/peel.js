@@ -36,6 +36,9 @@
 
 export const PEEL_LAYER = 2;
 const OVERLAY_LAYER = 3;
+// Screen-space lines (LineSegments2) expand their quads in their own shader;
+// the depth override material cannot, so they get a separate depth pass.
+const FAT_LINE_LAYER = 4;
 const MIN_LAYERS = 4,
   MAX_LAYERS = 24,
   START_LAYERS = 8;
@@ -204,6 +207,12 @@ export function createDepthPeeler({ THREE, renderer, onStatus = () => {} }) {
   function poll() {
     pollFrame = 0;
     if (!pending) return;
+    if (gl.isContextLost?.()) {
+      pending = null;
+      queries.length = 0;
+      unmeasured = false;
+      return;
+    }
     const { layerQueries, restQuery, budget: used } = pending;
     const all = [...layerQueries, restQuery];
     if (!all.every((q) => gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE))) {
@@ -247,6 +256,7 @@ export function createDepthPeeler({ THREE, renderer, onStatus = () => {} }) {
 
   /** Render `scene` with per-pixel ordered translucency. */
   function render(scene, camera) {
+    if (gl.isContextLost?.()) return status;
     const peeled = [],
       overlays = [];
     scene.traverseVisible((o) => {
@@ -291,9 +301,15 @@ export function createDepthPeeler({ THREE, renderer, onStatus = () => {} }) {
     const hidden = [];
     try {
       // 2. Opaque depth: everything that writes depth in the normal pass.
+      const fatLines = [];
       scene.traverseVisible((o) => {
         const m = o.material;
-        if (m && !Array.isArray(m) && (!m.depthWrite || !m.depthTest || m.visible === false)) hidden.push(o);
+        if (!m || Array.isArray(m)) return;
+        if (!m.depthWrite || !m.depthTest || m.visible === false) hidden.push(o);
+        else if (m.isLineMaterial && o.layers.isEnabled(0)) {
+          hidden.push(o);
+          fatLines.push(o);
+        }
       });
       hidden.forEach((o) => (o.visible = false));
       scene.overrideMaterial = depthMaterial;
@@ -303,6 +319,19 @@ export function createDepthPeeler({ THREE, renderer, onStatus = () => {} }) {
       scene.overrideMaterial = savedOverride;
       hidden.forEach((o) => (o.visible = true));
       hidden.length = 0;
+      if (fatLines.length) {
+        const autoClear = renderer.autoClear;
+        fatLines.forEach((o) => o.layers.enable(FAT_LINE_LAYER));
+        camera.layers.set(FAT_LINE_LAYER);
+        renderer.autoClear = false;
+        try {
+          renderer.render(scene, camera);
+        } finally {
+          renderer.autoClear = autoClear;
+          camera.layers.mask = savedLayers;
+          fatLines.forEach((o) => o.layers.disable(FAT_LINE_LAYER));
+        }
+      }
       shared.uPeelOpaque.value = opaqueRT.depthTexture;
       shared.uPeelEncode.value = output === null && renderer.outputColorSpace === THREE.SRGBColorSpace ? 1 : 0;
 
@@ -381,6 +410,13 @@ export function createDepthPeeler({ THREE, renderer, onStatus = () => {} }) {
     /** Exports always peel MAX_LAYERS (queries are not readable in the same task). */
     setExportMode(on) {
       exportMode = on;
+    },
+    resetContext() {
+      cancelAnimationFrame(pollFrame);
+      pollFrame = 0;
+      queries.length = 0;
+      pending = null;
+      unmeasured = false;
     },
     diagnostics: () => ({ ...status, method: "depth-peeling", exportMode, pending: Boolean(pending), unmeasured }),
     dispose() {

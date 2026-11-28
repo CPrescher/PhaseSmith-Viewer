@@ -18,6 +18,9 @@ import {
   elementEquation,
   operationString,
 } from "./crystal-math.js";
+import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
+import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { PEEL_LAYER } from "./peel.js";
 import { enableTripletSelection, numericKeys } from "./numeric-input.js";
 
@@ -268,11 +271,22 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     }
     const lines = (data, dashedLine) => {
       if (!data.positions.length) return;
-      const line = new THREE.LineSegments(
-        geometryOf(data.positions, data.colors),
-        dashedLine
-          ? new THREE.LineDashedMaterial({ vertexColors: true, dashSize: 0.25, gapSize: 0.15 })
-          : new THREE.LineBasicMaterial({ vertexColors: true }),
+      const geom = new LineSegmentsGeometry();
+      geom.setPositions(data.positions);
+      if (data.colors?.length) geom.setColors(data.colors);
+      const line = new LineSegments2(
+        geom,
+        new LineMaterial({
+          vertexColors: true,
+          linewidth: 1.6,
+          dashed: Boolean(dashedLine),
+          dashSize: 0.25,
+          gapSize: 0.15,
+          resolution: new THREE.Vector2(
+            Math.max(1, window.innerWidth || 1),
+            Math.max(1, window.innerHeight || 1),
+          ),
+        }),
       );
       if (dashedLine) line.computeLineDistances();
       line.renderOrder = 4;
@@ -1269,7 +1283,9 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
           box.value === "rotation" || box.value === "screw" ? axisColors[2] : CATEGORY_COLORS[box.value],
         );
       const count = counts[box.value] || 0;
-      box.closest("label").querySelector("small").textContent = count;
+      const chip = box.closest("label");
+      chip.querySelector("small").textContent = count;
+      chip.classList.toggle("sym-zero", count === 0);
     }
     renderAxisTypes(result.elements);
     note.textContent = result.note || (symmetry.shown ? "" : "Elements from the CIF's operations, clipped to the plotting range.");
@@ -1331,26 +1347,32 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
     );
   }
 
-  $("plane-add").onclick = () => {
-    if (!getStructure()) return;
-    planes.push({
+  function addPlane(hkl = [1, 0, 0], { family = false } = {}) {
+    if (!getStructure()) return null;
+    const indices = Array.isArray(hkl) && hkl.length === 3 && hkl.every(Number.isInteger) && hkl.some((v) => v !== 0)
+      ? [...hkl]
+      : [1, 0, 0];
+    const plane = {
       id: ++nextId,
-      hkl: [1, 0, 0],
+      hkl: indices,
       // Through the middle of the current plotting range; follows later
       // index edits until m is set by hand (autoOffset).
-      m: initialPlaneOffset([1, 0, 0], getRanges()),
+      m: initialPlaneOffset(indices, getRanges()),
       autoOffset: true,
       size: 100, // percent of the plotting range used to clip the faces
       opacity: 0.28, // face opacity, fraction 0..1 (slider shows percent)
-      family: false,
+      family: Boolean(family),
       visible: true,
       color: PLANE_COLORS[planes.length % PLANE_COLORS.length],
       error: "",
-    });
+    };
+    planes.push(plane);
     renderPlaneList();
     rebuild();
     revealAddedRow($("plane-list"));
-  };
+    return plane;
+  }
+  $("plane-add").onclick = () => addPlane([1, 0, 0]);
   $("arrow-add").onclick = () => {
     if (!getStructure()) return;
     arrows.push({
@@ -1470,7 +1492,8 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       };
     },
     /** Apply validated session settings; invalid entries are skipped. */
-    restoreState(state, { trusted = false } = {}) {
+    restoreState(state, { trusted = false, external = false } = {}) {
+      const objectLimit = trusted ? (external ? 1000 : undefined) : 50;
       cancelLabelRecovery();
       if (!state || typeof state !== "object") return;
       const finite = (v) => typeof v === "number" && Number.isFinite(v);
@@ -1487,7 +1510,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       };
       planes = (Array.isArray(state.planes) ? state.planes : [])
         .filter((p) => p && triple(p.hkl) && p.hkl.every(Number.isInteger) && p.hkl.some((x) => x !== 0) && finite(p.m))
-        .slice(0, trusted ? undefined : 50)
+        .slice(0, objectLimit)
         .map((p, i) => ({
           id: freshId(p.id),
           hkl: [...p.hkl],
@@ -1502,7 +1525,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
         }));
       arrows = (Array.isArray(state.arrows) ? state.arrows : [])
         .filter((a) => a && triple(a.uvw) && a.uvw.some((x) => x !== 0) && triple(a.origin) && finite(a.length) && a.length !== 0)
-        .slice(0, trusted ? undefined : 50)
+        .slice(0, objectLimit)
         .map((a, i) => ({
           id: freshId(a.id),
           uvw: [...a.uvw],
@@ -1536,6 +1559,7 @@ export function createLatticeTools({ THREE, scene, invalidate, getStructure, get
       rebuild();
       collectLabelAnchors();
     },
+    addPlane,
     reset() {
       cancelLabelRecovery();
       planes = [];

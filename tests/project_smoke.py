@@ -69,7 +69,7 @@ async def check(browser, phone):
     await page.locator("#theme-toggle").click()
     await choose_tool(page, "#mode-export")
     await page.locator("#export-dpi").fill("450")
-    await page.locator("#export-transparent").check()
+    await page.locator("#export-background").select_option("transparent")
     await idle(page)
     filename, data = await download_project(page)
     assert filename == "local.psv"

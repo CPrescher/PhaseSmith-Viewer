@@ -72,8 +72,9 @@ async def check_mixed_pointer_keypads(page):
 
 
 async def check_tablet_detector_figures(page):
-    await choose_tool(page, "#mode-detector", touch=True)
-    panel = page.locator("#detector-window")
+    await choose_tool(page, "#mode-diffraction", touch=True)
+    await page.locator("#xrd-tab-detector").tap()
+    panel = page.locator("#xrd-workspace")
     # The inspector is resizable independently of the tablet viewport.
     await panel.evaluate("el => { el.style.width = '760px'; el.style.height = '460px'; }")
     plots = [panel.locator(selector) for selector in ["#detector-ewald", "#detector-image"]]
@@ -84,7 +85,7 @@ async def check_tablet_detector_figures(page):
     await panel.evaluate("el => { el.style.width = '560px'; }")
     await panel.locator('[data-detector-view="image"]').tap()
     assert await plots[1].is_visible() and not await plots[0].is_visible()
-    await panel.locator("#detector-close").tap()
+    await panel.locator("#xrd-close").tap()
 
 
 async def main(tablet_webkit=False):
@@ -143,9 +144,10 @@ async def main(tablet_webkit=False):
                 assert await page.locator("#analysis-chart .analysis-stick").count() > 0
                 assert await page.locator("#analysis-legend [data-pair]").count() > 0
                 assert await page.locator('#analysis-pair option[value="Na–Cl"]').count() == 1
-                await choose_tool(page, "#mode-powder")
-                await page.wait_for_function("document.querySelector('#analysis-table th')?.textContent === '2θ (°)'")
                 await page.locator("#analysis-close").click()
+                await choose_tool(page, "#mode-diffraction")
+                await page.wait_for_function("document.querySelector('#powder-table th')?.textContent === '2θ (°)'")
+                await page.locator("#xrd-close").click()
             if example == "forsterite":
                 assert state["coordination"]["polyhedronCount"] == 12
                 await choose_tool(page, "#mode-lattice")
