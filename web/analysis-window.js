@@ -68,7 +68,7 @@ const Y_SCALES = ["linear", "sqrt", "log"];
 const X_AXES = ["2theta", "d", "q"];
 
 const EXPORT_STYLE_KEYS = [
-  "fill", "stroke", "opacity", "stroke-width", "stroke-dasharray", "fill-opacity",
+  "fill", "stroke", "opacity", "stroke-width", "stroke-opacity", "stroke-dasharray", "fill-opacity",
   "font-family", "font-size", "font-weight", "text-anchor", "dominant-baseline", "paint-order",
 ];
 
@@ -79,7 +79,7 @@ function freezePlotSvg(chart) {
     targets = [...copy.querySelectorAll("*")];
   sources.forEach((el, i) => {
     const target = targets[i];
-    if (el.closest(".analysis-crosshair, .analysis-brush")) {
+    if (el.closest(".analysis-crosshair, .analysis-brush, .analysis-cutoff-marker")) {
       target.remove();
       return;
     }
@@ -290,6 +290,8 @@ export function createAnalysisWindow({
   getStructure,
   onHighlightDistance = () => {},
   onApplyCutoff = () => {},
+  getRuleCutoff = () => null,
+  onDragCutoff = () => {},
   onChange = () => {},
 }) {
   const $ = (id) => document.getElementById(id);
@@ -380,6 +382,7 @@ export function createAnalysisWindow({
     if (!pair) return;
     const cutoff = Math.ceil((row.max + 1e-4) * 100) / 100;
     onApplyCutoff({ pair, cutoff });
+    draw();
   });
 
   function stop() {
@@ -487,12 +490,26 @@ export function createAnalysisWindow({
     for (const row of table?.querySelectorAll("tbody tr") ?? [])
       row.classList.toggle("selected", Number(row.dataset.index) === index);
     sync3dActions();
+    const fp = $("analysis-pair")?.value;
+    if (!fp || fp === "all") draw();
   }
 
   function pairTag(pair, count) {
     const tag = document.createElement("span");
     tag.className = "analysis-pair-tag";
     tag.dataset.pair = pair;
+    tag.onpointerenter = () => {
+      for (const line of chart?.querySelectorAll(".analysis-stick") ?? []) {
+        const match = line.dataset.pair === pair;
+        line.classList.toggle("dimmed", !match);
+        line.classList.toggle("hovered", match);
+      }
+    };
+    tag.onpointerleave = () => {
+      for (const line of chart?.querySelectorAll(".analysis-stick") ?? []) {
+        line.classList.remove("dimmed", "hovered");
+      }
+    };
     tag.style.setProperty("--pair-color", colors.get(pair));
     const swatch = document.createElement("span");
     swatch.className = "analysis-pair-swatch";
@@ -608,6 +625,68 @@ export function createAnalysisWindow({
       }
     }
 
+    // Draggable bond-cutoff marker when a specific pair (filtered or selected) has a bond rule
+    const filterPair = $("analysis-pair")?.value;
+    const activePair =
+      filterPair && filterPair !== "all"
+        ? filterPair
+        : selected != null && result.rows[selected]
+          ? primaryPairFor(result.rows[selected])
+          : null;
+    const ruleCutoff = activePair ? getRuleCutoff(activePair) : null;
+    if (activePair && Number.isFinite(ruleCutoff) && ruleCutoff >= viewMin && ruleCutoff <= viewMax) {
+      const clampHandleX = (px) => Math.max(left + 26, Math.min(right - 26, px));
+      const cx = x(ruleCutoff);
+      const hx = clampHandleX(cx);
+      const cutGroup = svg("g", { class: "analysis-cutoff-marker", "data-pair": activePair });
+      const cutLine = add(cutGroup, "line", { x1: cx.toFixed(2), x2: cx.toFixed(2), y1: top, y2: bottom, class: "analysis-cutoff-line" });
+      const handle = add(cutGroup, "rect", { x: (hx - 26).toFixed(1), y: (top - 2).toFixed(1), width: 52, height: 16, rx: 4, class: "analysis-cutoff-handle" });
+      const label = add(cutGroup, "text", { x: hx.toFixed(1), y: (top + 9.5).toFixed(1), "text-anchor": "middle", class: "analysis-cutoff-text" }, `↔ ${ruleCutoff.toFixed(2)} Å`);
+      let dragging = false;
+      const startVal = ruleCutoff;
+      const paintAt = (val) => {
+        const px = Math.max(left, Math.min(right, x(val)));
+        const chx = clampHandleX(px);
+        cutLine.setAttribute("x1", px.toFixed(2));
+        cutLine.setAttribute("x2", px.toFixed(2));
+        handle.setAttribute("x", (chx - 26).toFixed(1));
+        label.setAttribute("x", chx.toFixed(1));
+        label.textContent = `↔ ${val.toFixed(2)} Å`;
+      };
+      const moveCutoff = (clientX, commit) => {
+        const rect = chart.getBoundingClientRect();
+        const px = Math.max(left, Math.min(right, ((clientX - rect.left) / Math.max(rect.width, 1)) * width));
+        const nextVal = Math.max(0.1, xInv(px));
+        paintAt(nextVal);
+        onDragCutoff(activePair, nextVal, commit);
+      };
+      cutGroup.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dragging = true;
+        cutGroup.setPointerCapture?.(e.pointerId);
+      });
+      cutGroup.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        e.stopPropagation();
+        moveCutoff(e.clientX, false);
+      });
+      cutGroup.addEventListener("pointerup", (e) => {
+        if (!dragging) return;
+        e.stopPropagation();
+        dragging = false;
+        moveCutoff(e.clientX, true);
+      });
+      cutGroup.addEventListener("pointercancel", (e) => {
+        if (!dragging) return;
+        e.stopPropagation();
+        dragging = false;
+        paintAt(startVal);
+        onDragCutoff(activePair, startVal, false);
+      });
+    }
+
     const brush = svg("rect", { x: left, y: top, width: 0, height: plotH, class: "analysis-brush", display: "none" });
     const crosshair = svg("g", { class: "analysis-crosshair", display: "none" });
     const crossLine = add(crosshair, "line", { x1: left, x2: left, y1: top, y2: bottom, class: "analysis-crosshair-line" });
@@ -705,6 +784,12 @@ export function createAnalysisWindow({
         } else cell.textContent = value;
       });
       row.onclick = () => select(index);
+      row.onpointerenter = () => {
+        for (const el of chart?.querySelectorAll(`[data-index="${index}"]`) ?? []) el.classList.add("hovered");
+      };
+      row.onpointerleave = () => {
+        for (const el of chart?.querySelectorAll(".hovered") ?? []) el.classList.remove("hovered");
+      };
       row.onkeydown = (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
@@ -1259,20 +1344,43 @@ export function createPowderPanel({
 
     if (hklLabels ? hklLabels.checked : true) {
       const boxes = [];
-      for (const { row, value } of [...visible]
-        .filter((item) => item.row.intensity >= 3)
+      const overlaps = (a, b) => a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2;
+      for (const { row, index, value } of [...visible]
+        .filter((item) => item.row.intensity >= 2)
         .sort((a, b) => b.row.intensity - a.row.intensity)
-        .slice(0, 24)) {
-        if (boxes.length >= 12) break;
+        .slice(0, 32)) {
+        if (boxes.length >= 16) break;
         const label = `(${hklText(row)})`,
-          lx = x(value),
-          ly = Math.max(top + 10, y(row.intensity) - 6),
-          half = (label.length * 5.8 + 6) / 2;
-        const box = { x1: lx - half, x2: lx + half, y1: ly - 10, y2: ly + 2 };
-        if (box.x1 < left + 2 || box.x2 > right - 2 || boxes.some((b) => box.x1 < b.x2 && b.x1 < box.x2 && box.y1 < b.y2 && b.y1 < box.y2))
-          continue;
-        boxes.push(box);
-        svg("text", { x: lx.toFixed(1), y: ly.toFixed(1), "text-anchor": "middle", class: "analysis-hkl-label" }, label);
+          stickX = x(value),
+          stickTop = y(row.intensity),
+          half = (label.length * 5.6 + 6) / 2;
+        let placed = null;
+        const offsets = [
+          [0, 0], [0, -13], [-16, -6], [16, -6],
+          [0, -26], [-24, -18], [24, -18], [0, -39],
+        ];
+        for (const [dx, dy] of offsets) {
+          const lx = stickX + dx;
+          const ly = stickTop - 6 + dy;
+          const box = { x1: lx - half, x2: lx + half, y1: ly - 10, y2: ly + 2 };
+          if (box.x1 < left + 2 || box.x2 > right - 2 || box.y1 < top - 2) continue;
+          if (boxes.some((b) => overlaps(box, b))) continue;
+          placed = { lx, ly, box };
+          break;
+        }
+        if (!placed) continue;
+        boxes.push(placed.box);
+        if (Math.abs(placed.lx - stickX) > 2 || stickTop - placed.ly > 10) {
+          svg("line", {
+            x1: stickX.toFixed(1),
+            y1: Math.max(top, stickTop - 2).toFixed(1),
+            x2: placed.lx.toFixed(1),
+            y2: (placed.ly + 2).toFixed(1),
+            class: "analysis-hkl-leader",
+            "data-index": index,
+          });
+        }
+        svg("text", { x: placed.lx.toFixed(1), y: placed.ly.toFixed(1), "text-anchor": "middle", class: "analysis-hkl-label", "data-index": index }, label);
       }
     }
 
@@ -1388,6 +1496,12 @@ export function createPowderPanel({
         row.insertCell().textContent = value;
       });
       row.onclick = () => select(index);
+      row.onpointerenter = () => {
+        for (const el of chart?.querySelectorAll(`[data-index="${index}"]`) ?? []) el.classList.add("hovered");
+      };
+      row.onpointerleave = () => {
+        for (const el of chart?.querySelectorAll(".hovered") ?? []) el.classList.remove("hovered");
+      };
       row.onkeydown = (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();

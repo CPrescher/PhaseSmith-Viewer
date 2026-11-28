@@ -3,10 +3,10 @@
 export function installPanelScrollbars() {
   const selector = [
     ".tool-window-body", ".analysis-body", ".detector-body", ".table-scroll", ".sym-ops",
-    "#reflection-content", ".reflection-phasor-scroll", "#reflection-sum-panel", "#reflection-rays-panel",
+    "#reflection-explorer", "#reflection-content", ".reflection-phasor-scroll", "#reflection-sum-panel", "#reflection-rays-panel",
     ".reflection-atom-table", ".reflection-toolbar", ".detector-controls", ".detector-visuals", "#detector-matrix",
   ].join(",");
-  for (const panel of document.querySelectorAll(".tool-window, dialog, .file-menu")) {
+  for (const panel of document.querySelectorAll(".tool-window, .xrd-workspace, dialog, .file-menu")) {
     const layer = document.createElement("div");
     layer.className = "panel-scrollbars";
     layer.setAttribute("aria-hidden", "true");

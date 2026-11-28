@@ -3766,6 +3766,8 @@ body:fullscreen, body:-webkit-full-screen { width: 100%; height: 100%; backgroun
 }
 @media (pointer: fine) {
   #app[data-launcher="rail"] .rail-dense .rail-button { min-height: 40px; }
+}
+@media (pointer: fine) and (min-width: 541px) {
   @container (max-width: 420px) {
     /* Keyboard submission needs no empty column for the touch-only Go button. */
     #detector-window #detector-form { grid-template-columns: minmax(0, 1fr); }
@@ -3775,7 +3777,7 @@ body:fullscreen, body:-webkit-full-screen { width: 100%; height: 100%; backgroun
   #detector-head { gap: 4px; padding-inline: 8px; }
   #detector-title { flex: 1; min-width: 0; white-space: normal; font-size: 14px; }
   #detector-head button { flex: none; }
-  #detector-form { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 4px; }
+  #detector-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; }
   #detector-form > label { grid-column: 1 / -1; }
   #detector-form #detector-hkl { width: 100%; }
 }
@@ -4943,6 +4945,95 @@ details.tool-options[open] > summary::before {
     min-height: 44px;
   }
 }
+details.reflection-options.tool-options {
+  border-top: 0;
+  margin: 0;
+}
+details.reflection-options.tool-options .reflection-option-fields {
+  padding: 4px 0 0;
+}
+@media (min-width: 901px) and (min-height: 501px) {
+  details.reflection-options.tool-options {
+    display: contents;
+  }
+  details.reflection-options.tool-options > summary {
+    display: none;
+  }
+  details.reflection-options.tool-options .reflection-option-fields {
+    display: contents;
+  }
+}
+.reflection-atom-table tbody tr {
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .reflection-atom-table tbody tr:hover:not(.selected) td {
+    background: var(--accent-soft);
+  }
+}
+.reflection-ray-verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 8px 0 4px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.reflection-ray-verdict[data-tone="constructive"] {
+  border-color: color-mix(in srgb, #55d6ba 45%, var(--line));
+}
+.reflection-ray-verdict[data-tone="destructive"] {
+  border-color: color-mix(in srgb, #ff8c77 45%, var(--line));
+}
+.ray-role-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 550;
+  color: var(--text);
+}
+.ray-role-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.ray-role-arrow {
+  color: var(--muted);
+}
+.ray-verdict-text {
+  margin-left: auto;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--numeric-features);
+  color: var(--text);
+}
+#reflection-explorer .reflection-ref-btn {
+  min-height: 22px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 99px;
+  border: 1px solid var(--control-border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+#reflection-explorer .reflection-ref-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+#reflection-explorer .reflection-ref-btn.is-active {
+  background: color-mix(in srgb, #55d6ba 22%, transparent);
+  border-color: color-mix(in srgb, #55d6ba 55%, transparent);
+  color: var(--text);
+}
 
 /* ---- 4. Custom <select> and calm WCAG-safe input wells inside panes -------- */
 :is(.tool-window, .analysis-window, .xrd-workspace, #detector-options, #structure-library)
@@ -5599,5 +5690,458 @@ h3.table-title:has(+ #shell-controls[hidden]) {
   }
   .xrd-head .radiation-bar {
     flex-wrap: nowrap;
+  }
+}
+
+/* ---- v1.2 upgrades: Ortho/Persp, Hover Linking, Cutoff Marker, COD Fetch --- */
+#projection-toggle {
+  min-width: 50px;
+}
+#projection-toggle[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+@media (max-width: 640px) {
+  #projection-toggle {
+    min-width: 44px;
+    padding: 0 6px;
+    font-size: 11.5px;
+  }
+}
+.library-cod-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.library-cod-actions a.secondary {
+  text-decoration: none;
+  padding: 0 9px;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  background: var(--ctl-bg);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+}
+.analysis-stick.dimmed {
+  opacity: 0.16;
+}
+.analysis-stick.hovered {
+  stroke-width: 3;
+  filter: drop-shadow(0 0 2px var(--accent));
+}
+.analysis-hkl-leader {
+  stroke: var(--muted);
+  stroke-width: 0.85;
+  stroke-opacity: 0.55;
+  pointer-events: none;
+}
+.analysis-hkl-label.hovered {
+  fill: var(--accent);
+  font-weight: 700;
+}
+.analysis-cutoff-marker {
+  cursor: ew-resize;
+}
+.analysis-cutoff-line {
+  stroke: var(--accent);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 3;
+}
+.analysis-cutoff-handle {
+  fill: var(--accent);
+}
+.analysis-cutoff-text {
+  fill: var(--accent-ink);
+  font-size: 9.5px;
+  font-weight: 600;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+.library-cod-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  font-size: 12.5px;
+  color: var(--text);
+}
+.library-cod-bar[hidden] {
+  display: none;
+}
+.export-journal-presets {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.export-journal-presets .journal-preset {
+  min-height: 26px;
+  padding: 0 8px;
+  font-size: 11.5px;
+}
+
+/* ==========================================================================
+   XRD Workspace — Reflection & Detector Design/UX Polish (All Devices)
+   ========================================================================== */
+
+/* 1. Shared scrollbar right-gutter clearance inside XRD panels */
+#xrd-panel-reflection #reflection-content {
+  padding-inline-end: 12px;
+}
+#xrd-panel-detector .detector-body {
+  gap: 8px;
+  padding-inline-end: 14px;
+}
+
+/* 2. Reflection: segmented controls with unmistakable active states */
+#xrd-workspace #reflection-explorer :is(.reflection-tabs, .reflection-mobile-tabs) {
+  gap: 2px;
+  padding: 2px;
+  background: var(--well-track);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+}
+#xrd-workspace #reflection-explorer .reflection-tabs {
+  display: inline-flex;
+  width: fit-content;
+}
+#xrd-workspace #reflection-explorer :is(.reflection-tabs, .reflection-mobile-tabs) button:not([hidden]):not(.window-button) {
+  min-height: 28px;
+  padding: 3px 11px;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-weight: 600;
+  border-radius: 6px;
+}
+#xrd-workspace #reflection-explorer :is(.reflection-tabs, .reflection-mobile-tabs) button[aria-pressed="true"]:not([hidden]):not(.window-button) {
+  background: var(--seg-active);
+  border-color: transparent;
+  box-shadow: var(--seg-shadow);
+  color: var(--text);
+}
+#xrd-workspace #reflection-explorer .reflection-view-controls button[aria-pressed="true"]:not([hidden]):not(.window-button) {
+  background: var(--seg-active);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow: var(--seg-shadow);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* 3. Reflection Desktop: tighten top chrome & Ray paths controls so table + waves fit above fold */
+#xrd-panel-reflection #reflection-explorer {
+  padding: 8px 14px 10px;
+}
+#xrd-panel-reflection #reflection-structure {
+  margin: 0 0 4px;
+  font-size: 12px;
+}
+#xrd-panel-reflection .reflection-toolbar {
+  margin: 4px 0 8px;
+  gap: 8px;
+}
+#xrd-panel-reflection .reflection-equation {
+  margin: 0 0 10px;
+  font-size: 15px;
+  gap: 8px;
+}
+#xrd-panel-reflection .reflection-step-buttons {
+  margin: 6px 0;
+}
+#xrd-panel-reflection #reflection-total {
+  margin: 6px 0 4px;
+  font-size: 13.5px;
+}
+#xrd-panel-reflection #reflection-sum-note {
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+#xrd-panel-reflection .reflection-intensity {
+  padding-top: 8px;
+  margin-top: 8px;
+}
+#xrd-panel-reflection .reflection-intensity output {
+  font-size: 18px;
+}
+#xrd-panel-reflection #reflection-rays-panel {
+  padding-top: 8px;
+}
+#xrd-panel-reflection .reflection-ray-controls {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+}
+#xrd-panel-reflection .reflection-ray-controls .reflection-atom-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  white-space: nowrap;
+}
+#xrd-panel-reflection .reflection-ray-controls #reflection-reference {
+  flex: 1 1 110px;
+  min-width: 0;
+  width: auto;
+  max-width: none;
+}
+#xrd-panel-reflection #reflection-animate {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+#xrd-panel-reflection .reflection-ray-verdict {
+  margin: 6px 0 4px;
+  padding: 5px 8px;
+  gap: 4px 8px;
+  font-size: 11.5px;
+}
+#xrd-panel-reflection #reflection-ray-status {
+  margin: 2px 0 4px;
+  font-size: 11.5px;
+}
+#xrd-panel-reflection #reflection-rays {
+  height: 145px;
+}
+#xrd-panel-reflection #reflection-ray-equation {
+  margin: 4px 0;
+  font-size: 11.5px;
+}
+#xrd-panel-reflection #reflection-waves {
+  height: 100px;
+}
+
+/* 4. Detector Desktop: fix top-bar order, vertical gaps, status rhythm & card headers */
+#xrd-panel-detector .detector-top-bar {
+  order: 1;
+  align-items: center;
+}
+#xrd-panel-detector .detector-top-bar #detector-form {
+  order: 0;
+  align-items: center;
+}
+#xrd-panel-detector .detector-views,
+#xrd-panel-detector .detector-angles {
+  margin: 2px 0;
+}
+#xrd-panel-detector .detector-views figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 10px 4px;
+}
+#xrd-panel-detector .detector-views .ewald-hint {
+  padding: 0 10px 8px;
+}
+#xrd-panel-detector .reciprocal-size {
+  padding: 4px 10px 2px;
+}
+#xrd-panel-detector #detector-status,
+#xrd-panel-detector #detector-detail {
+  margin: 0;
+  min-height: 1.4lh;
+  line-height: 1.45;
+}
+#xrd-panel-detector #detector-status {
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--hairline);
+  color: var(--muted);
+  font-size: 12.5px;
+}
+#xrd-panel-detector #detector-detail {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--numeric-features);
+}
+#xrd-panel-detector #detector-scope:empty {
+  display: none;
+}
+
+/* Segmented view switcher for Detector on mobile/tablet */
+#xrd-workspace #detector-window .detector-view-tabs {
+  gap: 2px;
+  padding: 2px;
+  background: var(--well-track);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+}
+#xrd-workspace #detector-window .detector-view-tabs button:not([hidden]):not(.window-button) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-weight: 600;
+  border-radius: 6px;
+}
+#xrd-workspace #detector-window .detector-view-tabs button[aria-pressed="true"]:not([hidden]):not(.window-button) {
+  background: var(--seg-active);
+  border-color: transparent;
+  box-shadow: var(--seg-shadow);
+  color: var(--text);
+}
+
+/* 5. Phone Portrait (<= 640px) polish for Reflection & Detector */
+@media (max-width: 640px) {
+  #xrd-panel-reflection #reflection-explorer {
+    padding: 6px 10px 6px;
+  }
+  #xrd-panel-reflection #reflection-content {
+    padding-inline-end: 10px;
+  }
+  #xrd-panel-reflection .reflection-toolbar {
+    gap: 4px 6px;
+    margin: 2px 0 4px;
+  }
+  #xrd-panel-reflection #reflection-hkl {
+    width: 72px;
+  }
+  #xrd-panel-reflection details.reflection-options.tool-options > summary {
+    min-height: 36px;
+    padding: 4px 10px;
+    width: auto;
+  }
+  .xrd-workspace #reflection-explorer .reflection-mobile-tabs {
+    display: flex;
+    width: 100%;
+    margin: 2px 0 4px;
+  }
+  .xrd-workspace #reflection-explorer .reflection-mobile-tabs button:not([hidden]) {
+    flex: 1;
+    min-height: 34px;
+  }
+  #xrd-panel-reflection .reflection-step-buttons {
+    margin: 4px 0;
+  }
+  #xrd-panel-reflection .reflection-intensity {
+    padding-top: 4px;
+    margin-top: 4px;
+  }
+  #xrd-panel-reflection .reflection-equation {
+    margin: 4px 0;
+    font-size: 14px;
+  }
+  #xrd-panel-reflection #reflection-plane-note {
+    min-height: 0;
+    margin: 6px 0;
+  }
+}
+
+@media (max-width: 540px) {
+  #xrd-panel-detector .detector-top-bar {
+    align-items: end;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+  #xrd-panel-detector .detector-top-bar #detector-form {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  #xrd-panel-detector .detector-top-buttons {
+    margin-left: 0;
+    flex: none;
+  }
+  #xrd-panel-detector .detector-angles {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+}
+
+/* 6. Phone Landscape (max-height: 500px) — hide Tools FAB, fix XRD header & 2-col Reflection/Detector */
+@media (max-height: 500px) {
+  #app:has(#xrd-workspace:not([hidden])) .tools-menu {
+    display: none;
+  }
+}
+@media (max-height: 500px) and (min-width: 600px) {
+  .xrd-head {
+    padding-right: calc(var(--touch) + 12px);
+  }
+  .xrd-head .xrd-close {
+    background: var(--panel);
+  }
+  .xrd-head .radiation-energy,
+  .xrd-head .active-hkl-meta {
+    display: none;
+  }
+  .xrd-head .active-hkl,
+  .xrd-head .active-hkl-label {
+    flex: none;
+    white-space: nowrap;
+  }
+  /* Embedded Reflection 2-column landscape grid */
+  #xrd-panel-reflection #reflection-explorer {
+    display: grid;
+    grid-template-columns: 196px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    gap: 4px 10px;
+    padding: 6px 10px;
+    overflow: hidden;
+  }
+  #xrd-panel-reflection #reflection-structure {
+    display: none;
+  }
+  #xrd-panel-reflection .reflection-toolbar {
+    grid-column: 1;
+    grid-row: 1;
+    margin: 0;
+    align-content: start;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  #xrd-panel-reflection #reflection-hkl {
+    width: 68px;
+  }
+  #xrd-panel-reflection .reflection-mobile-tabs {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: row;
+    margin: 0;
+  }
+  #xrd-panel-reflection #reflection-content {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    padding-inline-end: 10px;
+  }
+  #xrd-panel-reflection .reflection-intensity {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin: 0;
+    padding-top: 4px;
+  }
+  #xrd-panel-reflection #reflection-stage {
+    height: clamp(150px, 52dvh, 210px);
+    max-height: none;
+  }
+  /* Detector landscape slider & card height */
+  #xrd-panel-detector #detector-window:not(.showing-crystal) .detector-top-bar {
+    align-items: end;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  #xrd-panel-detector #detector-window:not(.showing-crystal) .detector-angles input[type="range"] {
+    min-height: 32px;
+    height: 32px;
+  }
+  #xrd-panel-detector #detector-window:not(.showing-crystal) #detector-crossings {
+    margin-top: -6px;
+  }
+  #xrd-panel-detector #detector-window:not(.showing-crystal) .detector-views figure {
+    height: clamp(130px, calc(100dvh - 215px), 165px);
   }
 }

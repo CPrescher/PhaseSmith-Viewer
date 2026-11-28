@@ -134,8 +134,15 @@
           <button id="library-close" class="view-button" aria-label="Close structure library">✕</button>
         </div>
         <div class="library-filters">
-          <label for="library-search">Search<input id="library-search" type="search" placeholder="Quartz, feldspar, NaCl, spinel…" autocomplete="off" /></label>
+          <label for="library-search">Search<input id="library-search" type="search" placeholder="Quartz, feldspar, NaCl, or 7-digit COD ID…" autocomplete="off" /></label>
           <label for="library-collection">Collection<select id="library-collection"><option value="">All structures</option><option value="types">Structure types</option><option value="minerals">Rock-forming &amp; common minerals</option></select></label>
+        </div>
+        <div id="library-cod-bar" class="library-cod-bar" hidden>
+          <span id="library-cod-label"></span>
+          <div class="library-cod-actions">
+            <a id="library-cod-link" class="secondary" target="_blank" rel="noopener noreferrer">Download CIF ↗</a>
+            <button type="button" id="library-cod-fetch" class="primary">Open COD</button>
+          </div>
         </div>
         <p class="library-note">Formulas identify the mineral or type; each CIF retains its reported composition, substitutions, and occupancies. Idealized teaching models are labeled separately. References and CIF downloads are under each entry.</p>
         <p id="library-count" role="status" aria-live="polite"></p>
@@ -191,6 +198,15 @@
                 aria-label="Reset view"
               >
                 ↺
+              </button>
+              <button
+                id="projection-toggle"
+                class="view-button"
+                type="button"
+                aria-pressed="false"
+                title="Toggle perspective projection (P)"
+              >
+                Persp
               </button>
               <div id="history-controls" class="history-controls" role="group" aria-label="Undo and redo">
                 <button id="history-undo" class="secondary" type="button" disabled title="Undo" aria-label="Undo">
@@ -879,6 +895,12 @@
                     ><button type="button" class="chip small dpi-preset" data-dpi="150">150</button
                     ><button type="button" class="chip small dpi-preset" data-dpi="300">300</button
                     ><button type="button" class="chip small dpi-preset" data-dpi="600">600</button>
+                  </div>
+                  <div class="export-row export-journal-presets" role="group" aria-label="Quick resolution presets">
+                    <span class="tool-caption">Preset</span>
+                    <button type="button" class="secondary journal-preset" data-scale="2" data-dpi="300" title="2× scale at 300 dpi">2× · 300</button>
+                    <button type="button" class="secondary journal-preset" data-scale="4" data-dpi="300" title="4× scale at 300 dpi">4× · 300</button>
+                    <button type="button" class="secondary journal-preset" data-scale="4" data-dpi="600" title="4× scale at 600 dpi">4× · 600</button>
                   </div>
                   <p id="export-dims" class="note"></p>
                   </details>

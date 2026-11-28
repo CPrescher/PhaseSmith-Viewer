@@ -112,8 +112,9 @@ export function createReflectionExplorer({
             <p class="hint" id="reflection-sum-note"></p>
           </div>
           <div id="reflection-rays-panel" hidden>
-            <div class="reflection-ray-controls"><label class="reflection-atom-label">Reference atom<select id="reflection-reference"></select></label>
+            <div class="reflection-ray-controls"><label class="reflection-atom-label" title="Zero-path baseline plane (0λ). Click any atom in the crystal or table to compare its scattered wave against this plane.">Ref (0λ)<select id="reflection-reference"></select></label>
             <button type="button" id="reflection-animate" aria-pressed="false">Animate waves</button></div>
+            <div id="reflection-ray-verdict" class="reflection-ray-verdict" aria-live="polite"></div>
             <p id="reflection-ray-status" class="hint"></p>
             <svg id="reflection-rays" role="img"></svg>
             <p id="reflection-ray-equation"></p>
@@ -193,6 +194,21 @@ export function createReflectionExplorer({
   const layerColors = ["#55d6ba", "#ff8c77", "#83b9ff"];
   const layerColor = layer => layerColors[layer.id.charCodeAt(0) - 65];
   const layerName = layer => `${layer.id} · ${layer.elements.join("/")}`;
+  const layerRole = layer => {
+    const hasRef = layer.names.includes("Reference");
+    const hasSel = layer.names.includes("Selected");
+    const hasNext = layer.names.includes("Reference + t");
+    if (hasRef && hasSel) return "ref · sel";
+    if (hasSel && hasNext) return "sel · +d";
+    if (hasRef) return "ref";
+    if (hasSel) return "sel";
+    if (hasNext) return "+d";
+    return "";
+  };
+  const layerLabel = layer => {
+    const role = layerRole(layer);
+    return role ? `${layerName(layer)} (${role})` : layerName(layer);
+  };
   const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
   let pointerStart = null;
   let animateWaves = false, waveTime = 0, lastWaveFrame = 0;
@@ -479,13 +495,20 @@ export function createReflectionExplorer({
   }
 
   function arrow(parent, start, end, color, width = 2) {
-    const shaft = line(parent, ...start, ...end, color, width);
     const dx = end[0] - start[0], dy = end[1] - start[1], length = Math.hypot(dx, dy);
     if (length > 4) {
-      const c = dx / length, s = dy / length, head = Math.min(7, length * 0.4);
-      svg(parent, "polygon", { points: `${end} ${end[0] - head * c - head * s / 2},${end[1] - head * s + head * c / 2} ${end[0] - head * c + head * s / 2},${end[1] - head * s - head * c / 2}`, fill: color });
+      const c = dx / length, s = dy / length;
+      const head = Math.min(4.2 + width * 1.6, length * 0.45);
+      const wing = head * 0.52;
+      const trim = Math.min(head * 0.65, length * 0.3);
+      const shaft = line(parent, start[0], start[1], end[0] - trim * c, end[1] - trim * s, color, width);
+      svg(parent, "polygon", {
+        points: `${end[0]},${end[1]} ${end[0] - head * c - wing * s},${end[1] - head * s + wing * c} ${end[0] - head * c + wing * s},${end[1] - head * s - wing * c}`,
+        fill: color,
+      });
+      return shaft;
     }
-    return shaft;
+    return line(parent, ...start, ...end, color, width);
   }
 
   function drawSum() {
@@ -623,25 +646,70 @@ export function createReflectionExplorer({
     rays.replaceChildren();
     waves.replaceChildren();
     const delta = selectedDepth() - result.atoms[reference].m;
-    $("reflection-ray-equation").textContent = `Selected atom minus reference: Δm = ${format(delta)} · Δz⊥ = d × Δm = ${format(result.d * delta)} Å. At Bragg: ΔL = 2Δz⊥ sin θ = λΔm → Δφ = 2πΔm.`;
+    const { layers, translation, shift } = crystalRayLayers(result, reference, selected, selectedDepth());
+    const refLayer = layers.find(l => l.names.includes("Reference")) ?? layers[0];
+    const selLayer = layers.find(l => l.names.includes("Selected")) ?? refLayer;
+    const refAtom = result.atoms[reference], selAtom = result.atoms[selected];
+    const fracCycle = ((delta % 1) + 1) % 1;
+    const phaseDeg = Math.round(fracCycle * 360) % 360;
+    let verdictText, verdictTone;
+    if (Math.abs(delta) < 1e-6) {
+      verdictText = "Same plane as reference · 0° (in phase)";
+      verdictTone = "neutral";
+    } else if (fracCycle < 0.03 || fracCycle > 0.97) {
+      verdictText = `ΔL = ${format(Math.abs(delta))}λ · Constructive (in phase)`;
+      verdictTone = "constructive";
+    } else if (Math.abs(fracCycle - 0.5) < 0.03) {
+      verdictText = `ΔL = ${format(Math.abs(delta))}λ · Destructive (180° out of phase)`;
+      verdictTone = "destructive";
+    } else {
+      verdictText = `ΔL = ${format(Math.abs(delta))}λ · Partial (${phaseDeg}° shift)`;
+      verdictTone = "partial";
+    }
+    const verdictEl = $("reflection-ray-verdict");
+    if (verdictEl) {
+      verdictEl.dataset.tone = verdictTone;
+      verdictEl.replaceChildren();
+      const makeChip = (color, role, name) => {
+        const span = document.createElement("span");
+        span.className = "ray-role-chip";
+        const dot = document.createElement("i");
+        dot.className = "ray-role-dot";
+        dot.style.background = color;
+        span.append(dot, document.createTextNode(`${role}: ${name}`));
+        return span;
+      };
+      const arrowSpan = document.createElement("span");
+      arrowSpan.className = "ray-role-arrow";
+      arrowSpan.textContent = "→";
+      const resultSpan = document.createElement("strong");
+      resultSpan.className = "ray-verdict-text";
+      resultSpan.textContent = verdictText;
+      verdictEl.append(
+        makeChip(layerColor(refLayer), "Ref", atomName(refAtom)),
+        arrowSpan,
+        makeChip(layerColor(selLayer), "Sel", atomName(selAtom)),
+        resultSpan,
+      );
+    }
+    $("reflection-ray-equation").textContent = `Selected minus reference: Δm = ${format(delta)} · Δz⊥ = d × Δm = ${format(result.d * delta)} Å. At Bragg: ΔL = 2Δz⊥ sin θ = λΔm → Δφ = 2πΔm.`;
     const accessible = result.theta !== null;
     rays.hidden = waves.hidden = !accessible;
     $("reflection-translation").hidden = !accessible;
     $("reflection-ray-status").textContent = accessible
-      ? `θ = ${format(result.theta * 180 / Math.PI)}° · projected layer section along the plane normal`
+      ? `θ = ${format(result.theta * 180 / Math.PI)}° · click any atom in the crystal or table to compare against Reference (${atomName(refAtom)})`
       : `This reflection is beyond the Bragg limit at λ = ${format(result.wavelength)} Å. Reduce the wavelength to show ray paths. The structure factor is still defined.`;
     if (!accessible) return;
     const width = rays.clientWidth;
     if (!width) return;
-    const { layers, translation, shift } = crystalRayLayers(result, reference, selected, selectedDepth());
     const span = layers.at(-1).cycles;
-    const centerX = width / 2 + 38, top = 52, depthScale = Math.max(40, rays.clientHeight - top - 12) / span;
+    const centerX = width / 2 + 44, top = 38, depthScale = Math.max(36, rays.clientHeight - top - 10) / span;
     const theta = result.theta, sin = Math.sin(theta), cos = Math.cos(theta);
-    const reach = Math.min((width - 170) / 2, 44 / Math.max(Math.tan(theta), 1e-8));
+    const reach = Math.min((width - 180) / 2, 34 / Math.max(Math.tan(theta), 1e-8));
     for (const layer of layers) {
       const depth = layer.cycles * depthScale, y = top + depth;
       const color = layerColor(layer);
-      text(rays, 0, y - 6, layerName(layer), "start");
+      text(rays, 0, y - 6, layerLabel(layer), "start");
       line(rays, 0, y, width - 6, y, color, 1);
       for (const sign of [-1, 1]) {
         line(rays, centerX + sign * reach, y - reach * Math.tan(theta), centerX, y, "var(--muted)", 1.5);
@@ -653,16 +721,16 @@ export function createReflectionExplorer({
       }
       svg(rays, "circle", { cx: centerX, cy: y, r: 4, fill: color });
     }
-    text(rays, centerX - 12, 14, "Incoming ↘", "end");
-    text(rays, width - 5, 14, "↗ Outgoing", "end");
-    const left = 113, right = width - 66, period = (right - left) / 1.5, instant = left + period / 2;
+    text(rays, centerX - 12, 13, "Incoming ↘", "end");
+    text(rays, width - 5, 13, "↗ Outgoing", "end");
+    const left = 136, right = width - 62, period = (right - left) / 1.5, instant = left + period / 2;
     const clip = svg(waves, "clipPath", { id: "reflection-wave-clip" });
-    svg(clip, "rect", { x: left, y: 0, width: Math.max(0, right - left), height: 116 });
-    line(waves, instant, 18, instant, 110, "var(--muted)", 1, "3 3");
-    text(waves, Math.min(width - 50, Math.max(55, instant)), 12, "Same instant");
+    svg(clip, "rect", { x: left, y: 0, width: Math.max(0, right - left), height: 100 });
+    line(waves, instant, 15, instant, 96, "var(--muted)", 1, "3 3");
+    text(waves, Math.min(width - 50, Math.max(55, instant)), 11, "Same instant");
     for (const [index, layer] of layers.entries()) {
-      const baseline = 32 + index * 32;
-      text(waves, 0, baseline + 4, layerName(layer), "start");
+      const baseline = 26 + index * 28;
+      text(waves, 0, baseline + 4, layerLabel(layer), "start");
       line(waves, left, baseline, right, baseline, "var(--line)");
       if (period > 0) {
         // Slide a precomputed curve under a clip. Only the horizontal shift
@@ -671,7 +739,7 @@ export function createReflectionExplorer({
         const points = [];
         for (let i = -64; i <= 96; i++) {
           const x = i / 64;
-          points.push(`${left + x * period},${baseline - 10 * Math.cos(2 * Math.PI * (x - 0.5 - layer.cycles))}`);
+          points.push(`${left + x * period},${baseline - 9 * Math.cos(2 * Math.PI * (x - 0.5 - layer.cycles))}`);
         }
         const curve = svg(clipped, "polyline", { points: points.join(" "), fill: "none", stroke: layerColor(layer), "stroke-width": 2.3 });
         const marker = svg(waves, "circle", { cx: instant, r: 3.5, fill: layerColor(layer) });
@@ -689,7 +757,7 @@ export function createReflectionExplorer({
   function updateWavePositions() {
     for (const { curve, marker, period, baseline, cycles } of waveRows) {
       curve.setAttribute("transform", `translate(${(waveTime % 1) * period} 0)`);
-      marker.setAttribute("cy", baseline - 10 * Math.cos(2 * Math.PI * (cycles + waveTime)));
+      marker.setAttribute("cy", baseline - 9 * Math.cos(2 * Math.PI * (cycles + waveTime)));
     }
   }
 
@@ -737,11 +805,34 @@ export function createReflectionExplorer({
       new Option(`${groupName(group)} · ${degrees(group.cycles)}`, String(group.index))));
   }
 
+  function syncReferenceRows() {
+    if (!rayMode()) return;
+    for (const row of $("reflection-rows").rows) {
+      const isRef = row.sectionRowIndex === reference;
+      row.classList.toggle("is-reference", isRef);
+      const btn = row.querySelector(".reflection-ref-btn");
+      if (btn) {
+        btn.textContent = isRef ? "Ref" : "Set ref";
+        btn.classList.toggle("is-active", isRef);
+        btn.setAttribute("aria-pressed", String(isRef));
+      }
+    }
+  }
+
+  function setReference(index) {
+    if (!result || index < 0 || index >= result.atoms.length) return;
+    reference = index;
+    $("reflection-reference").value = String(reference);
+    syncReferenceRows();
+    paintCrystal();
+    drawRays();
+  }
+
   function fillTable() {
     const rays = rayMode();
     $("reflection-group").parentElement.hidden = rays;
     $("reflection-atom").parentElement.hidden = !rays;
-    const headers = rays ? ["Atom", "m", "Phase", "occ × f (e)"] : ["Site", "Positions", "Phase", "Amplitude (e)"];
+    const headers = rays ? ["Atom", "m", "Phase", "occ × f (e)", "Ref"] : ["Site", "Positions", "Phase", "Amplitude (e)"];
     $("reflection-columns").replaceChildren(...headers.map(title => {
       const th = document.createElement("th");
       th.textContent = title;
@@ -750,15 +841,35 @@ export function createReflectionExplorer({
     const rows = document.createDocumentFragment();
     for (const entry of rays ? result.atoms : result.groups) {
       const row = document.createElement("tr");
+      const activate = () => (rays ? selectAtom(entry.index) : selectGroup(entry.index));
       const button = document.createElement("button");
       button.type = "button";
       button.className = "text-button";
       button.textContent = rays ? atomName(entry) : entry.label || entry.element;
-      button.addEventListener("click", () => rays ? selectAtom(entry.index) : selectGroup(entry.index));
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        activate();
+      });
+      row.addEventListener("click", activate);
       row.insertCell().append(button);
       for (const value of [rays ? format(entry.m) : entry.members.length, degrees(entry.cycles),
         format(rays ? entry.amplitude : Math.hypot(entry.real, entry.imaginary))]) {
         row.insertCell().textContent = value;
+      }
+      if (rays) {
+        const isRef = entry.index === reference;
+        row.classList.toggle("is-reference", isRef);
+        const refBtn = document.createElement("button");
+        refBtn.type = "button";
+        refBtn.className = `reflection-ref-btn${isRef ? " is-active" : ""}`;
+        refBtn.textContent = isRef ? "Ref" : "Set ref";
+        refBtn.setAttribute("aria-pressed", String(isRef));
+        refBtn.title = "Use this atom's plane as the 0λ reference";
+        refBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          setReference(entry.index);
+        });
+        row.insertCell().append(refBtn);
       }
       rows.append(row);
     }
@@ -957,7 +1068,7 @@ export function createReflectionExplorer({
   $("reflection-colors").addEventListener("change", () => { paintCrystal(); drawSum(); });
   $("reflection-group").addEventListener("change", event => selectGroup(Number(event.target.value)));
   $("reflection-atom").addEventListener("change", event => selectAtom(Number(event.target.value)));
-  $("reflection-reference").addEventListener("change", event => { reference = Number(event.target.value); paintCrystal(); drawRays(); });
+  $("reflection-reference").addEventListener("change", event => setReference(Number(event.target.value)));
   $("reflection-animate").addEventListener("click", event => {
     animateWaves = !animateWaves;
     scheduleWaves();

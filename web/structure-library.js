@@ -17,7 +17,7 @@ export function searchLibrary(query = '', collection = '') {
     ].join(' ')).includes(term)));
 }
 
-export function createStructureLibrary({ onSelect, isBusy }) {
+export function createStructureLibrary({ onSelect, onFetchCod, isBusy }) {
   const dialog = document.getElementById('structure-library');
   const opener = document.getElementById('library-open');
   const search = document.getElementById('library-search');
@@ -25,6 +25,23 @@ export function createStructureLibrary({ onSelect, isBusy }) {
   const collection = document.getElementById('library-collection');
   const results = document.getElementById('library-results');
   const count = document.getElementById('library-count');
+  const codBar = document.getElementById('library-cod-bar');
+  const codLabel = document.getElementById('library-cod-label');
+  const codBtn = document.getElementById('library-cod-fetch');
+  const codLink = document.getElementById('library-cod-link');
+  let activeCodId = null;
+  const triggerCodFetch = () => {
+    if (!activeCodId || isBusy() || !onFetchCod) return;
+    dialog.close();
+    onFetchCod(activeCodId);
+  };
+  if (codBtn) codBtn.onclick = triggerCodFetch;
+  search.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && activeCodId) {
+      e.preventDefault();
+      triggerCodFetch();
+    }
+  });
   const el = (tag, className, text) => {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -32,6 +49,13 @@ export function createStructureLibrary({ onSelect, isBusy }) {
     return node;
   };
   function render() {
+    const codMatch = search.value.trim().match(/^(?:cod\s*#?\s*)?([1-9]\d{6})$/i);
+    activeCodId = codMatch && onFetchCod ? codMatch[1] : null;
+    if (codBar) {
+      codBar.hidden = !activeCodId;
+      if (activeCodId && codLabel) codLabel.textContent = `COD ${activeCodId} (crystallography.net)`;
+      if (activeCodId && codLink) codLink.href = `https://www.crystallography.net/cod/${activeCodId}.cif`;
+    }
     const matches = searchLibrary(search.value, collection.value);
     count.textContent = `${matches.length} of ${entries.length} structures`;
     results.replaceChildren(...matches.map((entry) => {
