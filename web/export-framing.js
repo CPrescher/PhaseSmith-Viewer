@@ -9,8 +9,16 @@ export function sceneExportBounds(scene, camera, { width, height, target, axis }
   camera.updateMatrixWorld();
   const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
   const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
-  const sx = width / (camera.right - camera.left) * camera.zoom;
-  const sy = height / (camera.top - camera.bottom) * camera.zoom;
+  let sx, sy;
+  if (camera.isPerspectiveCamera) {
+    const dist = Math.max(0.1, target ? camera.position.distanceTo(target) : camera.position.length());
+    const halfH = dist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    sx = width / (2 * halfH * (camera.aspect || 1));
+    sy = height / (2 * halfH);
+  } else {
+    sx = width / (camera.right - camera.left) * camera.zoom;
+    sy = height / (camera.top - camera.bottom) * camera.zoom;
+  }
   const pivot = target?.clone().project(camera);
   const turnAxis = axis?.clone().normalize();
   const point = new THREE.Vector3(), offset = new THREE.Vector3(), cross = new THREE.Vector3();

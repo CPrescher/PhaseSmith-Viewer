@@ -5603,9 +5603,37 @@ h3.table-title:has(+ #shell-controls[hidden]) {
 }
 
 /* ---- v1.2 upgrades: Ortho/Persp, Hover Linking, Cutoff Marker, COD Fetch --- */
+#projection-toggle {
+  min-width: 50px;
+}
 #projection-toggle[aria-pressed="true"] {
   background: var(--accent-soft);
   color: var(--accent);
+}
+@media (max-width: 640px) {
+  #projection-toggle {
+    min-width: 44px;
+    padding: 0 6px;
+    font-size: 11.5px;
+  }
+}
+.library-cod-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.library-cod-actions a.secondary {
+  text-decoration: none;
+  padding: 0 9px;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  background: var(--ctl-bg);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
 }
 .analysis-stick.dimmed {
   opacity: 0.16;

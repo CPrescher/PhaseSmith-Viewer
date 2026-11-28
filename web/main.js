@@ -202,7 +202,6 @@ function initialize() {
     viewCamera = next === "perspective" ? perspCamera : orthoCamera;
     const btn = $("projection-toggle");
     if (btn) {
-      btn.textContent = next === "perspective" ? "Persp" : "Ortho";
       btn.setAttribute("aria-pressed", String(next === "perspective"));
     }
     syncViewCamera();
@@ -568,9 +567,9 @@ function initialize() {
     let placed = [];
     if (labelsOn && atoms.length <= LABEL_ATOM_LIMIT) {
       const candidates = [];
-      // Screen pixels per world unit of the orthographic view: labels sit
-      // at the upper right of each sphere instead of covering it.
-      const pixelsPerUnit = height / (viewCamera.top - viewCamera.bottom || 1);
+      // Screen pixels per world unit at the target plane: labels sit at the
+      // upper right of each sphere instead of covering it (works in both Ortho & Persp).
+      const pixelsPerUnit = height / (orthoCamera.top - orthoCamera.bottom || 1);
       for (const a of atoms) {
         if (!atomVisible(a)) continue;
         projected.copy(a.position).project(viewCamera);
@@ -1185,21 +1184,45 @@ function initialize() {
       const found = rules.find((r) => normalizePair(normalizedPairName(r.center, r.neighbor)) === norm);
       return found ? Number(found.cutoff) : null;
     },
-    onDragCutoff: (pair, cutoff, commit) => {
-      if (!structure || !pair || !Number.isFinite(cutoff)) return;
-      const norm = normalizePair(pair);
-      const existing = rules.find((r) => normalizePair(normalizedPairName(r.center, r.neighbor)) === norm);
-      if (!existing) return;
-      existing.cutoff = Math.max(CUTOFF_MIN, Number(cutoff.toFixed(3)));
-      const card = document.querySelector(`.pair-rule[data-rule-id="${existing.id}"]`);
-      const field = card?.querySelector('input[data-field="cutoff"]');
-      if (field) field.value = existing.cutoff.toFixed(2);
-      rebuildRule(existing);
-      if (commit) {
-        historyLabel = "Adjust bond cutoff";
-        scheduleSave();
-      }
-    },
+    onDragCutoff: (() => {
+      let dragFrame = 0;
+      let pending = null;
+      const applyPending = (commit) => {
+        if (!pending) return;
+        const { pair, cutoff } = pending;
+        pending = null;
+        if (!structure || !pair || !Number.isFinite(cutoff)) return;
+        const norm = normalizePair(pair);
+        const existing = rules.find((r) => normalizePair(normalizedPairName(r.center, r.neighbor)) === norm);
+        if (!existing) return;
+        existing.cutoff = Math.max(CUTOFF_MIN, Number(cutoff.toFixed(3)));
+        const card = document.querySelector(`.pair-rule[data-rule-id="${existing.id}"]`);
+        const field = card?.querySelector('input[data-field="cutoff"]');
+        if (field) {
+          field.value = formatCutoff(existing.cutoff);
+          field.setCustomValidity("");
+        }
+        build();
+        if (commit) {
+          historyLabel = "Adjust bond cutoff";
+          scheduleSave();
+        }
+      };
+      return (pair, cutoff, commit) => {
+        pending = { pair, cutoff };
+        if (commit) {
+          if (dragFrame) { cancelAnimationFrame(dragFrame); dragFrame = 0; }
+          applyPending(true);
+          return;
+        }
+        if (!dragFrame) {
+          dragFrame = requestAnimationFrame(() => {
+            dragFrame = 0;
+            applyPending(false);
+          });
+        }
+      };
+    })(),
     onChange: () => scheduleSave(),
   });
   const powderPanel = createPowderPanel({
@@ -2414,10 +2437,10 @@ function initialize() {
         const choose = () => selectSite(highlightedSite === s.label ? null : s.label);
         row.onclick = choose;
         row.onpointerenter = (e) => {
-          if (e.pointerType === "mouse") highlightSite(s.label);
+          if (e.pointerType === "mouse") hoverSite(s.label);
         };
         row.onpointerleave = (e) => {
-          if (e.pointerType === "mouse") highlightSite(highlightedSite);
+          if (e.pointerType === "mouse") hoverSite(null);
         };
         row.onkeydown = (e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -2488,6 +2511,27 @@ function initialize() {
   let highlightedSite = null;
   let inspectedShellCenter = null;
   const siteGroup = new THREE.Group();
+  const siteHoverGroup = new THREE.Group();
+  scene.add(siteHoverGroup);
+  function hoverSite(label) {
+    dispose(siteHoverGroup);
+    siteHoverGroup.clear();
+    if (label && label !== highlightedSite) {
+      const copies = atoms.filter((a) => a.label === label && atomVisible(a)).slice(0, 400);
+      if (copies.length) {
+        const shells = new THREE.InstancedMesh(
+          new THREE.SphereGeometry(1, 24, 18),
+          new THREE.MeshBasicMaterial({ color: scenePalette().pick, side: THREE.BackSide, transparent: true, opacity: 0.45 }),
+          copies.length,
+        );
+        const m = new THREE.Matrix4();
+        copies.forEach((a, i) => shells.setMatrixAt(i, applyHaloMatrix(a, 1.12, m)));
+        shells.instanceMatrix.needsUpdate = true;
+        siteHoverGroup.add(shells);
+      }
+    }
+    invalidate();
+  }
   scene.add(siteGroup);
   function selectSite(label) {
     // A table row inspects the equivalent site copies, not a previously
@@ -3675,18 +3719,25 @@ function initialize() {
   async function openCodId(codId) {
     if (exporter.busy) return;
     const url = `https://www.crystallography.net/cod/${codId}.cif`;
-    const filename = `COD-${codId}.cif`;
+    const filename = `COD ${codId}.cif`;
     const intent = ++userIntent;
-    clearError();
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 12000);
+    flushHistory();
+    setError("");
     $("loading").hidden = false;
     $("open").disabled = true;
     $("block").disabled = true;
+    updateHistoryButtons();
+    updateProjectButtons();
     try {
-      const response = await fetch(url);
-      if (!response.ok) throw Error(`COD ${codId} could not be fetched (HTTP ${response.status}).`);
+      const response = await fetch(url, { signal: ac.signal });
+      if (!response.ok) throw Error(`HTTP ${response.status}`);
       const text = await response.text();
+      if (!/(?:^|\n)\s*(?:data_|_cell_length_a\b)/i.test(text))
+        throw Error("Response was not a valid CIF file.");
       if (intent !== userIntent) return;
-      startImport(text, filename);
+      load(text, filename);
     } catch (error) {
       if (intent !== userIntent) return;
       $("loading").hidden = true;
@@ -3694,7 +3745,12 @@ function initialize() {
       $("block").disabled = false;
       updateHistoryButtons();
       updateProjectButtons();
-      setError(`Could not fetch COD ${codId}: ${error.message}`);
+      const msg = error?.name === "AbortError"
+        ? "Timed out."
+        : "Direct fetch was blocked (CORS/network) — use Download CIF in Library and drop the file onto the viewer.";
+      setError(`Could not open COD ${codId}: ${msg}`);
+    } finally {
+      clearTimeout(timer);
     }
   }
   createStructureLibrary({ onSelect: openLibraryEntry, onFetchCod: openCodId, isBusy: () => exporter.busy });
@@ -4096,11 +4152,11 @@ function initialize() {
         .filter((e) => !hiddenElements.has(e))
         .map((symbol) => ({ symbol, color: colorFor(symbol) }));
     },
-    // CSS pixels per ångström of the orthographic view (scale bar).
+    // CSS pixels per ångström at the crystal target plane (scale bar).
     pixelsPerUnit: () => {
       syncViewCamera();
       const height = renderer.domElement.getBoundingClientRect().height || 1;
-      const world = viewCamera.top - viewCamera.bottom;
+      const world = orthoCamera.top - orthoCamera.bottom;
       return world > 0 ? height / world : 0;
     },
     compass: () => compassState,
@@ -4153,6 +4209,9 @@ function initialize() {
       " · cropped to the structure; movie frame fits the full turn (up to 1920 px).";
     for (const preset of document.querySelectorAll(".dpi-preset"))
       preset.setAttribute("aria-pressed", String(Number(preset.dataset.dpi) === dpi));
+    const scale = exportScale();
+    for (const preset of document.querySelectorAll(".journal-preset"))
+      preset.setAttribute("aria-pressed", String(Number(preset.dataset.scale) === scale && Number(preset.dataset.dpi) === dpi));
     $("export-dpi").setCustomValidity(dpi ? "" : "Enter a DPI between 30 and 2400.");
   }
   for (const input of document.querySelectorAll('input[name="export-scale"]')) input.onchange = updateExportInfo;
@@ -5131,7 +5190,7 @@ function initialize() {
       { id: "view-c", label: "View along +c", group: "View", shortcut: "C", run: () => orient([0, 0, 1], "c") },
       { id: "fit", label: "Fit crystal to view", group: "View", shortcut: "F", run: () => reset(true) },
       { id: "reset", label: "Reset view & selection", group: "View", shortcut: "R", run: () => reset(false) },
-      { id: "projection", label: "Toggle orthographic / perspective projection", group: "View", shortcut: "P", run: () => setProjection(projectionMode === "ortho" ? "perspective" : "ortho") },
+      { id: "projection", label: "Toggle orthographic / perspective projection", group: "View", shortcut: "P", run: () => { historyLabel = "Toggle projection"; setProjection(projectionMode === "ortho" ? "perspective" : "ortho"); } },
       { id: "theme", label: "Toggle light / dark theme", group: "View", run: () => $("theme-toggle").click() },
       { id: "measure-info", label: "Atom info mode", group: "Measure", shortcut: "1", run: () => setMeasureMode("info") },
       { id: "measure-distance", label: "Distance measurement mode", group: "Measure", shortcut: "2", run: () => setMeasureMode("distance") },

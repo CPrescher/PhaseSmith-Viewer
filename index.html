@@ -139,7 +139,10 @@
         </div>
         <div id="library-cod-bar" class="library-cod-bar" hidden>
           <span id="library-cod-label"></span>
-          <button type="button" id="library-cod-fetch" class="primary">Fetch CIF</button>
+          <div class="library-cod-actions">
+            <a id="library-cod-link" class="secondary" target="_blank" rel="noopener noreferrer">Download CIF ↗</a>
+            <button type="button" id="library-cod-fetch" class="primary">Open COD</button>
+          </div>
         </div>
         <p class="library-note">Formulas identify the mineral or type; each CIF retains its reported composition, substitutions, and occupancies. Idealized teaching models are labeled separately. References and CIF downloads are under each entry.</p>
         <p id="library-count" role="status" aria-live="polite"></p>
@@ -201,9 +204,9 @@
                 class="view-button"
                 type="button"
                 aria-pressed="false"
-                title="Switch between orthographic (parallel) and perspective projection (P)"
+                title="Toggle perspective projection (P)"
               >
-                Ortho
+                Persp
               </button>
               <div id="history-controls" class="history-controls" role="group" aria-label="Undo and redo">
                 <button id="history-undo" class="secondary" type="button" disabled title="Undo" aria-label="Undo">
@@ -893,11 +896,11 @@
                     ><button type="button" class="chip small dpi-preset" data-dpi="300">300</button
                     ><button type="button" class="chip small dpi-preset" data-dpi="600">600</button>
                   </div>
-                  <div class="export-row export-journal-presets" role="group" aria-label="Journal figure presets">
+                  <div class="export-row export-journal-presets" role="group" aria-label="Quick resolution presets">
                     <span class="tool-caption">Preset</span>
-                    <button type="button" class="secondary journal-preset" data-scale="2" data-dpi="300" title="Single-column journal figure (2× at 300 dpi)">1-col · 300</button>
-                    <button type="button" class="secondary journal-preset" data-scale="4" data-dpi="300" title="Double-column journal figure (4× at 300 dpi)">2-col · 300</button>
-                    <button type="button" class="secondary journal-preset" data-scale="4" data-dpi="600" title="High-resolution print figure (4× at 600 dpi)">Print · 600</button>
+                    <button type="button" class="secondary journal-preset" data-scale="2" data-dpi="300" title="2× scale at 300 dpi">2× · 300</button>
+                    <button type="button" class="secondary journal-preset" data-scale="4" data-dpi="300" title="4× scale at 300 dpi">4× · 300</button>
+                    <button type="button" class="secondary journal-preset" data-scale="4" data-dpi="600" title="4× scale at 600 dpi">4× · 600</button>
                   </div>
                   <p id="export-dims" class="note"></p>
                   </details>

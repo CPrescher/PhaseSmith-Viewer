@@ -68,7 +68,7 @@ const Y_SCALES = ["linear", "sqrt", "log"];
 const X_AXES = ["2theta", "d", "q"];
 
 const EXPORT_STYLE_KEYS = [
-  "fill", "stroke", "opacity", "stroke-width", "stroke-dasharray", "fill-opacity",
+  "fill", "stroke", "opacity", "stroke-width", "stroke-opacity", "stroke-dasharray", "fill-opacity",
   "font-family", "font-size", "font-weight", "text-anchor", "dominant-baseline", "paint-order",
 ];
 
@@ -79,7 +79,7 @@ function freezePlotSvg(chart) {
     targets = [...copy.querySelectorAll("*")];
   sources.forEach((el, i) => {
     const target = targets[i];
-    if (el.closest(".analysis-crosshair, .analysis-brush")) {
+    if (el.closest(".analysis-crosshair, .analysis-brush, .analysis-cutoff-marker")) {
       target.remove();
       return;
     }
@@ -382,6 +382,7 @@ export function createAnalysisWindow({
     if (!pair) return;
     const cutoff = Math.ceil((row.max + 1e-4) * 100) / 100;
     onApplyCutoff({ pair, cutoff });
+    draw();
   });
 
   function stop() {
@@ -489,6 +490,8 @@ export function createAnalysisWindow({
     for (const row of table?.querySelectorAll("tbody tr") ?? [])
       row.classList.toggle("selected", Number(row.dataset.index) === index);
     sync3dActions();
+    const fp = $("analysis-pair")?.value;
+    if (!fp || fp === "all") draw();
   }
 
   function pairTag(pair, count) {
@@ -623,26 +626,39 @@ export function createAnalysisWindow({
     }
 
     // Draggable bond-cutoff marker when a specific pair (filtered or selected) has a bond rule
-    const activePair = $("analysis-pair")?.value || (selected != null && result.rows[selected] ? primaryPair(result.rows[selected]) : null);
+    const filterPair = $("analysis-pair")?.value;
+    const activePair =
+      filterPair && filterPair !== "all"
+        ? filterPair
+        : selected != null && result.rows[selected]
+          ? primaryPairFor(result.rows[selected])
+          : null;
     const ruleCutoff = activePair ? getRuleCutoff(activePair) : null;
     if (activePair && Number.isFinite(ruleCutoff) && ruleCutoff >= viewMin && ruleCutoff <= viewMax) {
+      const clampHandleX = (px) => Math.max(left + 26, Math.min(right - 26, px));
       const cx = x(ruleCutoff);
+      const hx = clampHandleX(cx);
       const cutGroup = svg("g", { class: "analysis-cutoff-marker", "data-pair": activePair });
       const cutLine = add(cutGroup, "line", { x1: cx.toFixed(2), x2: cx.toFixed(2), y1: top, y2: bottom, class: "analysis-cutoff-line" });
-      const handle = add(cutGroup, "rect", { x: (cx - 26).toFixed(1), y: (top - 2).toFixed(1), width: 52, height: 16, rx: 4, class: "analysis-cutoff-handle" });
-      const label = add(cutGroup, "text", { x: cx.toFixed(1), y: (top + 9.5).toFixed(1), "text-anchor": "middle", class: "analysis-cutoff-text" }, `↔ ${ruleCutoff.toFixed(2)} Å`);
+      const handle = add(cutGroup, "rect", { x: (hx - 26).toFixed(1), y: (top - 2).toFixed(1), width: 52, height: 16, rx: 4, class: "analysis-cutoff-handle" });
+      const label = add(cutGroup, "text", { x: hx.toFixed(1), y: (top + 9.5).toFixed(1), "text-anchor": "middle", class: "analysis-cutoff-text" }, `↔ ${ruleCutoff.toFixed(2)} Å`);
       let dragging = false;
-      let latestVal = ruleCutoff;
+      const startVal = ruleCutoff;
+      const paintAt = (val) => {
+        const px = Math.max(left, Math.min(right, x(val)));
+        const chx = clampHandleX(px);
+        cutLine.setAttribute("x1", px.toFixed(2));
+        cutLine.setAttribute("x2", px.toFixed(2));
+        handle.setAttribute("x", (chx - 26).toFixed(1));
+        label.setAttribute("x", chx.toFixed(1));
+        label.textContent = `↔ ${val.toFixed(2)} Å`;
+      };
       const moveCutoff = (clientX, commit) => {
         const rect = chart.getBoundingClientRect();
         const px = Math.max(left, Math.min(right, ((clientX - rect.left) / Math.max(rect.width, 1)) * width));
-        latestVal = Math.max(0.1, xInv(px));
-        cutLine.setAttribute("x1", px.toFixed(2));
-        cutLine.setAttribute("x2", px.toFixed(2));
-        handle.setAttribute("x", (px - 26).toFixed(1));
-        label.setAttribute("x", px.toFixed(1));
-        label.textContent = `↔ ${latestVal.toFixed(2)} Å`;
-        onDragCutoff(activePair, latestVal, commit);
+        const nextVal = Math.max(0.1, xInv(px));
+        paintAt(nextVal);
+        onDragCutoff(activePair, nextVal, commit);
       };
       cutGroup.addEventListener("pointerdown", (e) => {
         if (e.button !== 0) return;
@@ -656,14 +672,19 @@ export function createAnalysisWindow({
         e.stopPropagation();
         moveCutoff(e.clientX, false);
       });
-      const endCut = (e) => {
+      cutGroup.addEventListener("pointerup", (e) => {
         if (!dragging) return;
         e.stopPropagation();
         dragging = false;
         moveCutoff(e.clientX, true);
-      };
-      cutGroup.addEventListener("pointerup", endCut);
-      cutGroup.addEventListener("pointercancel", endCut);
+      });
+      cutGroup.addEventListener("pointercancel", (e) => {
+        if (!dragging) return;
+        e.stopPropagation();
+        dragging = false;
+        paintAt(startVal);
+        onDragCutoff(activePair, startVal, false);
+      });
     }
 
     const brush = svg("rect", { x: left, y: top, width: 0, height: plotH, class: "analysis-brush", display: "none" });
@@ -1335,12 +1356,12 @@ export function createPowderPanel({
           half = (label.length * 5.6 + 6) / 2;
         let placed = null;
         const offsets = [
-          [0, 0], [0, -13], [-14, -13], [14, -13],
-          [0, -26], [-22, -26], [22, -26], [0, -39],
+          [0, 0], [0, -13], [-16, -6], [16, -6],
+          [0, -26], [-24, -18], [24, -18], [0, -39],
         ];
         for (const [dx, dy] of offsets) {
           const lx = stickX + dx;
-          const ly = Math.max(top + 10, stickTop - 6 + dy);
+          const ly = stickTop - 6 + dy;
           const box = { x1: lx - half, x2: lx + half, y1: ly - 10, y2: ly + 2 };
           if (box.x1 < left + 2 || box.x2 > right - 2 || box.y1 < top - 2) continue;
           if (boxes.some((b) => overlaps(box, b))) continue;
