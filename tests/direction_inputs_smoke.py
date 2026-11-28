@@ -83,8 +83,9 @@ async def check(browser, width, height, touch=True, locale="en-US"):
     arrow = (await diagnostics(page))["lattice"]["arrows"][0]
     assert arrow["endFrac"] == [1.5, -2, 0]
 
+    await choose_tool(page, "#mode-diffraction", touch)
     for tool in ["reflection", "detector"]:
-        await choose_tool(page, f"#mode-{tool}", touch)
+        await activate(page.locator(f"#xrd-tab-{tool}"))
         field = page.locator(f"#{tool}-hkl")
         if not touch:
             await field.blur()
@@ -98,7 +99,7 @@ async def check(browser, width, height, touch=True, locale="en-US"):
         else:
             await field.press("Enter")
         assert await field.input_value() == "2 0 0"
-        await activate(page.locator(f"#{tool}-close"))
+    await activate(page.locator("#xrd-close"))
     if touch:
         await choose_tool(page, "#mode-extent", touch)
         bound = page.locator("#range-a-min")
