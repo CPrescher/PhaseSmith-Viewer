@@ -112,7 +112,7 @@ export function createReflectionExplorer({
             <p class="hint" id="reflection-sum-note"></p>
           </div>
           <div id="reflection-rays-panel" hidden>
-            <div class="reflection-ray-controls"><label class="reflection-atom-label" title="Zero-path baseline plane (0λ). Click any atom in the crystal or table to compare its scattered wave against this plane.">Reference plane (0λ)<select id="reflection-reference"></select></label>
+            <div class="reflection-ray-controls"><label class="reflection-atom-label" title="Zero-path baseline plane (0λ). Click any atom in the crystal or table to compare its scattered wave against this plane.">Ref (0λ)<select id="reflection-reference"></select></label>
             <button type="button" id="reflection-animate" aria-pressed="false">Animate waves</button></div>
             <div id="reflection-ray-verdict" class="reflection-ray-verdict" aria-live="polite"></div>
             <p id="reflection-ray-status" class="hint"></p>
@@ -703,9 +703,9 @@ export function createReflectionExplorer({
     const width = rays.clientWidth;
     if (!width) return;
     const span = layers.at(-1).cycles;
-    const centerX = width / 2 + 44, top = 52, depthScale = Math.max(40, rays.clientHeight - top - 12) / span;
+    const centerX = width / 2 + 44, top = 38, depthScale = Math.max(36, rays.clientHeight - top - 10) / span;
     const theta = result.theta, sin = Math.sin(theta), cos = Math.cos(theta);
-    const reach = Math.min((width - 180) / 2, 44 / Math.max(Math.tan(theta), 1e-8));
+    const reach = Math.min((width - 180) / 2, 34 / Math.max(Math.tan(theta), 1e-8));
     for (const layer of layers) {
       const depth = layer.cycles * depthScale, y = top + depth;
       const color = layerColor(layer);
@@ -721,15 +721,15 @@ export function createReflectionExplorer({
       }
       svg(rays, "circle", { cx: centerX, cy: y, r: 4, fill: color });
     }
-    text(rays, centerX - 12, 14, "Incoming ↘", "end");
-    text(rays, width - 5, 14, "↗ Outgoing", "end");
-    const left = 136, right = width - 66, period = (right - left) / 1.5, instant = left + period / 2;
+    text(rays, centerX - 12, 13, "Incoming ↘", "end");
+    text(rays, width - 5, 13, "↗ Outgoing", "end");
+    const left = 136, right = width - 62, period = (right - left) / 1.5, instant = left + period / 2;
     const clip = svg(waves, "clipPath", { id: "reflection-wave-clip" });
-    svg(clip, "rect", { x: left, y: 0, width: Math.max(0, right - left), height: 116 });
-    line(waves, instant, 18, instant, 110, "var(--muted)", 1, "3 3");
-    text(waves, Math.min(width - 50, Math.max(55, instant)), 12, "Same instant");
+    svg(clip, "rect", { x: left, y: 0, width: Math.max(0, right - left), height: 100 });
+    line(waves, instant, 15, instant, 96, "var(--muted)", 1, "3 3");
+    text(waves, Math.min(width - 50, Math.max(55, instant)), 11, "Same instant");
     for (const [index, layer] of layers.entries()) {
-      const baseline = 32 + index * 32;
+      const baseline = 26 + index * 28;
       text(waves, 0, baseline + 4, layerLabel(layer), "start");
       line(waves, left, baseline, right, baseline, "var(--line)");
       if (period > 0) {
@@ -739,7 +739,7 @@ export function createReflectionExplorer({
         const points = [];
         for (let i = -64; i <= 96; i++) {
           const x = i / 64;
-          points.push(`${left + x * period},${baseline - 10 * Math.cos(2 * Math.PI * (x - 0.5 - layer.cycles))}`);
+          points.push(`${left + x * period},${baseline - 9 * Math.cos(2 * Math.PI * (x - 0.5 - layer.cycles))}`);
         }
         const curve = svg(clipped, "polyline", { points: points.join(" "), fill: "none", stroke: layerColor(layer), "stroke-width": 2.3 });
         const marker = svg(waves, "circle", { cx: instant, r: 3.5, fill: layerColor(layer) });
@@ -757,7 +757,7 @@ export function createReflectionExplorer({
   function updateWavePositions() {
     for (const { curve, marker, period, baseline, cycles } of waveRows) {
       curve.setAttribute("transform", `translate(${(waveTime % 1) * period} 0)`);
-      marker.setAttribute("cy", baseline - 10 * Math.cos(2 * Math.PI * (cycles + waveTime)));
+      marker.setAttribute("cy", baseline - 9 * Math.cos(2 * Math.PI * (cycles + waveTime)));
     }
   }
 
